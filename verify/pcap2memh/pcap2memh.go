@@ -139,6 +139,9 @@ func (p *pcap2memh) Execute(args []string) error {
 	//pretty.Println(args)
 	dumpReader, finisher := getTsharkDump(p.InputFileName, p.Args.TsharkArgs)
 	defer finisher()
+	if err := os.MkdirAll(p.DestDirName, 0755); err != nil {
+		log.Fatal(err)
+	}
 	translate(dumpReader, p.DestDirName)
 	return nil
 }
