@@ -368,7 +368,7 @@ func (p *pcap2log) Execute(args []string) error {
 	//pretty.Println(args)
 	dumpReader, finisher := getTsharkDump(p.InputFileName, p.Args.TsharkArgs)
 	defer finisher()
-	outFile, err := os.OpenFile(p.OutputFileName, os.O_WRONLY|os.O_CREATE, 0644)
+	outFile, err := os.OpenFile(p.OutputFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
