@@ -54,7 +54,21 @@ func splitTextFrames(data []byte, atEOF bool) (advance int, token []byte, err er
 	return separatorIndex, data[:separatorIndex], nil
 }
 
-func outMessage1(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
+type translator struct {
+	r     io.Reader
+	w     io.Writer
+	kvStr map[string]string
+	kvInt map[string]uint
+}
+
+func NewTranslator(r io.Reader, w io.Writer) translator {
+	return translator{
+		r: r,
+		w: w,
+	}
+}
+
+func (t *translator) outMessage1() {
 	type ittoOrderInfo struct {
 		msgType         byte
 		isBid           bool
@@ -67,101 +81,101 @@ func outMessage1(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 	}
 
 	ois := make([]ittoOrderInfo, 0, 3)
-	msgType := byte(kvInt["Message Type"])
+	msgType := byte(t.kvInt["Message Type"])
 	switch msgType {
 	case 'T', 'I': // ignore Seconds, NOII
 	case 'a', 'A':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Order Reference Number Delta"],
-			isBid:       byte(kvInt["Market Side"]) == 'B',
-			isAsk:       byte(kvInt["Market Side"]) == 'S',
-			optionId:    kvInt["Option ID"],
-			price:       kvInt["Price"],
-			size:        kvInt["Volume"],
+			refNumDelta: t.kvInt["Order Reference Number Delta"],
+			isBid:       byte(t.kvInt["Market Side"]) == 'B',
+			isAsk:       byte(t.kvInt["Market Side"]) == 'S',
+			optionId:    t.kvInt["Option ID"],
+			price:       t.kvInt["Price"],
+			size:        t.kvInt["Volume"],
 		})
 	case 'j', 'J':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Bid Reference Number Delta"],
-			optionId:    kvInt["Option ID"],
-			price:       kvInt["Bid Price"],
-			size:        kvInt["Bid Size"],
+			refNumDelta: t.kvInt["Bid Reference Number Delta"],
+			optionId:    t.kvInt["Option ID"],
+			price:       t.kvInt["Bid Price"],
+			size:        t.kvInt["Bid Size"],
 			isBid:       true,
 		})
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Ask Reference Number Delta"],
-			optionId:    kvInt["Option ID"],
-			price:       kvInt["Ask Price"],
-			size:        kvInt["Ask Size"],
+			refNumDelta: t.kvInt["Ask Reference Number Delta"],
+			optionId:    t.kvInt["Option ID"],
+			price:       t.kvInt["Ask Price"],
+			size:        t.kvInt["Ask Size"],
 			isAsk:       true,
 		})
 	case 'E':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Reference Number Delta"],
-			size:        kvInt["Executed Contracts"],
+			refNumDelta: t.kvInt["Reference Number Delta"],
+			size:        t.kvInt["Executed Contracts"],
 		})
 	case 'C':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Reference Number Delta"],
-			price:       kvInt["Price"],
-			size:        kvInt["Volume"],
+			refNumDelta: t.kvInt["Reference Number Delta"],
+			price:       t.kvInt["Price"],
+			size:        t.kvInt["Volume"],
 		})
 	case 'X':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Order Reference Number Delta"],
-			size:        kvInt["Cancelled Contracts"],
+			refNumDelta: t.kvInt["Order Reference Number Delta"],
+			size:        t.kvInt["Cancelled Contracts"],
 		})
 	case 'u', 'U':
 		ois = append(ois, ittoOrderInfo{
 			msgType:         msgType,
-			origRefNumDelta: kvInt["Original Reference Number Delta"],
-			refNumDelta:     kvInt["New Reference Number Delta"],
-			price:           kvInt["Price"],
-			size:            kvInt["Volume"],
+			origRefNumDelta: t.kvInt["Original Reference Number Delta"],
+			refNumDelta:     t.kvInt["New Reference Number Delta"],
+			price:           t.kvInt["Price"],
+			size:            t.kvInt["Volume"],
 		})
 	case 'D':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Reference Number Delta"],
+			refNumDelta: t.kvInt["Reference Number Delta"],
 		})
 	case 'G':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Reference Number Delta"],
-			price:       kvInt["Price"],
-			size:        kvInt["Volume"],
+			refNumDelta: t.kvInt["Reference Number Delta"],
+			price:       t.kvInt["Price"],
+			size:        t.kvInt["Volume"],
 		})
 	case 'k', 'K':
 		ois = append(ois, ittoOrderInfo{
 			msgType:         msgType,
-			origRefNumDelta: kvInt["Original Bid Reference Number Delta"],
-			refNumDelta:     kvInt["Bid Reference Number Delta"],
-			price:           kvInt["Bid Price"],
-			size:            kvInt["Bid Size"],
+			origRefNumDelta: t.kvInt["Original Bid Reference Number Delta"],
+			refNumDelta:     t.kvInt["Bid Reference Number Delta"],
+			price:           t.kvInt["Bid Price"],
+			size:            t.kvInt["Bid Size"],
 			isBid:           true,
 		})
 		ois = append(ois, ittoOrderInfo{
 			msgType:         msgType,
-			origRefNumDelta: kvInt["Original Ask Reference Number Delta"],
-			refNumDelta:     kvInt["Ask Reference Number Delta"],
-			price:           kvInt["Ask Price"],
-			size:            kvInt["Ask Size"],
+			origRefNumDelta: t.kvInt["Original Ask Reference Number Delta"],
+			refNumDelta:     t.kvInt["Ask Reference Number Delta"],
+			price:           t.kvInt["Ask Price"],
+			size:            t.kvInt["Ask Size"],
 			isAsk:           true,
 		})
 	case 'Y':
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Bid Reference Number Delta"],
+			refNumDelta: t.kvInt["Bid Reference Number Delta"],
 			isBid:       true,
 		})
 		ois = append(ois, ittoOrderInfo{
 			msgType:     msgType,
-			refNumDelta: kvInt["Ask Reference Number Delta"],
+			refNumDelta: t.kvInt["Ask Reference Number Delta"],
 			isAsk:       true,
 		})
 
@@ -181,7 +195,7 @@ func outMessage1(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 			qo = "ORDER"
 		}
 
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x %08x\n",
 			qo,
 			oi.msgType,
 			oi.optionId,
@@ -193,105 +207,105 @@ func outMessage1(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 	}
 }
 
-func outMessage2(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
-	msgType := byte(kvInt["Message Type"])
+func (t *translator) outMessage2() {
+	msgType := byte(t.kvInt["Message Type"])
 	switch msgType {
 	case 'T', 'L', 'I': // ignore Seconds, NOII
 	case 'j', 'J': // Add Quote
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QBID", msgType,
-			kvInt["Option ID"],
-			kvInt["Bid Reference Number Delta"],
-			kvInt["Bid Size"],
-			kvInt["Bid Price"],
+			t.kvInt["Option ID"],
+			t.kvInt["Bid Reference Number Delta"],
+			t.kvInt["Bid Size"],
+			t.kvInt["Bid Price"],
 		)
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QASK", msgType,
-			kvInt["Option ID"],
-			kvInt["Ask Reference Number Delta"],
-			kvInt["Ask Size"],
-			kvInt["Ask Price"],
+			t.kvInt["Option ID"],
+			t.kvInt["Ask Reference Number Delta"],
+			t.kvInt["Ask Size"],
+			t.kvInt["Ask Price"],
 		)
 	case 'k', 'K': // Quote Replace
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QBID", msgType,
-			kvInt["Bid Reference Number Delta"],
-			kvInt["Original Bid Reference Number Delta"],
-			kvInt["Bid Size"],
-			kvInt["Bid Price"],
+			t.kvInt["Bid Reference Number Delta"],
+			t.kvInt["Original Bid Reference Number Delta"],
+			t.kvInt["Bid Size"],
+			t.kvInt["Bid Price"],
 		)
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QASK", msgType,
-			kvInt["Ask Reference Number Delta"],
-			kvInt["Original Ask Reference Number Delta"],
-			kvInt["Ask Size"],
-			kvInt["Ask Price"],
+			t.kvInt["Ask Reference Number Delta"],
+			t.kvInt["Original Ask Reference Number Delta"],
+			t.kvInt["Ask Size"],
+			t.kvInt["Ask Price"],
 		)
 	case 'Y': // Quote Delete
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QBID", msgType,
-			kvInt["Bid Reference Number Delta"],
+			t.kvInt["Bid Reference Number Delta"],
 		)
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QASK", msgType,
-			kvInt["Ask Reference Number Delta"],
+			t.kvInt["Ask Reference Number Delta"],
 		)
 	case 'a', 'A': // Add Order
-		fmt.Fprintf(w, "%s %c %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %c %08x %08x %08x %08x\n",
 			"NORM ORDER", msgType,
-			kvInt["Market Side"],
-			kvInt["Option ID"],
-			kvInt["Order Reference Number Delta"],
-			kvInt["Volume"],
-			kvInt["Price"],
+			t.kvInt["Market Side"],
+			t.kvInt["Option ID"],
+			t.kvInt["Order Reference Number Delta"],
+			t.kvInt["Volume"],
+			t.kvInt["Price"],
 		)
 	case 'E': // Single Side Executed
-		fmt.Fprintf(w, "%s %c %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
 			"NORM ORDER", msgType,
-			kvInt["Reference Number Delta"],
-			kvInt["Volume"],
+			t.kvInt["Reference Number Delta"],
+			t.kvInt["Volume"],
 		)
 	case 'C': // Single Side Executed with Price
-		fmt.Fprintf(w, "%s %c %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
 			"NORM ORDER", msgType,
-			kvInt["Reference Number Delta"],
-			kvInt["Executed Contracts"],
+			t.kvInt["Reference Number Delta"],
+			t.kvInt["Executed Contracts"],
 		)
 	case 'X': //  Order Cancel
-		fmt.Fprintf(w, "%s %c %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
 			"NORM ORDER", msgType,
-			kvInt["Order Reference Number Delta"],
-			kvInt["Cancelled Contracts"],
+			t.kvInt["Order Reference Number Delta"],
+			t.kvInt["Cancelled Contracts"],
 		)
 	case 'G': // Single Side Update
-		fmt.Fprintf(w, "%s %c %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x\n",
 			"NORM ORDER", msgType,
-			kvInt["Reference Number Delta"],
-			kvInt["Volume"],
-			kvInt["Price"],
+			t.kvInt["Reference Number Delta"],
+			t.kvInt["Volume"],
+			t.kvInt["Price"],
 		)
 	case 'u', 'U': // Single Side Replace
-		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM ORDER", msgType,
-			kvInt["New Reference Number Delta"],
-			kvInt["Original Reference Number Delta"],
-			kvInt["Volume"],
-			kvInt["Price"],
+			t.kvInt["New Reference Number Delta"],
+			t.kvInt["Original Reference Number Delta"],
+			t.kvInt["Volume"],
+			t.kvInt["Price"],
 		)
 	case 'D': // Single Side Delete
-		fmt.Fprintf(w, "%s %c %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x\n",
 			"NORM ORDER", msgType,
-			kvInt["Reference Number Delta"],
+			t.kvInt["Reference Number Delta"],
 		)
 	default:
 		log.Fatalf("Unknown message type %d (%c)\n", msgType, msgType)
 	}
 }
 
-func translate(r io.Reader, w io.Writer) {
+func (t *translator) translate() {
 	kvRegexp := regexp.MustCompile("(?m)^            ([^:]*): (.*)$")
 	parValueRegexp := regexp.MustCompile(".*\\((\\d+)\\)")
-	scanner := bufio.NewScanner(r)
+	scanner := bufio.NewScanner(t.r)
 	scanner.Split(splitTextFrames)
 	for scanner.Scan() {
 		//fmt.Println("=====================")
@@ -302,33 +316,32 @@ func translate(r io.Reader, w io.Writer) {
 		}
 		for _, ittoMessage := range ittoMessages[1:] {
 			matches := kvRegexp.FindAllStringSubmatch(ittoMessage, -1)
-			kvStr := make(map[string]string)
-			kvInt := make(map[string]uint)
+			t.kvStr = make(map[string]string)
+			t.kvInt = make(map[string]uint)
 			for _, m := range matches {
 				k := m[1]
 				v := m[2]
-				if _, ok := kvStr[k]; ok {
+				if _, ok := t.kvStr[k]; ok {
 					pretty.Println(ittoMessage)
 					pretty.Println(matches)
 					pretty.Println(m)
 					log.Fatal("Duplicate key ", k)
 				}
-				kvStr[k] = v
+				t.kvStr[k] = v
 				vInt, err := strconv.ParseUint(v, 0, 32)
 				if err == nil {
-					kvInt[k] = uint(vInt)
+					t.kvInt[k] = uint(vInt)
 				} else if matches := parValueRegexp.FindStringSubmatch(v); matches != nil {
 					vInt, err := strconv.ParseUint(matches[1], 0, 32)
-					kvInt[k] = uint(vInt)
+					t.kvInt[k] = uint(vInt)
 					if err != nil {
 						log.Fatal("Can't parse", v)
 					}
 				}
 			}
-			//pretty.Println(kvStr)
-			//pretty.Println(kvInt)
-			//outMessage1(w, kvStr, kvInt)
-			outMessage2(w, kvStr, kvInt)
+			//pretty.Println(t.kvStr)
+			//pretty.Println(t.kvInt)
+			t.outMessage2()
 		}
 	}
 }
@@ -376,7 +389,8 @@ func (p *pcap2log) Execute(args []string) error {
 		log.Fatal(err)
 	}
 	defer outFile.Close()
-	translate(dumpReader, outFile)
+	t := NewTranslator(dumpReader, outFile)
+	t.translate()
 	return nil
 }
 
@@ -392,7 +406,8 @@ func InitArgv(parser *flags.Parser) {
 // experiments and debugging
 
 func main() {
-	translate(os.Stdin, os.Stdout)
+	t := NewTranslator(os.Stdin, os.Stdout)
+	t.translate()
 	_ = pretty.Print
 	_ = fmt.Print
 
