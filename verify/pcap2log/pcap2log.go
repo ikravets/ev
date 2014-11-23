@@ -197,22 +197,16 @@ func outMessage2(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 	msgType := byte(kvInt["Message Type"])
 	switch msgType {
 	case 'T', 'L', 'I': // ignore Seconds, NOII
-		return
-	}
-
-	fmt.Fprintf(w, "NORM ")
-	switch msgType {
-	//case 'T', 'L', 'I': // ignore Seconds, NOII
 	case 'j', 'J': // Add Quote
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
-			"QBID", msgType,
+			"NORM QBID", msgType,
 			kvInt["Option ID"],
 			kvInt["Bid Reference Number Delta"],
 			kvInt["Bid Size"],
 			kvInt["Bid Price"],
 		)
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
-			"QASK", msgType,
+			"NORM QASK", msgType,
 			kvInt["Option ID"],
 			kvInt["Ask Reference Number Delta"],
 			kvInt["Ask Size"],
@@ -220,14 +214,14 @@ func outMessage2(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 		)
 	case 'k', 'K': // Quote Replace
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
-			"QBID", msgType,
+			"NORM QBID", msgType,
 			kvInt["Bid Reference Number Delta"],
 			kvInt["Original Bid Reference Number Delta"],
 			kvInt["Bid Size"],
 			kvInt["Bid Price"],
 		)
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
-			"QASK", msgType,
+			"NORM QASK", msgType,
 			kvInt["Ask Reference Number Delta"],
 			kvInt["Original Ask Reference Number Delta"],
 			kvInt["Ask Size"],
@@ -235,16 +229,16 @@ func outMessage2(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 		)
 	case 'Y': // Quote Delete
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
-			"QBID", msgType,
+			"NORM QBID", msgType,
 			kvInt["Bid Reference Number Delta"],
 		)
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
-			"QASK", msgType,
+			"NORM QASK", msgType,
 			kvInt["Ask Reference Number Delta"],
 		)
 	case 'a', 'A': // Add Order
 		fmt.Fprintf(w, "%s %c %c %08x %08x %08x %08x\n",
-			"ORDER", msgType,
+			"NORM ORDER", msgType,
 			kvInt["Market Side"],
 			kvInt["Option ID"],
 			kvInt["Order Reference Number Delta"],
@@ -253,32 +247,32 @@ func outMessage2(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 		)
 	case 'E': // Single Side Executed
 		fmt.Fprintf(w, "%s %c %08x %08x\n",
-			"ORDER", msgType,
+			"NORM ORDER", msgType,
 			kvInt["Reference Number Delta"],
 			kvInt["Volume"],
 		)
 	case 'C': // Single Side Executed with Price
 		fmt.Fprintf(w, "%s %c %08x %08x\n",
-			"ORDER", msgType,
+			"NORM ORDER", msgType,
 			kvInt["Reference Number Delta"],
 			kvInt["Executed Contracts"],
 		)
 	case 'X': //  Order Cancel
 		fmt.Fprintf(w, "%s %c %08x %08x\n",
-			"ORDER", msgType,
+			"NORM ORDER", msgType,
 			kvInt["Order Reference Number Delta"],
 			kvInt["Cancelled Contracts"],
 		)
 	case 'G': // Single Side Update
 		fmt.Fprintf(w, "%s %c %08x %08x %08x\n",
-			"ORDER", msgType,
+			"NORM ORDER", msgType,
 			kvInt["Reference Number Delta"],
 			kvInt["Volume"],
 			kvInt["Price"],
 		)
 	case 'u', 'U': // Single Side Replace
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
-			"ORDER", msgType,
+			"NORM ORDER", msgType,
 			kvInt["New Reference Number Delta"],
 			kvInt["Original Reference Number Delta"],
 			kvInt["Volume"],
@@ -286,7 +280,7 @@ func outMessage2(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 		)
 	case 'D': // Single Side Delete
 		fmt.Fprintf(w, "%s %c %08x\n",
-			"ORDER", msgType,
+			"NORM ORDER", msgType,
 			kvInt["Reference Number Delta"],
 		)
 	default:
