@@ -314,7 +314,10 @@ func translate(r io.Reader, w io.Writer) {
 				k := m[1]
 				v := m[2]
 				if _, ok := kvStr[k]; ok {
-					log.Fatal("Duplicate key", k)
+					pretty.Println(ittoMessage)
+					pretty.Println(matches)
+					pretty.Println(m)
+					log.Fatal("Duplicate key ", k)
 				}
 				kvStr[k] = v
 				vInt, err := strconv.ParseUint(v, 0, 32)
