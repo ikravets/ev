@@ -197,6 +197,12 @@ func outMessage2(w io.Writer, kvStr map[string]string, kvInt map[string]uint) {
 	msgType := byte(kvInt["Message Type"])
 	switch msgType {
 	case 'T', 'L', 'I': // ignore Seconds, NOII
+		return
+	}
+
+	fmt.Fprintf(w, "NORM ")
+	switch msgType {
+	//case 'T', 'L', 'I': // ignore Seconds, NOII
 	case 'j', 'J': // Add Quote
 		fmt.Fprintf(w, "%s %c %08x %08x %08x %08x\n",
 			"QBID", msgType,
