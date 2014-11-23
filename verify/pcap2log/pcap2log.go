@@ -58,9 +58,10 @@ type translator struct {
 	r io.Reader
 	w io.Writer
 	// current message data
-	kvStr   map[string]string
-	kvInt   map[string]uint
-	msgType byte
+	kvStr       map[string]string
+	kvInt       map[string]uint
+	msgType     byte
+	refNumDelta []uint // for Block Single Side Delete Message
 }
 
 func NewTranslator(r io.Reader, w io.Writer) translator {
@@ -297,6 +298,18 @@ func (t *translator) outMessage2() {
 			"NORM ORDER", t.msgType,
 			t.kvInt["Reference Number Delta"],
 		)
+	case 'Z': // Block Single Side Delete
+		exp := t.kvInt["Total Number of Reference Number Deltas."]
+		if uint(len(t.refNumDelta)) != exp {
+			pretty.Println(t.kvInt)
+			log.Fatalf("Unexpected number of refs in Z message (%d != %d)\n", exp, len(t.refNumDelta))
+		}
+		for _, n := range t.refNumDelta {
+			fmt.Fprintf(t.w, "%s %c %08x\n",
+				"NORM ORDER", t.msgType,
+				n,
+			)
+		}
 	default:
 		log.Fatalf("Unknown message type %d (%c)\n", t.msgType, t.msgType)
 	}
@@ -318,28 +331,37 @@ func (t *translator) translate() {
 			matches := kvRegexp.FindAllStringSubmatch(ittoMessage, -1)
 			t.kvStr = make(map[string]string)
 			t.kvInt = make(map[string]uint)
+			t.refNumDelta = nil
 			t.msgType = 0
 			for _, m := range matches {
 				k := m[1]
 				v := m[2]
-				if _, ok := t.kvStr[k]; ok {
-					pretty.Println(ittoMessage)
-					pretty.Println(matches)
-					pretty.Println(m)
-					log.Fatal("Duplicate key ", k)
-				}
-				t.kvStr[k] = v
-				vInt, err := strconv.ParseUint(v, 0, 32)
-				if err == nil {
-					t.kvInt[k] = uint(vInt)
-				} else if matches := parValueRegexp.FindStringSubmatch(v); matches != nil {
-					vInt, err := strconv.ParseUint(matches[1], 0, 32)
-					t.kvInt[k] = uint(vInt)
+				if t.msgType == 'Z' && k == "Reference Number Delta" {
+					vInt, err := strconv.ParseUint(v, 0, 32)
 					if err != nil {
 						log.Fatal("Can't parse", v)
 					}
-					if k == "Message Type" {
-						t.msgType = byte(vInt)
+					t.refNumDelta = append(t.refNumDelta, uint(vInt))
+				} else {
+					if _, ok := t.kvStr[k]; ok {
+						pretty.Println(ittoMessage)
+						pretty.Println(matches)
+						pretty.Println(m)
+						log.Fatal("Duplicate key ", k)
+					}
+					t.kvStr[k] = v
+					vInt, err := strconv.ParseUint(v, 0, 32)
+					if err == nil {
+						t.kvInt[k] = uint(vInt)
+					} else if matches := parValueRegexp.FindStringSubmatch(v); matches != nil {
+						vInt, err := strconv.ParseUint(matches[1], 0, 32)
+						t.kvInt[k] = uint(vInt)
+						if err != nil {
+							log.Fatal("Can't parse", v)
+						}
+						if k == "Message Type" {
+							t.msgType = byte(vInt)
+						}
 					}
 				}
 			}
