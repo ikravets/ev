@@ -55,10 +55,12 @@ func splitTextFrames(data []byte, atEOF bool) (advance int, token []byte, err er
 }
 
 type translator struct {
-	r     io.Reader
-	w     io.Writer
-	kvStr map[string]string
-	kvInt map[string]uint
+	r io.Reader
+	w io.Writer
+	// current message data
+	kvStr   map[string]string
+	kvInt   map[string]uint
+	msgType byte
 }
 
 func NewTranslator(r io.Reader, w io.Writer) translator {
@@ -81,12 +83,11 @@ func (t *translator) outMessage1() {
 	}
 
 	ois := make([]ittoOrderInfo, 0, 3)
-	msgType := byte(t.kvInt["Message Type"])
-	switch msgType {
+	switch t.msgType {
 	case 'T', 'I': // ignore Seconds, NOII
 	case 'a', 'A':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Order Reference Number Delta"],
 			isBid:       byte(t.kvInt["Market Side"]) == 'B',
 			isAsk:       byte(t.kvInt["Market Side"]) == 'S',
@@ -96,7 +97,7 @@ func (t *translator) outMessage1() {
 		})
 	case 'j', 'J':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Bid Reference Number Delta"],
 			optionId:    t.kvInt["Option ID"],
 			price:       t.kvInt["Bid Price"],
@@ -104,7 +105,7 @@ func (t *translator) outMessage1() {
 			isBid:       true,
 		})
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Ask Reference Number Delta"],
 			optionId:    t.kvInt["Option ID"],
 			price:       t.kvInt["Ask Price"],
@@ -113,26 +114,26 @@ func (t *translator) outMessage1() {
 		})
 	case 'E':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Reference Number Delta"],
 			size:        t.kvInt["Executed Contracts"],
 		})
 	case 'C':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Reference Number Delta"],
 			price:       t.kvInt["Price"],
 			size:        t.kvInt["Volume"],
 		})
 	case 'X':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Order Reference Number Delta"],
 			size:        t.kvInt["Cancelled Contracts"],
 		})
 	case 'u', 'U':
 		ois = append(ois, ittoOrderInfo{
-			msgType:         msgType,
+			msgType:         t.msgType,
 			origRefNumDelta: t.kvInt["Original Reference Number Delta"],
 			refNumDelta:     t.kvInt["New Reference Number Delta"],
 			price:           t.kvInt["Price"],
@@ -140,19 +141,19 @@ func (t *translator) outMessage1() {
 		})
 	case 'D':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Reference Number Delta"],
 		})
 	case 'G':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Reference Number Delta"],
 			price:       t.kvInt["Price"],
 			size:        t.kvInt["Volume"],
 		})
 	case 'k', 'K':
 		ois = append(ois, ittoOrderInfo{
-			msgType:         msgType,
+			msgType:         t.msgType,
 			origRefNumDelta: t.kvInt["Original Bid Reference Number Delta"],
 			refNumDelta:     t.kvInt["Bid Reference Number Delta"],
 			price:           t.kvInt["Bid Price"],
@@ -160,7 +161,7 @@ func (t *translator) outMessage1() {
 			isBid:           true,
 		})
 		ois = append(ois, ittoOrderInfo{
-			msgType:         msgType,
+			msgType:         t.msgType,
 			origRefNumDelta: t.kvInt["Original Ask Reference Number Delta"],
 			refNumDelta:     t.kvInt["Ask Reference Number Delta"],
 			price:           t.kvInt["Ask Price"],
@@ -169,18 +170,18 @@ func (t *translator) outMessage1() {
 		})
 	case 'Y':
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Bid Reference Number Delta"],
 			isBid:       true,
 		})
 		ois = append(ois, ittoOrderInfo{
-			msgType:     msgType,
+			msgType:     t.msgType,
 			refNumDelta: t.kvInt["Ask Reference Number Delta"],
 			isAsk:       true,
 		})
 
 	default:
-		log.Fatalf("Unknown message type %d (%c)\n", msgType, msgType)
+		log.Fatalf("Unknown message type %d (%c)\n", t.msgType, t.msgType)
 	}
 	for _, oi := range ois {
 		var qo string
@@ -208,19 +209,18 @@ func (t *translator) outMessage1() {
 }
 
 func (t *translator) outMessage2() {
-	msgType := byte(t.kvInt["Message Type"])
-	switch msgType {
+	switch t.msgType {
 	case 'T', 'L', 'I': // ignore Seconds, NOII
 	case 'j', 'J': // Add Quote
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", msgType,
+			"NORM QBID", t.msgType,
 			t.kvInt["Option ID"],
 			t.kvInt["Bid Reference Number Delta"],
 			t.kvInt["Bid Size"],
 			t.kvInt["Bid Price"],
 		)
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", msgType,
+			"NORM QASK", t.msgType,
 			t.kvInt["Option ID"],
 			t.kvInt["Ask Reference Number Delta"],
 			t.kvInt["Ask Size"],
@@ -228,14 +228,14 @@ func (t *translator) outMessage2() {
 		)
 	case 'k', 'K': // Quote Replace
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", msgType,
+			"NORM QBID", t.msgType,
 			t.kvInt["Bid Reference Number Delta"],
 			t.kvInt["Original Bid Reference Number Delta"],
 			t.kvInt["Bid Size"],
 			t.kvInt["Bid Price"],
 		)
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", msgType,
+			"NORM QASK", t.msgType,
 			t.kvInt["Ask Reference Number Delta"],
 			t.kvInt["Original Ask Reference Number Delta"],
 			t.kvInt["Ask Size"],
@@ -243,16 +243,16 @@ func (t *translator) outMessage2() {
 		)
 	case 'Y': // Quote Delete
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", msgType,
+			"NORM QBID", t.msgType,
 			t.kvInt["Bid Reference Number Delta"],
 		)
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", msgType,
+			"NORM QASK", t.msgType,
 			t.kvInt["Ask Reference Number Delta"],
 		)
 	case 'a', 'A': // Add Order
 		fmt.Fprintf(t.w, "%s %c %c %08x %08x %08x %08x\n",
-			"NORM ORDER", msgType,
+			"NORM ORDER", t.msgType,
 			t.kvInt["Market Side"],
 			t.kvInt["Option ID"],
 			t.kvInt["Order Reference Number Delta"],
@@ -261,32 +261,32 @@ func (t *translator) outMessage2() {
 		)
 	case 'E': // Single Side Executed
 		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", msgType,
+			"NORM ORDER", t.msgType,
 			t.kvInt["Reference Number Delta"],
 			t.kvInt["Volume"],
 		)
 	case 'C': // Single Side Executed with Price
 		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", msgType,
+			"NORM ORDER", t.msgType,
 			t.kvInt["Reference Number Delta"],
 			t.kvInt["Executed Contracts"],
 		)
 	case 'X': //  Order Cancel
 		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", msgType,
+			"NORM ORDER", t.msgType,
 			t.kvInt["Order Reference Number Delta"],
 			t.kvInt["Cancelled Contracts"],
 		)
 	case 'G': // Single Side Update
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x\n",
-			"NORM ORDER", msgType,
+			"NORM ORDER", t.msgType,
 			t.kvInt["Reference Number Delta"],
 			t.kvInt["Volume"],
 			t.kvInt["Price"],
 		)
 	case 'u', 'U': // Single Side Replace
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM ORDER", msgType,
+			"NORM ORDER", t.msgType,
 			t.kvInt["New Reference Number Delta"],
 			t.kvInt["Original Reference Number Delta"],
 			t.kvInt["Volume"],
@@ -294,11 +294,11 @@ func (t *translator) outMessage2() {
 		)
 	case 'D': // Single Side Delete
 		fmt.Fprintf(t.w, "%s %c %08x\n",
-			"NORM ORDER", msgType,
+			"NORM ORDER", t.msgType,
 			t.kvInt["Reference Number Delta"],
 		)
 	default:
-		log.Fatalf("Unknown message type %d (%c)\n", msgType, msgType)
+		log.Fatalf("Unknown message type %d (%c)\n", t.msgType, t.msgType)
 	}
 }
 
@@ -318,6 +318,7 @@ func (t *translator) translate() {
 			matches := kvRegexp.FindAllStringSubmatch(ittoMessage, -1)
 			t.kvStr = make(map[string]string)
 			t.kvInt = make(map[string]uint)
+			t.msgType = 0
 			for _, m := range matches {
 				k := m[1]
 				v := m[2]
@@ -336,6 +337,9 @@ func (t *translator) translate() {
 					t.kvInt[k] = uint(vInt)
 					if err != nil {
 						log.Fatal("Can't parse", v)
+					}
+					if k == "Message Type" {
+						t.msgType = byte(vInt)
 					}
 				}
 			}
