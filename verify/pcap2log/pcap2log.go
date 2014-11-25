@@ -72,144 +72,6 @@ func NewTranslator(r io.Reader, w io.Writer) translator {
 	}
 }
 
-func (t *translator) outMessage1() {
-	type ittoOrderInfo struct {
-		msgType         byte
-		isBid           bool
-		isAsk           bool
-		optionId        uint
-		refNumDelta     uint
-		origRefNumDelta uint
-		size            uint
-		price           uint
-	}
-
-	ois := make([]ittoOrderInfo, 0, 3)
-	switch t.msgType {
-	case 'T', 'I': // ignore Seconds, NOII
-	case 'a', 'A':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Order Reference Number Delta"],
-			isBid:       byte(t.kvInt["Market Side"]) == 'B',
-			isAsk:       byte(t.kvInt["Market Side"]) == 'S',
-			optionId:    t.kvInt["Option ID"],
-			price:       t.kvInt["Price"],
-			size:        t.kvInt["Volume"],
-		})
-	case 'j', 'J':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Bid Reference Number Delta"],
-			optionId:    t.kvInt["Option ID"],
-			price:       t.kvInt["Bid Price"],
-			size:        t.kvInt["Bid Size"],
-			isBid:       true,
-		})
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Ask Reference Number Delta"],
-			optionId:    t.kvInt["Option ID"],
-			price:       t.kvInt["Ask Price"],
-			size:        t.kvInt["Ask Size"],
-			isAsk:       true,
-		})
-	case 'E':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Reference Number Delta"],
-			size:        t.kvInt["Executed Contracts"],
-		})
-	case 'C':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Reference Number Delta"],
-			price:       t.kvInt["Price"],
-			size:        t.kvInt["Volume"],
-		})
-	case 'X':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Order Reference Number Delta"],
-			size:        t.kvInt["Cancelled Contracts"],
-		})
-	case 'u', 'U':
-		ois = append(ois, ittoOrderInfo{
-			msgType:         t.msgType,
-			origRefNumDelta: t.kvInt["Original Reference Number Delta"],
-			refNumDelta:     t.kvInt["New Reference Number Delta"],
-			price:           t.kvInt["Price"],
-			size:            t.kvInt["Volume"],
-		})
-	case 'D':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Reference Number Delta"],
-		})
-	case 'G':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Reference Number Delta"],
-			price:       t.kvInt["Price"],
-			size:        t.kvInt["Volume"],
-		})
-	case 'k', 'K':
-		ois = append(ois, ittoOrderInfo{
-			msgType:         t.msgType,
-			origRefNumDelta: t.kvInt["Original Bid Reference Number Delta"],
-			refNumDelta:     t.kvInt["Bid Reference Number Delta"],
-			price:           t.kvInt["Bid Price"],
-			size:            t.kvInt["Bid Size"],
-			isBid:           true,
-		})
-		ois = append(ois, ittoOrderInfo{
-			msgType:         t.msgType,
-			origRefNumDelta: t.kvInt["Original Ask Reference Number Delta"],
-			refNumDelta:     t.kvInt["Ask Reference Number Delta"],
-			price:           t.kvInt["Ask Price"],
-			size:            t.kvInt["Ask Size"],
-			isAsk:           true,
-		})
-	case 'Y':
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Bid Reference Number Delta"],
-			isBid:       true,
-		})
-		ois = append(ois, ittoOrderInfo{
-			msgType:     t.msgType,
-			refNumDelta: t.kvInt["Ask Reference Number Delta"],
-			isAsk:       true,
-		})
-
-	default:
-		log.Fatalf("Unknown message type %d (%c)\n", t.msgType, t.msgType)
-	}
-	for _, oi := range ois {
-		var qo string
-		switch {
-		case oi.isBid && oi.isAsk:
-			log.Fatal("Both bid and ask is set", oi)
-		case oi.isBid:
-			qo = "QBID"
-		case oi.isAsk:
-			qo = "QASK"
-		default:
-			qo = "ORDER"
-		}
-
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x %08x\n",
-			qo,
-			oi.msgType,
-			oi.optionId,
-			oi.refNumDelta,
-			oi.origRefNumDelta,
-			oi.size,
-			oi.price,
-		)
-	}
-}
-
 type MarketSide byte
 
 const (
@@ -357,7 +219,7 @@ func (t *translator) translateQOMessage() {
 	}
 }
 
-func (t *translator) outMessage3() {
+func (t *translator) outMessageNorm() {
 	m := &t.qom
 	ord, bid, ask := &m.side1, &m.side1, &m.side2
 	if bid.side == MarketSideSell {
@@ -406,129 +268,6 @@ func (t *translator) outMessage3() {
 		s := pretty.Sprintf("%v", t)
 		//log.Fatalf("Unknown message type %d (%c)\n%s\n", m.typ, m.typ, s)
 		log.Printf("Unknown message type %d (%c)\n%s\n", m.typ, m.typ, s)
-	}
-}
-
-func (t *translator) outMessage2() {
-	switch t.msgType {
-	case 'T', 'L', 'S', 'H', 'O', 'Q', 'I': // ignore Seconds, Base Reference, System,  Options Trading Action, Option Open, Cross Trade, NOII
-	case 'j': // Add Quote
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", t.msgType,
-			t.kvInt["Option ID"],
-			t.kvInt["Bid Reference Number Delta"],
-			t.kvInt["Bid Size"],
-			t.kvInt["Bid Price"],
-		)
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", t.msgType,
-			t.kvInt["Option ID"],
-			t.kvInt["Ask Reference Number Delta"],
-			t.kvInt["Ask Size"],
-			t.kvInt["Ask Price"],
-		)
-	case 'J': // Add Quote
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", t.msgType,
-			t.kvInt["Option ID"],
-			t.kvInt["Bid Reference Number Delta"],
-			t.kvInt["Bid Size"],
-			t.kvInt["Bid"],
-		)
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", t.msgType,
-			t.kvInt["Option ID"],
-			t.kvInt["Ask Reference Number Delta"],
-			t.kvInt["Ask Size"],
-			t.kvInt["Ask"],
-		)
-	case 'k', 'K': // Quote Replace
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", t.msgType,
-			t.kvInt["Bid Reference Number Delta"],
-			t.kvInt["Original Bid Reference Number Delta"],
-			t.kvInt["Bid Size"],
-			t.kvInt["Bid Price"],
-		)
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", t.msgType,
-			t.kvInt["Ask Reference Delta Number"],
-			t.kvInt["Original Ask Reference Number Delta"],
-			t.kvInt["Ask Size"],
-			t.kvInt["Ask Price"],
-		)
-	case 'Y': // Quote Delete
-		fmt.Fprintf(t.w, "%s %c %08x\n",
-			"NORM QBID", t.msgType,
-			t.kvInt["Bid Reference Number Delta"],
-		)
-		fmt.Fprintf(t.w, "%s %c %08x\n",
-			"NORM QASK", t.msgType,
-			t.kvInt["Ask Reference Number Delta"],
-		)
-	case 'a', 'A': // Add Order
-		fmt.Fprintf(t.w, "%s %c %c %08x %08x %08x %08x\n",
-			"NORM ORDER", t.msgType,
-			t.kvInt["Market Side"],
-			t.kvInt["Option ID"],
-			t.kvInt["Order Reference Number Delta"],
-			t.kvInt["Volume"],
-			t.kvInt["Price"],
-		)
-	case 'E': // Single Side Executed
-		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", t.msgType,
-			t.kvInt["Reference Number Delta"],
-			t.kvInt["Executed Contracts"],
-		)
-	case 'C': // Single Side Executed with Price
-		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", t.msgType,
-			t.kvInt["Reference Number Delta"],
-			t.kvInt["Volume"],
-		)
-	case 'X': //  Order Cancel
-		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", t.msgType,
-			t.kvInt["Order Reference Number Delta"],
-			t.kvInt["Cancelled Contracts"],
-		)
-	case 'G': // Single Side Update
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x\n",
-			"NORM ORDER", t.msgType,
-			t.kvInt["Reference Number Delta"],
-			t.kvInt["Volume"],
-			t.kvInt["Price"],
-		)
-	case 'u', 'U': // Single Side Replace
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM ORDER", t.msgType,
-			t.kvInt["New Reference Number Delta"],
-			t.kvInt["Original Reference Number Delta"],
-			t.kvInt["Volume"],
-			t.kvInt["Price"],
-		)
-	case 'D': // Single Side Delete
-		fmt.Fprintf(t.w, "%s %c %08x\n",
-			"NORM ORDER", t.msgType,
-			t.kvInt["Reference Number Delta"],
-		)
-	case 'Z': // Block Single Side Delete
-		exp := t.kvInt["Total Number of Reference Number Deltas."]
-		if uint(len(t.refNumDelta)) != exp {
-			pretty.Println(t.kvInt)
-			log.Fatalf("Unexpected number of refs in Z message (%d != %d)\n", exp, len(t.refNumDelta))
-		}
-		for _, n := range t.refNumDelta {
-			fmt.Fprintf(t.w, "%s %c %08x\n",
-				"NORM ORDER", t.msgType,
-				n,
-			)
-		}
-	default:
-		s := pretty.Sprintf("%v", t)
-		//log.Fatalf("Unknown message type %d (%c)\n%s\n", t.msgType, t.msgType, s)
-		log.Printf("Unknown message type %d (%c)\n%s\n", t.msgType, t.msgType, s)
 	}
 }
 
@@ -582,11 +321,8 @@ func (t *translator) translate() {
 					}
 				}
 			}
-			//pretty.Println(t.kvStr)
-			//pretty.Println(t.kvInt)
-			//t.outMessage2()
 			t.translateQOMessage()
-			t.outMessage3()
+			t.outMessageNorm()
 		}
 	}
 }
