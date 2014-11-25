@@ -62,6 +62,7 @@ type translator struct {
 	kvInt       map[string]uint
 	msgType     byte
 	refNumDelta []uint // for Block Single Side Delete Message
+	qom         QOMessage
 }
 
 func NewTranslator(r io.Reader, w io.Writer) translator {
@@ -206,6 +207,205 @@ func (t *translator) outMessage1() {
 			oi.size,
 			oi.price,
 		)
+	}
+}
+
+type MarketSide byte
+
+const (
+	MasketSideUnknown MarketSide = 0
+	MarketSideBuy                = 'B'
+	MarketSideSell               = 'S'
+)
+
+type MessageType byte
+type OrderSide struct {
+	refNumDelta     uint
+	origRefNumDelta uint
+	price           uint
+	size            uint
+	side            MarketSide
+}
+type QOMessage struct {
+	typ          MessageType
+	timestamp    uint
+	optionId     uint
+	side1        OrderSide
+	side2        OrderSide
+	sseCrossNum  uint
+	sseMatchNum  uint
+	ssePrintable bool
+	ssuReason    byte
+	bssdNum      uint
+	bssdRefs     []uint
+}
+
+func (t *translator) translateQOMessage() {
+	t.qom = QOMessage{
+		typ:       MessageType(t.msgType),
+		optionId:  t.kvInt["Option ID"],
+		timestamp: t.kvInt["Timestamp"],
+	}
+	switch t.msgType {
+	case 'T', 'L', 'S', 'H', 'O', 'Q', 'I': // ignore Seconds, Base Reference, System,  Options Trading Action, Option Open, Cross Trade, NOII
+	case 'j': // Add Quote
+		t.qom.side1 = OrderSide{
+			side:        MarketSideBuy,
+			refNumDelta: t.kvInt["Bid Reference Number Delta"],
+			size:        t.kvInt["Bid Size"],
+			price:       t.kvInt["Bid Price"],
+		}
+		t.qom.side2 = OrderSide{
+			side:        MarketSideSell,
+			refNumDelta: t.kvInt["Ask Reference Number Delta"],
+			size:        t.kvInt["Ask Size"],
+			price:       t.kvInt["Ask Price"],
+		}
+	case 'J': // Add Quote
+		t.qom.side1 = OrderSide{
+			side:        MarketSideBuy,
+			refNumDelta: t.kvInt["Bid Reference Number Delta"],
+			size:        t.kvInt["Bid Size"],
+			price:       t.kvInt["Bid"],
+		}
+		t.qom.side2 = OrderSide{
+			side:        MarketSideSell,
+			refNumDelta: t.kvInt["Ask Reference Number Delta"],
+			size:        t.kvInt["Ask Size"],
+			price:       t.kvInt["Ask"],
+		}
+	case 'k', 'K': // Quote Replace
+		t.qom.side1 = OrderSide{
+			side:            MarketSideBuy,
+			refNumDelta:     t.kvInt["Bid Reference Number Delta"],
+			origRefNumDelta: t.kvInt["Original Bid Reference Number Delta"],
+			size:            t.kvInt["Bid Size"],
+			price:           t.kvInt["Bid Price"],
+		}
+		t.qom.side2 = OrderSide{
+			side:            MarketSideSell,
+			refNumDelta:     t.kvInt["Ask Reference Delta Number"],
+			origRefNumDelta: t.kvInt["Original Ask Reference Number Delta"],
+			size:            t.kvInt["Ask Size"],
+			price:           t.kvInt["Ask Price"],
+		}
+	case 'Y': // Quote Delete
+		t.qom.side1 = OrderSide{
+			side:            MarketSideBuy,
+			origRefNumDelta: t.kvInt["Bid Reference Number Delta"],
+		}
+		t.qom.side2 = OrderSide{
+			side:            MarketSideSell,
+			origRefNumDelta: t.kvInt["Ask Reference Number Delta"],
+		}
+	case 'a', 'A': // Add Order
+		t.qom.side1 = OrderSide{
+			side:        MarketSide(t.kvInt["Market Side"]),
+			refNumDelta: t.kvInt["Order Reference Number Delta"],
+			size:        t.kvInt["Volume"],
+			price:       t.kvInt["Price"],
+		}
+	case 'E': // Single Side Executed
+		t.qom.side1 = OrderSide{
+			origRefNumDelta: t.kvInt["Reference Number Delta"],
+			size:            t.kvInt["Executed Contracts"],
+		}
+		t.qom.sseCrossNum = t.kvInt["Cross Number"]
+		t.qom.sseMatchNum = t.kvInt["Match Number"]
+	case 'C': // Single Side Executed with Price
+		t.qom.side1 = OrderSide{
+			origRefNumDelta: t.kvInt["Reference Number Delta"],
+			size:            t.kvInt["Volume"],
+			price:           t.kvInt["Price"],
+		}
+		t.qom.sseCrossNum = t.kvInt["Cross Number"]
+		t.qom.sseMatchNum = t.kvInt["Match Number"]
+		t.qom.ssePrintable = t.kvStr["Printable"] == "Y"
+	case 'X': //  Order Cancel
+		t.qom.side1 = OrderSide{
+			origRefNumDelta: t.kvInt["Order Reference Number Delta"],
+			size:            t.kvInt["Cancelled Contracts"],
+		}
+	case 'G': // Single Side Update
+		t.qom.side1 = OrderSide{
+			origRefNumDelta: t.kvInt["Reference Number Delta"],
+			price:           t.kvInt["Price"],
+			size:            t.kvInt["Volume"],
+		}
+	case 'u', 'U': // Single Side Replace
+		t.qom.side1 = OrderSide{
+			refNumDelta:     t.kvInt["New Reference Number Delta"],
+			origRefNumDelta: t.kvInt["Original Reference Number Delta"],
+			price:           t.kvInt["Price"],
+			size:            t.kvInt["Volume"],
+		}
+	case 'D': // Single Side Delete
+		t.qom.side1 = OrderSide{
+			origRefNumDelta: t.kvInt["Reference Number Delta"],
+		}
+	case 'Z': // Block Single Side Delete
+		t.qom.bssdNum = t.kvInt["Total Number of Reference Number Deltas."]
+		if uint(len(t.refNumDelta)) != t.qom.bssdNum {
+			pretty.Println(t.kvInt)
+			log.Fatalf("Unexpected number of refs in Z message (%d != %d)\n", t.qom.bssdNum, len(t.refNumDelta))
+		}
+		t.qom.bssdRefs = append([]uint(nil), t.refNumDelta...)
+	default:
+		s := pretty.Sprintf("%v", t)
+		//log.Fatalf("Unknown message type %d (%c)\n%s\n", t.msgType, t.msgType, s)
+		log.Printf("Unknown message type %d (%c)\n%s\n", t.msgType, t.msgType, s)
+	}
+}
+
+func (t *translator) outMessage3() {
+	m := &t.qom
+	ord, bid, ask := &m.side1, &m.side1, &m.side2
+	if bid.side == MarketSideSell {
+		bid, ask = ask, bid
+	}
+	switch m.typ {
+	case 'T', 'L', 'S', 'H', 'O', 'Q', 'I': // ignore Seconds, Base Reference, System,  Options Trading Action, Option Open, Cross Trade, NOII
+	case 'j', 'J': // Add Quote
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+			"NORM QBID", m.typ, m.optionId, bid.refNumDelta, bid.size, bid.price)
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+			"NORM QASK", m.typ, m.optionId, ask.refNumDelta, ask.size, ask.price)
+	case 'k', 'K': // Quote Replace
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+			"NORM QBID", m.typ, bid.refNumDelta, bid.origRefNumDelta, bid.size, bid.price)
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+			"NORM QASK", m.typ, ask.refNumDelta, ask.origRefNumDelta, ask.size, ask.price)
+	case 'Y': // Quote Delete
+		fmt.Fprintf(t.w, "%s %c %08x\n",
+			"NORM QBID", m.typ, bid.origRefNumDelta)
+		fmt.Fprintf(t.w, "%s %c %08x\n",
+			"NORM QASK", m.typ, ask.origRefNumDelta)
+	case 'a', 'A': // Add Order
+		fmt.Fprintf(t.w, "%s %c %c %08x %08x %08x %08x\n",
+			"NORM ORDER", m.typ, ord.side, m.optionId, ord.refNumDelta, ord.size, ord.price)
+	case 'E', 'C': // Single Side Executed (with Price)
+		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
+			"NORM ORDER", m.typ, ord.origRefNumDelta, ord.size)
+	case 'X': //  Order Cancel
+		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
+			"NORM ORDER", m.typ, ord.origRefNumDelta, ord.size)
+	case 'G': // Single Side Update
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x\n",
+			"NORM ORDER", m.typ, ord.origRefNumDelta, ord.size, ord.price)
+	case 'u', 'U': // Single Side Replace
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+			"NORM ORDER", m.typ, ord.refNumDelta, ord.origRefNumDelta, ord.size, ord.price)
+	case 'D': // Single Side Delete
+		fmt.Fprintf(t.w, "%s %c %08x\n",
+			"NORM ORDER", m.typ, ord.origRefNumDelta)
+	case 'Z': // Block Single Side Delete
+		for _, r := range m.bssdRefs {
+			fmt.Fprintf(t.w, "%s %c %08x\n", "NORM ORDER", m.typ, r)
+		}
+	default:
+		s := pretty.Sprintf("%v", t)
+		//log.Fatalf("Unknown message type %d (%c)\n%s\n", m.typ, m.typ, s)
+		log.Printf("Unknown message type %d (%c)\n%s\n", m.typ, m.typ, s)
 	}
 }
 
@@ -384,7 +584,9 @@ func (t *translator) translate() {
 			}
 			//pretty.Println(t.kvStr)
 			//pretty.Println(t.kvInt)
-			t.outMessage2()
+			//t.outMessage2()
+			t.translateQOMessage()
+			t.outMessage3()
 		}
 	}
 }
