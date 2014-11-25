@@ -211,7 +211,7 @@ func (t *translator) outMessage1() {
 
 func (t *translator) outMessage2() {
 	switch t.msgType {
-	case 'T', 'L', 'I': // ignore Seconds, NOII
+	case 'T', 'L', 'S', 'H', 'O', 'Q', 'I': // ignore Seconds, Base Reference, System,  Options Trading Action, Option Open, Cross Trade, NOII
 	case 'j', 'J': // Add Quote
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QBID", t.msgType,
@@ -237,17 +237,17 @@ func (t *translator) outMessage2() {
 		)
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QASK", t.msgType,
-			t.kvInt["Ask Reference Number Delta"],
+			t.kvInt["Ask Reference Delta Number"],
 			t.kvInt["Original Ask Reference Number Delta"],
 			t.kvInt["Ask Size"],
 			t.kvInt["Ask Price"],
 		)
 	case 'Y': // Quote Delete
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x\n",
 			"NORM QBID", t.msgType,
 			t.kvInt["Bid Reference Number Delta"],
 		)
-		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+		fmt.Fprintf(t.w, "%s %c %08x\n",
 			"NORM QASK", t.msgType,
 			t.kvInt["Ask Reference Number Delta"],
 		)
@@ -311,7 +311,9 @@ func (t *translator) outMessage2() {
 			)
 		}
 	default:
-		log.Fatalf("Unknown message type %d (%c)\n", t.msgType, t.msgType)
+		s := pretty.Sprintf("%v", t)
+		//log.Fatalf("Unknown message type %d (%c)\n%s\n", t.msgType, t.msgType, s)
+		log.Printf("Unknown message type %d (%c)\n%s\n", t.msgType, t.msgType, s)
 	}
 }
 
