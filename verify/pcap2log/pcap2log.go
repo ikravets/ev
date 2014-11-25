@@ -212,7 +212,7 @@ func (t *translator) outMessage1() {
 func (t *translator) outMessage2() {
 	switch t.msgType {
 	case 'T', 'L', 'S', 'H', 'O', 'Q', 'I': // ignore Seconds, Base Reference, System,  Options Trading Action, Option Open, Cross Trade, NOII
-	case 'j', 'J': // Add Quote
+	case 'j': // Add Quote
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
 			"NORM QBID", t.msgType,
 			t.kvInt["Option ID"],
@@ -226,6 +226,21 @@ func (t *translator) outMessage2() {
 			t.kvInt["Ask Reference Number Delta"],
 			t.kvInt["Ask Size"],
 			t.kvInt["Ask Price"],
+		)
+	case 'J': // Add Quote
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+			"NORM QBID", t.msgType,
+			t.kvInt["Option ID"],
+			t.kvInt["Bid Reference Number Delta"],
+			t.kvInt["Bid Size"],
+			t.kvInt["Bid"],
+		)
+		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
+			"NORM QASK", t.msgType,
+			t.kvInt["Option ID"],
+			t.kvInt["Ask Reference Number Delta"],
+			t.kvInt["Ask Size"],
+			t.kvInt["Ask"],
 		)
 	case 'k', 'K': // Quote Replace
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
