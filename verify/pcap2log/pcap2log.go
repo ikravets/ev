@@ -279,13 +279,13 @@ func (t *translator) outMessage2() {
 		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
 			"NORM ORDER", t.msgType,
 			t.kvInt["Reference Number Delta"],
-			t.kvInt["Volume"],
+			t.kvInt["Executed Contracts"],
 		)
 	case 'C': // Single Side Executed with Price
 		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
 			"NORM ORDER", t.msgType,
 			t.kvInt["Reference Number Delta"],
-			t.kvInt["Executed Contracts"],
+			t.kvInt["Volume"],
 		)
 	case 'X': //  Order Cancel
 		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
