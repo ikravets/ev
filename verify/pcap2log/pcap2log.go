@@ -55,8 +55,9 @@ func splitTextFrames(data []byte, atEOF bool) (advance int, token []byte, err er
 }
 
 type translator struct {
-	r io.Reader
-	w io.Writer
+	r   io.Reader
+	w   io.Writer
+	sim simulator
 	// current message data
 	kvStr       map[string]string
 	kvInt       map[string]uint
@@ -67,8 +68,9 @@ type translator struct {
 
 func NewTranslator(r io.Reader, w io.Writer) translator {
 	return translator{
-		r: r,
-		w: w,
+		r:   r,
+		w:   w,
+		sim: NewSimulator(w),
 	}
 }
 
@@ -304,7 +306,7 @@ func (t *translator) translate() {
 				}
 			}
 			t.translateQOMessage()
-			t.outMessageNorm()
+			t.sim.addMessage(&t.qom, t.msgType)
 		}
 	}
 }
