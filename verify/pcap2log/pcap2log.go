@@ -81,6 +81,22 @@ const (
 )
 
 type MessageType byte
+
+const (
+	MessageTypeUnknown MessageType = iota
+	MessageTypeQuoteAdd
+	MessageTypeQuoteReplace
+	MessageTypeQuoteDelete
+	MessageTypeOrderAdd
+	MessageTypeOrderExecute
+	MessageTypeOrderExecuteWPrice
+	MessageTypeOrderCancel
+	MessageTypeOrderUpdate
+	MessageTypeOrderReplace
+	MessageTypeOrderDelete
+	MessageTypeBlockOrderDelete
+)
+
 type OrderSide struct {
 	refNumDelta     uint
 	origRefNumDelta uint
@@ -102,9 +118,27 @@ type QOMessage struct {
 	bssdRefs     []uint
 }
 
+var charToMessageType = []MessageType{
+	'j': MessageTypeQuoteAdd,
+	'J': MessageTypeQuoteAdd,
+	'k': MessageTypeQuoteReplace,
+	'K': MessageTypeQuoteReplace,
+	'Y': MessageTypeQuoteDelete,
+	'a': MessageTypeOrderAdd,
+	'A': MessageTypeOrderAdd,
+	'E': MessageTypeOrderExecute,
+	'C': MessageTypeOrderExecuteWPrice,
+	'X': MessageTypeOrderCancel,
+	'G': MessageTypeOrderUpdate,
+	'u': MessageTypeOrderReplace,
+	'U': MessageTypeOrderReplace,
+	'D': MessageTypeOrderDelete,
+	'Z': MessageTypeBlockOrderDelete,
+}
+
 func (t *translator) translateQOMessage() {
 	t.qom = QOMessage{
-		typ:       MessageType(t.msgType),
+		typ:       charToMessageType[t.msgType],
 		optionId:  t.kvInt["Option ID"],
 		timestamp: t.kvInt["Timestamp"],
 	}
@@ -226,48 +260,43 @@ func (t *translator) outMessageNorm() {
 		bid, ask = ask, bid
 	}
 	switch m.typ {
-	case 'T', 'L', 'S', 'H', 'O', 'Q', 'I': // ignore Seconds, Base Reference, System,  Options Trading Action, Option Open, Cross Trade, NOII
-	case 'j', 'J': // Add Quote
+	case MessageTypeUnknown: // ignore
+	case MessageTypeQuoteAdd:
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", m.typ, m.optionId, bid.refNumDelta, bid.size, bid.price)
+			"NORM QBID", t.msgType, m.optionId, bid.refNumDelta, bid.size, bid.price)
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", m.typ, m.optionId, ask.refNumDelta, ask.size, ask.price)
-	case 'k', 'K': // Quote Replace
+			"NORM QASK", t.msgType, m.optionId, ask.refNumDelta, ask.size, ask.price)
+	case MessageTypeQuoteReplace:
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QBID", m.typ, bid.refNumDelta, bid.origRefNumDelta, bid.size, bid.price)
+			"NORM QBID", t.msgType, bid.refNumDelta, bid.origRefNumDelta, bid.size, bid.price)
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM QASK", m.typ, ask.refNumDelta, ask.origRefNumDelta, ask.size, ask.price)
-	case 'Y': // Quote Delete
+			"NORM QASK", t.msgType, ask.refNumDelta, ask.origRefNumDelta, ask.size, ask.price)
+	case MessageTypeQuoteDelete:
 		fmt.Fprintf(t.w, "%s %c %08x\n",
-			"NORM QBID", m.typ, bid.origRefNumDelta)
+			"NORM QBID", t.msgType, bid.origRefNumDelta)
 		fmt.Fprintf(t.w, "%s %c %08x\n",
-			"NORM QASK", m.typ, ask.origRefNumDelta)
-	case 'a', 'A': // Add Order
+			"NORM QASK", t.msgType, ask.origRefNumDelta)
+	case MessageTypeOrderAdd:
 		fmt.Fprintf(t.w, "%s %c %c %08x %08x %08x %08x\n",
-			"NORM ORDER", m.typ, ord.side, m.optionId, ord.refNumDelta, ord.size, ord.price)
-	case 'E', 'C': // Single Side Executed (with Price)
+			"NORM ORDER", t.msgType, ord.side, m.optionId, ord.refNumDelta, ord.size, ord.price)
+	case MessageTypeOrderExecute, MessageTypeOrderExecuteWPrice, MessageTypeOrderCancel:
 		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", m.typ, ord.origRefNumDelta, ord.size)
-	case 'X': //  Order Cancel
-		fmt.Fprintf(t.w, "%s %c %08x %08x\n",
-			"NORM ORDER", m.typ, ord.origRefNumDelta, ord.size)
-	case 'G': // Single Side Update
+			"NORM ORDER", t.msgType, ord.origRefNumDelta, ord.size)
+	case MessageTypeOrderUpdate:
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x\n",
-			"NORM ORDER", m.typ, ord.origRefNumDelta, ord.size, ord.price)
-	case 'u', 'U': // Single Side Replace
+			"NORM ORDER", t.msgType, ord.origRefNumDelta, ord.size, ord.price)
+	case MessageTypeOrderReplace:
 		fmt.Fprintf(t.w, "%s %c %08x %08x %08x %08x\n",
-			"NORM ORDER", m.typ, ord.refNumDelta, ord.origRefNumDelta, ord.size, ord.price)
-	case 'D': // Single Side Delete
+			"NORM ORDER", t.msgType, ord.refNumDelta, ord.origRefNumDelta, ord.size, ord.price)
+	case MessageTypeOrderDelete:
 		fmt.Fprintf(t.w, "%s %c %08x\n",
-			"NORM ORDER", m.typ, ord.origRefNumDelta)
-	case 'Z': // Block Single Side Delete
+			"NORM ORDER", t.msgType, ord.origRefNumDelta)
+	case MessageTypeBlockOrderDelete:
 		for _, r := range m.bssdRefs {
-			fmt.Fprintf(t.w, "%s %c %08x\n", "NORM ORDER", m.typ, r)
+			fmt.Fprintf(t.w, "%s %c %08x\n", "NORM ORDER", t.msgType, r)
 		}
 	default:
-		s := pretty.Sprintf("%v", t)
-		//log.Fatalf("Unknown message type %d (%c)\n%s\n", m.typ, m.typ, s)
-		log.Printf("Unknown message type %d (%c)\n%s\n", m.typ, m.typ, s)
+		log.Fatalf("Unexpected message type %d\ntranslator=%s\n", m.typ, pretty.Sprintf("%v", t))
 	}
 }
 
