@@ -99,6 +99,10 @@ const (
 	MessageTypeBlockOrderDelete
 )
 
+type OptionId uint
+
+const OptionIdUnknown OptionId = 0
+
 type OrderSide struct {
 	refNumDelta     uint
 	origRefNumDelta uint
@@ -109,7 +113,7 @@ type OrderSide struct {
 type QOMessage struct {
 	typ          MessageType
 	timestamp    uint
-	optionId     uint
+	optionId     OptionId
 	side1        OrderSide
 	side2        OrderSide
 	sseCrossNum  uint
@@ -141,8 +145,12 @@ var charToMessageType = []MessageType{
 func (t *translator) translateQOMessage() {
 	t.qom = QOMessage{
 		typ:       charToMessageType[t.msgType],
-		optionId:  t.kvInt["Option ID"],
 		timestamp: t.kvInt["Timestamp"],
+	}
+	if oid := t.kvInt["Option ID"]; oid != 0 {
+		t.qom.optionId = OptionId(oid)
+	} else {
+		t.qom.optionId = OptionIdUnknown
 	}
 	switch t.msgType {
 	case 'T', 'L', 'S', 'H', 'O', 'Q', 'I': // ignore Seconds, Base Reference, System,  Options Trading Action, Option Open, Cross Trade, NOII
