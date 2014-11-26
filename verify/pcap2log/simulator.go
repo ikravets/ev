@@ -23,6 +23,9 @@ func NewSimulator(w io.Writer) simulator {
 }
 
 func (s *simulator) addMessage(qom *QOMessage, typeChar byte) {
+	if qom.typ == MessageTypeUnknown {
+		return
+	}
 	s.outMessageNorm(qom, typeChar)
 }
 
@@ -49,7 +52,6 @@ func (s *simulator) outMessageNorm(m *QOMessage, typeChar byte) {
 		bid, ask = ask, bid
 	}
 	switch m.typ {
-	case MessageTypeUnknown: // ignore
 	case MessageTypeQuoteAdd:
 		out("QBID", "%08x %08x %08x %08x", m.optionId, bid.refNumDelta, bid.size, bid.price)
 		out("QASK", "%08x %08x %08x %08x", m.optionId, ask.refNumDelta, ask.size, ask.price)
