@@ -77,7 +77,7 @@ func NewTranslator(r io.Reader, w io.Writer) translator {
 type MarketSide byte
 
 const (
-	MasketSideUnknown MarketSide = 0
+	MarketSideUnknown MarketSide = 0
 	MarketSideBuy                = 'B'
 	MarketSideSell               = 'S'
 )
