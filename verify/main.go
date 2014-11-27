@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/jessevdk/go-flags"
 	"github.com/kr/pretty"
+	"log"
 	"my/itto/verify/pcap2log"
 	"my/itto/verify/pcap2memh"
 	"os"
@@ -14,7 +15,8 @@ import (
 
 func processArgs() (commands []func() error, finisher func()) {
 	var opts struct {
-		Verbose []bool `short:"v" long:"verbose" description:"show verbose debug information"`
+		Verbose     []bool `short:"v" long:"verbose" description:"show verbose debug information"`
+		LogFileName string `short:"l" long:"log" value-name:"FILE" default:"/dev/stderr" default-mask:"stderr" description:"log file"`
 	}
 
 	var cmds []func() error
@@ -27,12 +29,21 @@ func processArgs() (commands []func() error, finisher func()) {
 		fmt.Println(err.(*flags.Error).Message)
 		os.Exit(1)
 	}
+	logFile, err := os.OpenFile(opts.LogFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetOutput(logFile)
+	finisher = func() {
+		logFile.Close()
+	}
 	commands = cmds
 	return
 }
 
 func main() {
 	os.Setenv("PATH", os.ExpandEnv("$HOME/my/proj/ekaline/esniff/wireshark/build/run:$HOME/wireshark/build/run:$PATH"))
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	commands, finisher := processArgs()
 	defer finisher()
 	for _, c := range commands {
