@@ -24,6 +24,7 @@ type simulator struct {
 	w                io.Writer
 	ops              []OrderOperation
 	orders           map[uint]Order
+	options          map[OptionId]*OptionState
 	assumeSubscribed bool
 }
 
@@ -31,6 +32,7 @@ func NewSimulator(w io.Writer) simulator {
 	return simulator{
 		w:                w,
 		orders:           make(map[uint]Order),
+		options:          make(map[OptionId]*OptionState),
 		assumeSubscribed: true,
 	}
 }
@@ -165,6 +167,12 @@ func (s *simulator) processOperations() {
 			if !orderFound {
 				continue
 			}
+			if op.optionId != OptionIdUnknown || op.side != MarketSideUnknown || op.price != 0 {
+				log.Fatalf("unexpected operation parameters %#v\n", op)
+			}
+			op.optionId = order.optionId
+			op.side = order.side
+			op.price = order.price
 			if op.op == OrderOpRemove {
 				prev.nextValid = true
 				prev.optionId = order.optionId
@@ -172,6 +180,7 @@ func (s *simulator) processOperations() {
 			}
 		}
 		s.updateOrders(op, order)
+		s.updateOptionState(*op)
 	}
 	s.ops = s.ops[:0]
 }
@@ -201,11 +210,81 @@ func (s *simulator) updateOrders(op *OrderOperation, order Order) {
 	s.outOrderUpdate(op, order)
 }
 
+func (s *simulator) updateOptionState(op OrderOperation) {
+	if op.optionId == OptionIdUnknown || op.side == MarketSideUnknown {
+		log.Fatalf("unexpected operation parameters op=%#v order=%#v newOrder=%#v\n", op)
+	}
+	optionState := s.options[op.optionId]
+	if optionState == nil {
+		log.Fatal("unexpectedly not subscribed to", op.optionId)
+	}
+	var delta int
+	if op.op == OrderOpAdd {
+		delta = int(op.size)
+	} else {
+		delta = int(-op.size)
+	}
+
+	side := optionState.side(op.side)
+	side.updateLevel(op.price, delta)
+}
+
 func (s *simulator) subscibe(optionId OptionId) {
+	if !s.subscribed(optionId) {
+		s.options[optionId] = NewOptionState(optionId)
+	}
 }
 
 func (s *simulator) subscribed(optionId OptionId) bool {
-	return true
+	_, ok := s.options[optionId]
+	return ok
+}
+
+type OptionState struct {
+	bid *OptionSideState
+	ask *OptionSideState
+}
+
+func NewOptionState(id OptionId) *OptionState {
+	return &OptionState{
+		bid: NewOptionSideState(MarketSideBuy),
+		ask: NewOptionSideState(MarketSideSell),
+	}
+}
+
+func (s *OptionState) side(ms MarketSide) (res *OptionSideState) {
+	switch ms {
+	case MarketSideBuy:
+		res = s.bid
+	case MarketSideSell:
+		res = s.ask
+	default:
+		log.Fatal("Unexpected market side", ms, "for option", s)
+	}
+	return
+}
+
+type OptionSideState struct {
+	levels map[uint]uint
+}
+
+func NewOptionSideState(side MarketSide) *OptionSideState {
+	s := OptionSideState{
+		levels: make(map[uint]uint),
+	}
+	return &s
+}
+
+func (s *OptionSideState) updateLevel(price uint, delta int) {
+	ssize := int(s.levels[price]) + delta
+	if ssize < 0 {
+		log.Fatal("size become negative")
+	}
+	if ssize == 0 {
+		delete(s.levels, price)
+	} else {
+		s.levels[price] = uint(ssize)
+	}
 }
 
 // output functions
