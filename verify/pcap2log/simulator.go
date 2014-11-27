@@ -39,6 +39,7 @@ func (s *simulator) addMessage(qom *QOMessage, typeChar byte) {
 	if qom.typ == MessageTypeUnknown {
 		return
 	}
+	//log.Printf("addMessage(%#v, %c)\n", qom, typeChar)
 	s.outMessageNorm(qom, typeChar)
 	s.addMessageOperations(qom)
 	s.processOperations()

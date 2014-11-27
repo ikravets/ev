@@ -277,6 +277,7 @@ func (t *translator) translate() {
 		}
 		for _, ittoMessage := range ittoMessages[1:] {
 			matches := kvRegexp.FindAllStringSubmatch(ittoMessage, -1)
+			// TODO be more gc friendly
 			t.kvStr = make(map[string]string)
 			t.kvInt = make(map[string]uint)
 			t.refNumDelta = nil
