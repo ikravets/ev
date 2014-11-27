@@ -79,7 +79,9 @@ func (s *simulator) addMessageOperations(m *QOMessage) {
 		s.addOp(OrderOpUpdate, m.side1, OptionIdUnknown)
 	case MessageTypeOrderUpdate:
 		s.addOp(OrderOpRemove, m.side1, OptionIdUnknown)
-		s.addOp(OrderOpAdd, m.side1, OptionIdUnknown)
+		order := m.side1
+		order.refNumDelta = order.origRefNumDelta
+		s.addOp(OrderOpAdd, order, OptionIdUnknown)
 	case MessageTypeOrderReplace:
 		s.addOp(OrderOpRemove, m.side1, OptionIdUnknown)
 		s.addOp(OrderOpAdd, m.side1, OptionIdUnknown)
@@ -124,32 +126,49 @@ func (s *simulator) addOp(op OrderOp, order OrderSide, optionId OptionId) {
 }
 
 func (s *simulator) processOperations() {
-	var lastOrder Order
+	var prev struct {
+		valid     bool
+		nextValid bool
+		optionId  OptionId
+		side      MarketSide
+	}
 	for i := range s.ops {
+		prev.valid, prev.nextValid = prev.nextValid, false
 		op := &s.ops[i]
 		order, orderFound := s.orders[op.orderId]
 		s.outOrderLookup(op, order, orderFound)
-		if orderFound && op.op == OrderOpAdd {
-			log.Fatal("Order already exist when adding", op, order)
-		}
-		if !orderFound && op.op != OrderOpAdd {
-			continue
-		}
-		if op.op == OrderOpAdd && op.optionId == OptionIdUnknown {
-			if i < 1 || s.ops[i-1].op != OrderOpRemove {
-				log.Fatal("Unexpected add operation", op)
+		if op.op == OrderOpAdd {
+			if orderFound {
+				log.Fatalf("Order already exist when adding op=%#v order=%#v", op, order)
 			}
-			op.optionId = lastOrder.optionId
+			if op.optionId == OptionIdUnknown {
+				if s.ops[i-1].op != OrderOpRemove {
+					log.Fatal("Unexpected add operation", op)
+				}
+				if !prev.valid || i == 0 {
+					continue
+				}
+				op.optionId = prev.optionId
+				if op.side == MarketSideUnknown {
+					op.side = prev.side
+				}
+			}
+		} else {
+			if !orderFound {
+				continue
+			}
+			if op.op == OrderOpRemove {
+				prev.nextValid = true
+				prev.optionId = order.optionId
+				prev.side = order.side
+			}
 		}
-		lastOrder = order
-		order = s.processOperation(op)
-		s.outOrderUpdate(op, order)
+		s.updateOrders(op, order)
 	}
 	s.ops = s.ops[:0]
 }
 
-func (s *simulator) processOperation(op *OrderOperation) Order {
-	var order Order
+func (s *simulator) updateOrders(op *OrderOperation, order Order) Order {
 	switch op.op {
 	case OrderOpAdd:
 		order = Order{
@@ -161,15 +180,17 @@ func (s *simulator) processOperation(op *OrderOperation) Order {
 		}
 		s.orders[op.orderId] = order
 	case OrderOpUpdate:
-		order = s.orders[op.orderId]
 		order.size -= op.size
 		s.orders[op.orderId] = order
 	case OrderOpRemove:
-		order.id = op.orderId
+		order = Order{
+			id: op.orderId,
+		}
 		delete(s.orders, op.orderId)
 	default:
 		log.Fatal("Unexpected order operation", op)
 	}
+	s.outOrderUpdate(op, order)
 	return order
 }
 
@@ -235,13 +256,10 @@ func bool2int(b bool) int {
 }
 
 func marketSide2int(ms MarketSide) int {
-	switch ms {
-	case MarketSideSell:
+	if ms == MarketSideSell {
 		return 1
-	case MarketSideBuy:
+	} else {
 		return 0
-	default:
-		return -1
 	}
 }
 
@@ -249,7 +267,6 @@ func (s *simulator) outOrderLookup(op *OrderOperation, order Order, isFound bool
 	if op.op == OrderOpAdd {
 		s.Printfln("ORDL 1 %08x %08x", op.orderId, op.optionId)
 		order.optionId = op.optionId
-		order.side = MarketSideBuy
 	} else {
 		s.Printfln("ORDL 0 %08x", op.orderId)
 	}
