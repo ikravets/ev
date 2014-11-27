@@ -175,7 +175,7 @@ func (s *simulator) processOperations() {
 	s.ops = s.ops[:0]
 }
 
-func (s *simulator) updateOrders(op *OrderOperation, order Order) Order {
+func (s *simulator) updateOrders(op *OrderOperation, order Order) {
 	switch op.op {
 	case OrderOpAdd:
 		order = Order{
@@ -198,7 +198,6 @@ func (s *simulator) updateOrders(op *OrderOperation, order Order) Order {
 		log.Fatal("Unexpected order operation", op)
 	}
 	s.outOrderUpdate(op, order)
-	return order
 }
 
 func (s *simulator) subscibe(optionId OptionId) {
