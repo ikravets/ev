@@ -21,15 +21,17 @@ type Order struct {
 }
 
 type simulator struct {
-	w      io.Writer
-	ops    []OrderOperation
-	orders map[uint]Order
+	w                io.Writer
+	ops              []OrderOperation
+	orders           map[uint]Order
+	assumeSubscribed bool
 }
 
 func NewSimulator(w io.Writer) simulator {
 	return simulator{
-		w:      w,
-		orders: make(map[uint]Order),
+		w:                w,
+		orders:           make(map[uint]Order),
+		assumeSubscribed: true,
 	}
 }
 
@@ -153,6 +155,11 @@ func (s *simulator) processOperations() {
 					op.side = prev.side
 				}
 			}
+			if s.assumeSubscribed {
+				s.subscibe(op.optionId)
+			} else if !s.subscribed(op.optionId) {
+				continue
+			}
 		} else {
 			if !orderFound {
 				continue
@@ -192,6 +199,13 @@ func (s *simulator) updateOrders(op *OrderOperation, order Order) Order {
 	}
 	s.outOrderUpdate(op, order)
 	return order
+}
+
+func (s *simulator) subscibe(optionId OptionId) {
+}
+
+func (s *simulator) subscribed(optionId OptionId) bool {
+	return true
 }
 
 // output functions
