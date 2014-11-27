@@ -349,12 +349,18 @@ type pcap2log struct {
 	InputFileName  string                        `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
 	OutputFileName string                        `long:"output" short:"o" value-name:"FILE" default:"/dev/stdout" default-mask:"stdout" description:"output file"`
 	Args           struct{ TsharkArgs []string } `positional-args:"y"`
+	shouldExecute  bool
 }
 
 func (p *pcap2log) Execute(args []string) error {
-	//fmt.Println("pcap2log Executed", p, args)
-	//pretty.Println(p)
-	//pretty.Println(args)
+	p.shouldExecute = true
+	return nil
+}
+
+func (p *pcap2log) maybeRun() error {
+	if !p.shouldExecute {
+		return nil
+	}
 	dumpReader, finisher := getTsharkDump(p.InputFileName, p.Args.TsharkArgs)
 	defer finisher()
 	outFile, err := os.OpenFile(p.OutputFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -367,12 +373,13 @@ func (p *pcap2log) Execute(args []string) error {
 	return nil
 }
 
-func InitArgv(parser *flags.Parser) {
-	var p2l pcap2log
+func InitArgv(parser *flags.Parser) func() error {
+	var command pcap2log
 	parser.AddCommand("pcap2log",
 		"convert pcap file to simulator output",
 		"",
-		&p2l)
+		&command)
+	return command.maybeRun
 }
 
 /*****************************************************************************/

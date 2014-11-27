@@ -131,12 +131,18 @@ type pcap2memh struct {
 	DestDirName   string                        `short:"d" long:"dest-dir" default:"." default-mask:"current dir" value-name:"DIR" description:"destination directory, will be created if does not exist" `
 	InputFileName string                        `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
 	Args          struct{ TsharkArgs []string } `positional-args:"y"`
+	shouldExecute bool
 }
 
 func (p *pcap2memh) Execute(args []string) error {
-	//fmt.Println("pcap2memh Executed")
-	//pretty.Println(p)
-	//pretty.Println(args)
+	p.shouldExecute = true
+	return nil
+}
+
+func (p *pcap2memh) maybeRun() error {
+	if !p.shouldExecute {
+		return nil
+	}
 	dumpReader, finisher := getTsharkDump(p.InputFileName, p.Args.TsharkArgs)
 	defer finisher()
 	if err := os.MkdirAll(p.DestDirName, 0755); err != nil {
@@ -146,12 +152,13 @@ func (p *pcap2memh) Execute(args []string) error {
 	return nil
 }
 
-func InitArgv(parser *flags.Parser) {
-	var p2m pcap2memh
+func InitArgv(parser *flags.Parser) func() error {
+	var command pcap2memh
 	parser.AddCommand("pcap2memh",
 		"convert pcap file to simulator input",
 		"",
-		&p2m)
+		&command)
+	return command.maybeRun
 }
 
 /*****************************************************************************/

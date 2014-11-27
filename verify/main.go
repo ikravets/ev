@@ -12,29 +12,31 @@ import (
 	"os"
 )
 
-func processArgs() {
+func processArgs() (commands []func() error, finisher func()) {
 	var opts struct {
-		Verbose []bool `short:"v" long:"verbose" description:"Show verbose debug information"`
+		Verbose []bool `short:"v" long:"verbose" description:"show verbose debug information"`
 	}
+
+	var cmds []func() error
+	finisher = func() {}
 
 	parser := flags.NewParser(&opts, flags.PassDoubleDash|flags.HelpFlag|flags.IgnoreUnknown)
-
-	pcap2memh.InitArgv(parser)
-	pcap2log.InitArgv(parser)
-	_, err := parser.Parse()
-	/*
-		pretty.Println(err)
-		pretty.Println(args)
-		pretty.Println(parser)
-	*/
-	if err != nil {
-		perr := err.(*flags.Error)
-		fmt.Println(perr.Message)
+	cmds = append(cmds, pcap2memh.InitArgv(parser))
+	cmds = append(cmds, pcap2log.InitArgv(parser))
+	if _, err := parser.Parse(); err != nil {
+		fmt.Println(err.(*flags.Error).Message)
+		os.Exit(1)
 	}
+	commands = cmds
+	return
 }
 
 func main() {
 	os.Setenv("PATH", os.ExpandEnv("$HOME/my/proj/ekaline/esniff/wireshark/build/run:$HOME/wireshark/build/run:$PATH"))
-	processArgs()
+	commands, finisher := processArgs()
+	defer finisher()
+	for _, c := range commands {
+		c()
+	}
 	_ = pretty.Print
 }
