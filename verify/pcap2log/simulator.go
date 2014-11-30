@@ -363,15 +363,15 @@ func (s *simulator) outOrderLookup(op *OrderOperation, order Order, isFound bool
 	} else {
 		s.Printfln("ORDL 0 %08x", op.orderId)
 	}
-	s.Printfln("ORDRESP %d %d %d %08x %08x %08x",
+	s.Printfln("ORDRESP %d %d %d %08x %08x %08x %08x",
 		bool2int(!isFound && op.op != OrderOpAdd),
 		bool2int(op.op == OrderOpAdd),
 		marketSide2int(order.side),
 		order.size,
 		order.price,
 		order.optionId,
+		op.orderId,
 	)
-
 }
 
 func (s *simulator) outOrderUpdate(op *OrderOperation, order Order) {
