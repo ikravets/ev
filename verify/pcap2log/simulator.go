@@ -5,12 +5,15 @@ package pcap2log
 
 import (
 	"fmt"
+	"github.com/cznic/b"
 	"github.com/kr/pretty"
 	"io"
 	"log"
 )
 
 var _ = pretty.Print
+
+const TopPriceLevels = 32
 
 type Order struct {
 	id       uint
@@ -226,7 +229,9 @@ func (s *simulator) updateOptionState(op OrderOperation) {
 	}
 
 	side := optionState.side(op.side)
+	s.outSupernode(side, true)
 	side.updateLevel(op.price, delta)
+	s.outSupernode(side, false)
 }
 
 func (s *simulator) subscibe(optionId OptionId) {
@@ -264,27 +269,82 @@ func (s *OptionState) side(ms MarketSide) (res *OptionSideState) {
 	return
 }
 
+type PriceLevel struct {
+	price int
+	size  int
+}
+
+func (l *PriceLevel) UpdateSize(delta int) bool {
+	l.size += delta
+	if l.size < 0 {
+		log.Fatal("size becomes negative")
+	}
+	return l.size != 0
+}
+
+func ComparePrice(lhs, rhs interface{}) int {
+	l, r := lhs.(int), rhs.(int)
+	return l - r
+}
+
+func ComparePriceRev(lhs, rhs interface{}) int {
+	return -ComparePrice(lhs, rhs)
+}
+
 type OptionSideState struct {
-	levels map[uint]uint
+	side   MarketSide
+	levels *b.Tree
 }
 
 func NewOptionSideState(side MarketSide) *OptionSideState {
+	var cmp b.Cmp
+	switch side {
+	case MarketSideBuy:
+		cmp = ComparePrice
+	case MarketSideSell:
+		cmp = ComparePriceRev
+	default:
+		log.Fatal("unexpected market side ", side)
+	}
 	s := OptionSideState{
-		levels: make(map[uint]uint),
+		side:   side,
+		levels: b.TreeNew(cmp),
 	}
 	return &s
 }
 
 func (s *OptionSideState) updateLevel(price uint, delta int) {
-	ssize := int(s.levels[price]) + delta
-	if ssize < 0 {
-		log.Fatal("size become negative")
+	upd := func(oldV interface{}, exists bool) (newV interface{}, write bool) {
+		v := PriceLevel{
+			price: int(price),
+			size:  delta,
+		}
+		keep := true
+		if exists {
+			v = oldV.(PriceLevel)
+			keep = v.UpdateSize(delta)
+		}
+		return v, keep
 	}
-	if ssize == 0 {
-		delete(s.levels, price)
-	} else {
-		s.levels[price] = uint(ssize)
+	p := int(price)
+	if _, keep := s.levels.Put(p, upd); !keep {
+		s.levels.Delete(p)
 	}
+}
+
+func (s *OptionSideState) getTop(maxNum int) []PriceLevel {
+	pl := make([]PriceLevel, 0, maxNum)
+	if it, err := s.levels.SeekFirst(); err == nil {
+		for i := 0; i < maxNum; i++ {
+			if _, v, err := it.Next(); err != nil {
+				break
+			} else {
+				pl = append(pl, v.(PriceLevel))
+			}
+		}
+		it.Close()
+	}
+	return pl
 }
 
 // output functions
@@ -382,4 +442,25 @@ func (s *simulator) outOrderUpdate(op *OrderOperation, order Order) {
 		order.price,
 		order.size,
 	)
+}
+
+func (s *simulator) outSupernode(state *OptionSideState, old bool) {
+	pls := state.getTop(TopPriceLevels)
+	empty := PriceLevel{}
+	if state.side == MarketSideSell {
+		empty.price = -1
+	}
+	for i := len(pls); i < TopPriceLevels; i++ {
+		pls = append(pls, empty)
+	}
+	var tag string
+	if old {
+		tag = "OLD"
+	} else {
+		tag = "NEW"
+	}
+	for i, pl := range pls {
+		//s.Printfln("SN_SIZE_%s  %02d %08x\nSN_PRICE_%s %02d %08x", tag, i, pl.size, tag, i, uint32(pl.price))
+		s.Printfln("SN_%s %02d %08x %08x", tag, i, pl.size, uint32(pl.price))
+	}
 }
