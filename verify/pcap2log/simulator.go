@@ -220,7 +220,7 @@ func (s *simulator) updateOrders(op *OrderOperation, order Order) {
 
 func (s *simulator) updateOptionState(op OrderOperation) {
 	if op.optionId == OptionIdUnknown || op.side == MarketSideUnknown {
-		log.Fatalf("unexpected operation parameters op=%#v order=%#v newOrder=%#v\n", op)
+		log.Fatalf("unexpected operation parameters op=%#v\n", op)
 	}
 	optionState := s.options[op.optionId]
 	if optionState == nil {
