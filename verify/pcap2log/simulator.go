@@ -229,9 +229,10 @@ func (s *simulator) updateOptionState(op OrderOperation) {
 	}
 
 	side := optionState.side(op.side)
-	s.outSupernode(side, true)
+	topOld := side.getTop(TopPriceLevels)
 	side.updateLevel(op.price, delta)
-	s.outSupernode(side, false)
+	topNew := side.getTop(TopPriceLevels)
+	s.outSupernode(side, topOld, topNew)
 }
 
 func (s *simulator) subscibe(optionId OptionId) {
@@ -444,23 +445,22 @@ func (s *simulator) outOrderUpdate(op *OrderOperation, order Order) {
 	)
 }
 
-func (s *simulator) outSupernode(state *OptionSideState, old bool) {
-	pls := state.getTop(TopPriceLevels)
+func (s *simulator) outSupernode(state *OptionSideState, topOld, topNew []PriceLevel) {
 	empty := PriceLevel{}
 	if state.side == MarketSideSell {
 		empty.price = -1
 	}
-	for i := len(pls); i < TopPriceLevels; i++ {
-		pls = append(pls, empty)
-	}
-	var tag string
-	if old {
-		tag = "OLD"
-	} else {
-		tag = "NEW"
-	}
-	for i, pl := range pls {
-		//s.Printfln("SN_SIZE_%s  %02d %08x\nSN_PRICE_%s %02d %08x", tag, i, pl.size, tag, i, uint32(pl.price))
-		s.Printfln("SN_%s %02d %08x %08x", tag, i, pl.size, uint32(pl.price))
+	for i := 0; i < TopPriceLevels; i++ {
+		plo, pln := empty, empty
+		if i < len(topOld) {
+			plo = topOld[i]
+		}
+		if i < len(topNew) {
+			pln = topNew[i]
+		}
+		s.Printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
+			plo.size, uint32(plo.price),
+			pln.size, uint32(pln.price),
+		)
 	}
 }
