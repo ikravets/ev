@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 var textFrameSeparator []byte = []byte("\nFrame ")
@@ -321,17 +322,9 @@ func (t *translator) translate() {
 	t.sim.logStats()
 }
 
-func getTsharkDump(fileName string, args []string) (reader io.Reader, finisher func()) {
-	//pretty.Println(fileName, args)
-	cmdArgs := []string{
-		"-d", "udp.port==18000:10,moldudp64",
-		"-V",
-		"-r",
-		fileName,
-	}
-	cmdArgs = append(cmdArgs, args...)
-	cmd := exec.Command("tshark", cmdArgs...)
-	reader, err := cmd.StdoutPipe()
+func startCommandPipe(name string, args []string, ignoreSigpipe bool) (pipe io.ReadCloser, finisher func()) {
+	cmd := exec.Command(name, args...)
+	pipe, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -340,10 +333,33 @@ func getTsharkDump(fileName string, args []string) (reader io.Reader, finisher f
 	}
 
 	finisher = func() {
-		if err := cmd.Wait(); err != nil {
+		pipe.Close()
+		for err := cmd.Wait(); err != nil; {
+			if ignoreSigpipe {
+				if exiterr, ok := err.(*exec.ExitError); ok {
+					if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+						if status.Signaled() && status.Signal() == syscall.SIGPIPE {
+							log.Printf("WARNING: command %s exited with SIGPIPE\n", name)
+							break
+						}
+					}
+				}
+			}
 			log.Fatal(err)
 		}
 	}
+	return
+}
+
+func getTsharkDump(fileName string, args []string) (reader io.Reader, finisher func()) {
+	cmdArgs := []string{
+		"-d", "udp.port==18000:10,moldudp64",
+		"-V",
+		"-r",
+		fileName,
+	}
+	cmdArgs = append(cmdArgs, args...)
+	reader, finisher = startCommandPipe("tshark", cmdArgs, false)
 	return
 }
 
