@@ -24,11 +24,15 @@ type Order struct {
 }
 
 type simulator struct {
-	w                io.Writer
-	ops              []OrderOperation
-	orders           map[uint]Order
-	options          map[OptionId]*OptionState
-	assumeSubscribed bool
+	w                    io.Writer
+	ops                  []OrderOperation
+	orders               map[uint]Order
+	options              map[OptionId]*OptionState
+	assumeSubscribed     bool
+	maxOrders            int
+	maxPriceLevels       int
+	maxOrderReduction    int
+	maxSubscribedOptions int
 }
 
 func NewSimulator(w io.Writer) simulator {
@@ -211,6 +215,7 @@ func (s *simulator) updateOrders(op *OrderOperation, order Order) {
 		log.Fatal("Unexpected order operation", op)
 	}
 	s.outOrderUpdate(op, order)
+	s.statUpdateOrders()
 }
 
 func (s *simulator) updateOptionState(op OrderOperation) {
@@ -233,11 +238,15 @@ func (s *simulator) updateOptionState(op OrderOperation) {
 	side.updateLevel(op.price, delta)
 	topNew := side.getTop(TopPriceLevels)
 	s.outSupernode(side, topOld, topNew)
+	s.statUpdateOptionState(side)
 }
 
 func (s *simulator) subscibe(optionId OptionId) {
 	if !s.subscribed(optionId) {
 		s.options[optionId] = NewOptionState(optionId)
+		if len(s.options) > s.maxSubscribedOptions {
+			s.maxSubscribedOptions = len(s.options)
+		}
 	}
 }
 
@@ -346,6 +355,24 @@ func (s *OptionSideState) getTop(maxNum int) []PriceLevel {
 		it.Close()
 	}
 	return pl
+}
+
+// statistics
+func (s *simulator) statUpdateOrders() {
+	num := len(s.orders)
+	diff := s.maxOrders - num
+	if diff < 0 {
+		s.maxOrders = num
+	} else if diff > s.maxOrderReduction {
+		s.maxOrderReduction = diff
+	}
+}
+
+func (s *simulator) statUpdateOptionState(side *OptionSideState) {
+	num := side.levels.Len()
+	if num > s.maxPriceLevels {
+		s.maxPriceLevels = num
+	}
 }
 
 // output functions
@@ -463,4 +490,9 @@ func (s *simulator) outSupernode(state *OptionSideState, topOld, topNew []PriceL
 			pln.size, uint32(pln.price),
 		)
 	}
+}
+
+func (s *simulator) logStats() {
+	log.Printf("INFO maxOrders=%d maxPriceLevels=%d maxOrderReduction=%d maxSubscribedOptions=%d\n",
+		s.maxOrders, s.maxPriceLevels, s.maxOrderReduction, s.maxSubscribedOptions)
 }

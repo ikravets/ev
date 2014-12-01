@@ -318,6 +318,7 @@ func (t *translator) translate() {
 			t.sim.addMessage(&t.qom, t.msgType)
 		}
 	}
+	t.sim.logStats()
 }
 
 func getTsharkDump(fileName string, args []string) (reader io.Reader, finisher func()) {
