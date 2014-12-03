@@ -33,6 +33,7 @@ type simulator struct {
 	maxPriceLevels       int
 	maxOrderReduction    int
 	maxSubscribedOptions int
+	totalMessages        int
 }
 
 func NewSimulator(w io.Writer) simulator {
@@ -49,6 +50,7 @@ func (s *simulator) addMessage(qom *QOMessage, typeChar byte) {
 		return
 	}
 	//log.Printf("addMessage(%#v, %c)\n", qom, typeChar)
+	s.totalMessages++
 	s.outMessageNorm(qom, typeChar)
 	s.addMessageOperations(qom)
 	s.processOperations()
@@ -494,6 +496,6 @@ func (s *simulator) outSupernode(state *OptionSideState, topOld, topNew []PriceL
 }
 
 func (s *simulator) logStats() {
-	log.Printf("INFO maxOrders=%d maxPriceLevels=%d maxOrderReduction=%d maxSubscribedOptions=%d\n",
-		s.maxOrders, s.maxPriceLevels, s.maxOrderReduction, s.maxSubscribedOptions)
+	log.Printf("INFO maxOrders=%d maxPriceLevels=%d maxOrderReduction=%d maxSubscribedOptions=%d totalMessages=%d\n",
+		s.maxOrders, s.maxPriceLevels, s.maxOrderReduction, s.maxSubscribedOptions, s.totalMessages)
 }
