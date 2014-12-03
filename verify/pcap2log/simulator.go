@@ -207,6 +207,7 @@ func (s *simulator) updateOrders(op *OrderOperation, order Order) {
 		order.size -= op.size
 		s.orders[op.orderId] = order
 	case OrderOpRemove:
+		op.size = order.size
 		order = Order{
 			id: op.orderId,
 		}
@@ -310,9 +311,9 @@ func NewOptionSideState(side MarketSide) *OptionSideState {
 	var cmp b.Cmp
 	switch side {
 	case MarketSideBuy:
-		cmp = ComparePrice
-	case MarketSideSell:
 		cmp = ComparePriceRev
+	case MarketSideSell:
+		cmp = ComparePrice
 	default:
 		log.Fatal("unexpected market side ", side)
 	}
