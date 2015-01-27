@@ -264,7 +264,7 @@ func (t *translator) translateQOMessage() {
 	}
 }
 
-func (t *translator) translate() {
+func (t *translator) Translate() {
 	kvRegexp := regexp.MustCompile("(?m)^            ([^:]*): (.*)$")
 	parValueRegexp := regexp.MustCompile(".*\\((\\d+)\\)")
 	scanner := bufio.NewScanner(t.r)
@@ -387,7 +387,7 @@ func (p *pcap2log) maybeRun() error {
 	}
 	defer outFile.Close()
 	t := NewTranslator(dumpReader, outFile)
-	t.translate()
+	t.Translate()
 	return nil
 }
 
@@ -405,7 +405,7 @@ func InitArgv(parser *flags.Parser) func() error {
 
 func main() {
 	t := NewTranslator(os.Stdin, os.Stdout)
-	t.translate()
+	t.Translate()
 	_ = pretty.Print
 	_ = fmt.Print
 

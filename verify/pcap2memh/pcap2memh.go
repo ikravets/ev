@@ -52,7 +52,7 @@ func splitTextFrames(data []byte, atEOF bool) (advance int, token []byte, err er
 	return separatorIndex, data[:separatorIndex], nil
 }
 
-func translate(r io.Reader, dirPath string) {
+func Translate(r io.Reader, dirPath string) {
 	scanner := bufio.NewScanner(r)
 	scanner.Split(splitTextFrames)
 	hexdumpRegexp := regexp.MustCompile("(?m)^[[:xdigit:]]{4}  (([[:xdigit:]]{2} ){1,16})  ")
@@ -102,6 +102,9 @@ func translate(r io.Reader, dirPath string) {
 	}
 }
 
+/*****************************************************************************/
+// experiments and debugging
+
 func getTsharkDump(fileName string, args []string) (reader io.Reader, finisher func()) {
 	//pretty.Println(fileName, args)
 	cmdArgs := []string{
@@ -148,7 +151,7 @@ func (p *pcap2memh) maybeRun() error {
 	if err := os.MkdirAll(p.DestDirName, 0755); err != nil {
 		log.Fatal(err)
 	}
-	translate(dumpReader, p.DestDirName)
+	Translate(dumpReader, p.DestDirName)
 	return nil
 }
 
@@ -223,7 +226,7 @@ func tryCli() {
 				}
 				dumpReader, finisher := getTsharkDump(inputFile, c.Args())
 				defer finisher()
-				translate(dumpReader, destDir)
+				Translate(dumpReader, destDir)
 			},
 		},
 	}
@@ -234,7 +237,7 @@ func tryHardCoded() {
 	tsharkArgs := []string{"-c", "1000"}
 	dumpReader, finisher := getTsharkDump("/home/ilia/my/proj/ekaline/tmp/nasdaq/mcast.nasdaq.20140910.pcap", tsharkArgs)
 	defer finisher()
-	translate(dumpReader, "/tmp/packets")
+	Translate(dumpReader, "/tmp/packets")
 }
 
 func main() {
