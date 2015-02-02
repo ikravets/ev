@@ -60,7 +60,7 @@ func (s *Splitter) HandleMessage(message packet.ApplicationMessage) {
 	ops := s.idb.MessageOperations(&m)
 	for _, op := range ops {
 		//log.Println(op)
-		op.Apply()
+		s.idb.ApplyOperation(op)
 		oid := op.GetOptionId()
 		if oid.Valid() {
 			s.packetOids = append(s.packetOids, oid)
