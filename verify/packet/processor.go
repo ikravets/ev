@@ -4,12 +4,14 @@
 package packet
 
 import (
+	"io"
 	"log"
-	"my/itto/verify/packet/itto"
-	"my/itto/verify/packet/moldudp64"
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
+
+	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet/moldudp64"
 )
 
 type Obtainer interface {
@@ -74,7 +76,14 @@ func (p *processor) ProcessAll() error {
 	source := gopacket.NewPacketSource(p.obtainer, p.obtainer.LinkType())
 	source.NoCopy = true
 	packetNum := 0
-	for packet := range source.Packets() {
+	for {
+		packet, err := source.NextPacket()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
 		p.decodeAppLayer(packet) // ignore errors
 		p.handler.HandlePacket(packet)
 
