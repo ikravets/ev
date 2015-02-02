@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"code.google.com/p/gopacket"
+	"code.google.com/p/gopacket/pcap"
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
@@ -14,11 +15,13 @@ import (
 )
 
 type Splitter struct {
-	packetNum     int
-	idb           sim.IttoDb
-	packetOids    []itto.OptionId
-	invalidOidNum int
-	allPacketOids [][]itto.OptionId
+	inputFileName    string
+	inputPacketLimit int
+	packetNum        int
+	idb              sim.IttoDb
+	packetOids       []itto.OptionId
+	invalidOidNum    int
+	allPacketOids    [][]itto.OptionId
 }
 
 func NewSplitter() *Splitter {
@@ -27,12 +30,32 @@ func NewSplitter() *Splitter {
 	}
 }
 
+func (s *Splitter) SetInput(fileName string, limit int) {
+	s.inputFileName = fileName
+	s.inputPacketLimit = limit
+}
+
+func (s *Splitter) AnalyzeInput() error {
+	handle, err := pcap.OpenOffline(s.inputFileName)
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
+	pp := packet.NewProcessor()
+	pp.LimitPacketNumber(s.inputPacketLimit)
+	pp.SetObtainer(handle)
+	pp.SetHandler(s)
+	pp.ProcessAll()
+	s.HandlePacket(nil) // process the last packet
+	return nil
+}
+
 func (s *Splitter) HandlePacket(packet gopacket.Packet) {
 	s.packetNum++
 	if s.packetNum%10000 == 0 {
 		log.Printf("stats packets:%d %#v invOid:%d\n", s.packetNum, s.idb.Stats(), s.invalidOidNum)
 	}
-	//fmt.Println(s.packetNum, packet)
+	// process *previous* packet info
 
 	// uniquefy packet oids
 	oidSet := make(map[itto.OptionId]struct{})
@@ -46,9 +69,7 @@ func (s *Splitter) HandlePacket(packet gopacket.Packet) {
 	}
 	uniqOids := make([]itto.OptionId, uniq)
 	copy(uniqOids, s.packetOids)
-	//if len(uniqOids) > 0 {
-	//log.Println(uniqOids)
-	//}
+
 	s.allPacketOids = append(s.allPacketOids, uniqOids)
 	s.packetOids = s.packetOids[:0]
 }

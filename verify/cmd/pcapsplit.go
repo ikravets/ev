@@ -9,10 +9,8 @@ import (
 	"os"
 	"strconv"
 
-	"code.google.com/p/gopacket/pcap"
 	"github.com/jessevdk/go-flags"
 
-	"my/itto/verify/packet"
 	"my/itto/verify/pcapsplit"
 )
 
@@ -43,18 +41,11 @@ func (p *cmdPcapsplit) ParsingFinished() {
 	if err := os.MkdirAll(p.DestDirName, 0755); err != nil {
 		log.Fatal(err)
 	}
-	handle, err := pcap.OpenOffline(p.InputFileName)
-	if err != nil {
+	splitter := pcapsplit.NewSplitter()
+	splitter.SetInput(p.InputFileName, p.PacketNumLimit)
+	if err := splitter.AnalyzeInput(); err != nil {
 		log.Fatal(err)
 	}
-	defer handle.Close()
-
-	pp := packet.NewProcessor()
-	pp.LimitPacketNumber(p.PacketNumLimit)
-	pp.SetObtainer(handle)
-	splitter := pcapsplit.NewSplitter()
-	pp.SetHandler(splitter)
-	pp.ProcessAll()
 	pbo := splitter.PacketByOptionAll()
 	//log.Println(splitter.AllPacketOids())
 	//log.Println(pbo)
