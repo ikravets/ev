@@ -19,6 +19,7 @@ type cmdPcapsplit struct {
 	InputFileName    string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
 	PacketNumLimit   int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
 	MinPacketsPerOid int    `long:"min-chain" short:"m" value-name:"NUM" description:"ignore options which appear in less than NUM packets"`
+	UseEditcap       bool   `long:"editcap" short:"e" description:"don't write pcap files, just output editcap commands"`
 	shouldExecute    bool
 }
 
@@ -51,24 +52,28 @@ func (p *cmdPcapsplit) ParsingFinished() {
 	//log.Println(pbo)
 	for oid, pnums := range pbo {
 		if len(pnums) < p.MinPacketsPerOid {
-			log.Printf("option %d with %d packets ignored\n", oid, len(pnums))
+			//log.Printf("option %d with %d packets ignored\n", oid, len(pnums))
 			continue
 		}
+		log.Printf("oid %6d => pkts %d : %v\n", oid, len(pnums), pnums)
 		outFileName := fmt.Sprintf("%s/%d.pcap", p.DestDirName, oid)
-		editcapArgs := []string{
-			"-r",
-			p.InputFileName,
-			outFileName,
+		if p.UseEditcap {
+			editcapArgs := []string{
+				"-r",
+				p.InputFileName,
+				outFileName,
+			}
+			for _, pnum := range pnums {
+				editcapArgs = append(editcapArgs, strconv.Itoa(pnum))
+			}
+			//log.Printf("editcap %v\n", editcapArgs)
+			cmdStr := fmt.Sprintf("%v", editcapArgs)
+			cmdStr = cmdStr[1 : len(cmdStr)-1]
+			cmdStr = "editcap " + cmdStr
+			fmt.Println(cmdStr)
+		} else {
+			splitter.SplitByOption(oid, outFileName)
 		}
-		for _, pnum := range pnums {
-			editcapArgs = append(editcapArgs, strconv.Itoa(pnum))
-		}
-		log.Printf("oid %d => pkts %d : %v\n", oid, len(pnums), pnums)
-		log.Printf("editcap %v\n", editcapArgs)
-		cmdStr := fmt.Sprintf("%v", editcapArgs)
-		cmdStr = cmdStr[1 : len(cmdStr)-1]
-		cmdStr = "editcap " + cmdStr
-		fmt.Println(cmdStr)
 	}
 }
 

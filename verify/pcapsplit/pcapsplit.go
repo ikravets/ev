@@ -5,9 +5,12 @@ package pcapsplit
 
 import (
 	"log"
+	"os"
 
 	"code.google.com/p/gopacket"
+	"code.google.com/p/gopacket/layers"
 	"code.google.com/p/gopacket/pcap"
+	"code.google.com/p/gopacket/pcapgo"
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
@@ -47,6 +50,39 @@ func (s *Splitter) AnalyzeInput() error {
 	pp.SetHandler(s)
 	pp.ProcessAll()
 	s.HandlePacket(nil) // process the last packet
+	return nil
+}
+
+func (s *Splitter) SplitByOption(oid itto.OptionId, fileName string) error {
+	inHandle, err := pcap.OpenOffline(s.inputFileName)
+	if err != nil {
+		return err
+	}
+	defer inHandle.Close()
+
+	outFile, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+	w := pcapgo.NewWriter(outFile)
+	if err := w.WriteFileHeader(65536, layers.LinkTypeEthernet); err != nil {
+		return err
+	}
+
+	for _, poids := range s.allPacketOids[1:] {
+		data, ci, err := inHandle.ZeroCopyReadPacketData()
+		if err != nil {
+			return err
+		}
+		for _, poid := range poids {
+			if poid == oid {
+				if err := w.WritePacket(ci, data); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 
