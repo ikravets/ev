@@ -6,10 +6,11 @@ package sim
 import (
 	"errors"
 	"log"
-	"my/itto/verify/packet"
-	"my/itto/verify/packet/itto"
 
 	"code.google.com/p/gopacket"
+
+	"my/itto/verify/packet"
+	"my/itto/verify/packet/itto"
 )
 
 var _ = log.Ldate
@@ -96,7 +97,8 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 	}
 	switch op := operation.(type) {
 	case *OperationAdd:
-		newOrder := order{OId: op.optionId, OrderSide: op.OrderSide}
+		// intentionally allow adding zero price/size orders
+		o := order{OId: op.optionId, OrderSide: op.OrderSide}
 		if op.origOrder != nil {
 			if op.optionId.Valid() {
 				log.Fatalf("bad option id for add operation %#v origOrder=%#v\n", op, *op.origOrder)
@@ -104,25 +106,23 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 			if op.Side != itto.MarketSideUnknown && op.Side != op.origOrder.Side {
 				log.Fatalf("bad side for add operation %#v origOrder=%#v\n", op, *op.origOrder)
 			}
-			newOrder.OId = op.origOrder.OId
-			newOrder.Side = op.origOrder.Side
+			o.OId = op.origOrder.OId
+			o.Side = op.origOrder.Side
 		}
-		d.orders[op.orderIndex()] = newOrder
-	case *OperationRemove:
-		delete(d.orders, op.origOrderIndex())
-	case *OperationUpdate:
-		o := *op.origOrder
-		o.Size -= op.sizeChange
+		d.orders[op.orderIndex()] = o
+	default:
+		o := *operation.getOperation().origOrder
+		oidx := operation.getOperation().origOrderIndex()
+		o.Size += op.GetSizeDelta()
 		switch {
 		case o.Size > 0:
-			d.orders[op.origOrderIndex()] = o
+			d.orders[oidx] = o
 		case o.Size == 0:
-			delete(d.orders, op.origOrderIndex())
+			// treat OperationUpdate which zeroes order size as order removal
+			delete(d.orders, oidx)
 		case o.Size < 0:
-			log.Fatalf("negative size after operation %#v origOrder=%#v\n", op, *op.origOrder)
+			log.Fatalf("negative size after operation %#v origOrder=%#v\n", operation, o)
 		}
-	default:
-		log.Fatal("unknown operation ", operation)
 	}
 }
 
