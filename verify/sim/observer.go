@@ -79,34 +79,63 @@ func (s *SimLogger) MessageArrived(idm *IttoDbMessage) {
 	}
 }
 func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
-	marketSide2int := func(ms itto.MarketSide) int {
-		if ms == itto.MarketSideAsk {
-			return 1
-		} else {
-			return 0
-		}
+	type ordrespLogInfo struct {
+		notFound, addOp, refNum uint32
+		optionId                itto.OptionId
+		side, price, size       int
+		ordlSuffix              string
 	}
-	switch op := operation.(type) {
-	case *OperationAdd:
-		refNum := op.RefNumD.Delta()
-		s.printfln("ORDL 1 %08x %08x", refNum, op.optionId)
-		s.printfln("ORDRESP 0 1 0 %08x %08x %08x %08x", 0, 0, op.optionId, refNum)
-		if op.GetOptionId().Valid() {
-			s.printfln("ORDU %08x %08x %d %08x %08x", refNum, op.GetOptionId(), marketSide2int(op.GetSide()), op.GetPrice(), op.GetSizeDelta())
+	type orduLogInfo struct {
+		refNum            uint32
+		optionId          itto.OptionId
+		side, price, size int
+	}
+
+	var or ordrespLogInfo
+	var ou orduLogInfo
+	if op, ok := operation.(*OperationAdd); ok {
+		or = ordrespLogInfo{
+			addOp:      1,
+			refNum:     op.RefNumD.Delta(),
+			optionId:   op.optionId,
+			ordlSuffix: fmt.Sprintf(" %08x", op.optionId),
 		}
-	default:
-		refNum := op.getOperation().origRefNumD.Delta()
-		s.printfln("ORDL 0 %08x", refNum)
-		if op.GetOptionId().Valid() {
-			s.printfln("ORDRESP 0 0 %d %08x %08x %08x %08x", marketSide2int(op.GetSide()), -op.GetSizeDelta(), op.GetPrice(), op.GetOptionId(), refNum)
-			size := op.getOperation().origOrder.Size + op.GetSizeDelta()
-			if size == 0 {
-				s.printfln("ORDU %08x %08x %d %08x %08x", refNum, 0, 0, 0, 0)
-			} else {
-				s.printfln("ORDU %08x %08x %d %08x %08x", refNum, op.GetOptionId(), marketSide2int(op.GetSide()), op.GetPrice(), size)
-			}
+		ou = orduLogInfo{
+			refNum:   or.refNum,
+			optionId: op.GetOptionId(),
+			price:    op.GetPrice(),
+			size:     op.GetNewSize(),
+		}
+		if op.GetSide() == itto.MarketSideAsk {
+			ou.side = 1
+		}
+	} else {
+		if operation.GetOptionId().Invalid() {
+			or = ordrespLogInfo{notFound: 1}
 		} else {
-			s.printfln("ORDRESP 1 0 %d %08x %08x %08x %08x", marketSide2int(op.GetSide()), 0, 0, 0, refNum)
+			or = ordrespLogInfo{
+				optionId: operation.GetOptionId(),
+				price:    operation.GetPrice(),
+				size:     -operation.GetSizeDelta(),
+			}
+			if operation.GetSide() == itto.MarketSideAsk {
+				or.side = 1
+			}
 		}
+		if operation.GetNewSize() != 0 {
+			ou = orduLogInfo{
+				optionId: or.optionId,
+				side:     or.side,
+				price:    or.price,
+				size:     operation.GetNewSize(),
+			}
+		}
+		or.refNum = operation.getOperation().origRefNumD.Delta()
+		ou.refNum = or.refNum
+	}
+	s.printfln("ORDL %d %08x%s", or.addOp, or.refNum, or.ordlSuffix)
+	s.printfln("ORDRESP %d %d %d %08x %08x %08x %08x", or.notFound, or.addOp, or.side, or.size, or.price, or.optionId, or.refNum)
+	if operation.GetOptionId().Valid() {
+		s.printfln("ORDU %08x %08x %d %08x %08x", ou.refNum, ou.optionId, ou.side, ou.price, ou.size)
 	}
 }
