@@ -130,6 +130,7 @@ type IttoOperation interface {
 	GetOptionId() itto.OptionId
 	GetSide() itto.MarketSide
 	GetSizeDelta() int
+	GetNewSize() int
 	GetPrice() int
 	getOperation() *Operation
 }
@@ -203,6 +204,9 @@ func (o *OperationAdd) GetPrice() int {
 func (o *OperationAdd) GetSizeDelta() int {
 	return o.Size
 }
+func (o *OperationAdd) GetNewSize() int {
+	return o.Size
+}
 func (op *OperationAdd) orderIndex() orderIndex {
 	return NewOrderIndex(op.d, op.m.Pam.Flow(), op.RefNumD)
 }
@@ -226,6 +230,9 @@ func (o *OperationRemove) GetSizeDelta() int {
 		log.Fatal("no origOrder")
 	}
 	return -o.origOrder.Size
+}
+func (o *OperationRemove) GetNewSize() int {
+	return 0
 }
 func (o *OperationRemove) GetPrice() int {
 	o.Operation.populate()
@@ -251,6 +258,13 @@ func (o *OperationUpdate) GetSide() (side itto.MarketSide) {
 }
 func (o *OperationUpdate) GetSizeDelta() int {
 	return -o.sizeChange
+}
+func (o *OperationUpdate) GetNewSize() int {
+	o.Operation.populate()
+	if o.origOrder == nil {
+		log.Fatal("no origOrder")
+	}
+	return o.origOrder.Size - o.sizeChange
 }
 func (o *OperationUpdate) GetPrice() int {
 	o.Operation.populate()
