@@ -13,6 +13,7 @@ import (
 
 type Book interface {
 	ApplyOperation(operation IttoOperation)
+	GetTop(itto.OptionId, itto.MarketSide, int) []PriceLevel
 }
 
 func NewBook() Book {
@@ -36,6 +37,27 @@ func (b *book) ApplyOperation(operation IttoOperation) {
 		b.options[oid] = os
 	}
 	os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
+}
+
+func (b *book) GetTop(optionId itto.OptionId, side itto.MarketSide, levels int) []PriceLevel {
+	os, ok := b.options[optionId]
+	if !ok {
+		return nil
+	}
+	s := os.Side(side)
+
+	pl := make([]PriceLevel, 0, levels)
+	if it, err := s.levels.SeekFirst(); err == nil {
+		for i := 0; i < levels; i++ {
+			if _, v, err := it.Next(); err != nil {
+				break
+			} else {
+				pl = append(pl, v.(PriceLevel))
+			}
+		}
+		it.Close()
+	}
+	return pl
 }
 
 type PriceLevel struct {
