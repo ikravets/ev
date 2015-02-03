@@ -23,6 +23,7 @@ type Splitter struct {
 	inputPacketLimit int
 	packetNum        int
 	idb              sim.IttoDb
+	book             sim.Book
 	packetOids       []itto.OptionId
 	invalidOidNum    int
 	allPacketOids    [][]itto.OptionId
@@ -30,7 +31,8 @@ type Splitter struct {
 
 func NewSplitter() *Splitter {
 	return &Splitter{
-		idb: sim.NewIttoDb(),
+		idb:  sim.NewIttoDb(),
+		book: sim.NewBook(),
 	}
 }
 
@@ -151,6 +153,7 @@ func (s *Splitter) HandleMessage(message packet.ApplicationMessage) {
 	for _, op := range ops {
 		//log.Println(op)
 		s.idb.ApplyOperation(op)
+		s.book.ApplyOperation(op)
 		oid := op.GetOptionId()
 		if oid.Valid() {
 			s.packetOids = append(s.packetOids, oid)
