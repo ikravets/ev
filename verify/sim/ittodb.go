@@ -128,6 +128,9 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 
 type IttoOperation interface {
 	GetOptionId() itto.OptionId
+	GetSide() itto.MarketSide
+	GetSizeDelta() int
+	GetPrice() int
 	getOperation() *Operation
 }
 
@@ -152,11 +155,9 @@ func (op *Operation) populate() {
 		}
 	}
 }
-
 func (op *Operation) origOrderIndex() orderIndex {
 	return NewOrderIndex(op.d, op.m.Pam.Flow(), op.origRefNumD)
 }
-
 func (o *Operation) getOptionId() (oid itto.OptionId) {
 	o.populate()
 	if o.origOrder != nil {
@@ -164,6 +165,13 @@ func (o *Operation) getOptionId() (oid itto.OptionId) {
 	} else {
 		return itto.OptionId(0)
 	}
+}
+func (o *Operation) getSide() (side itto.MarketSide) {
+	o.populate()
+	if o.origOrder != nil {
+		side = o.origOrder.Side
+	}
+	return
 }
 
 type OperationAdd struct {
@@ -182,6 +190,19 @@ func (o *OperationAdd) GetOptionId() itto.OptionId {
 		return o.Operation.getOptionId()
 	}
 }
+func (o *OperationAdd) GetSide() (side itto.MarketSide) {
+	if o.Side != itto.MarketSideUnknown {
+		return o.Side
+	} else {
+		return o.Operation.getSide()
+	}
+}
+func (o *OperationAdd) GetPrice() int {
+	return o.Price
+}
+func (o *OperationAdd) GetSizeDelta() int {
+	return o.Size
+}
 func (op *OperationAdd) orderIndex() orderIndex {
 	return NewOrderIndex(op.d, op.m.Pam.Flow(), op.RefNumD)
 }
@@ -196,6 +217,23 @@ func (o *OperationRemove) getOperation() *Operation {
 func (o *OperationRemove) GetOptionId() itto.OptionId {
 	return o.Operation.getOptionId()
 }
+func (o *OperationRemove) GetSide() (side itto.MarketSide) {
+	return o.Operation.getSide()
+}
+func (o *OperationRemove) GetSizeDelta() int {
+	o.Operation.populate()
+	if o.origOrder == nil {
+		log.Fatal("no origOrder")
+	}
+	return -o.origOrder.Size
+}
+func (o *OperationRemove) GetPrice() int {
+	o.Operation.populate()
+	if o.origOrder == nil {
+		log.Fatal("no origOrder")
+	}
+	return o.origOrder.Price
+}
 
 type OperationUpdate struct {
 	Operation
@@ -207,6 +245,19 @@ func (o *OperationUpdate) getOperation() *Operation {
 }
 func (o *OperationUpdate) GetOptionId() itto.OptionId {
 	return o.Operation.getOptionId()
+}
+func (o *OperationUpdate) GetSide() (side itto.MarketSide) {
+	return o.Operation.getSide()
+}
+func (o *OperationUpdate) GetSizeDelta() int {
+	return -o.sizeChange
+}
+func (o *OperationUpdate) GetPrice() int {
+	o.Operation.populate()
+	if o.origOrder == nil {
+		log.Fatal("no origOrder")
+	}
+	return o.origOrder.Price
 }
 
 func (d *db) MessageOperations(m *IttoDbMessage) []IttoOperation {
