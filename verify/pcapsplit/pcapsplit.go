@@ -4,6 +4,7 @@
 package pcapsplit
 
 import (
+	"io"
 	"log"
 	"os"
 
@@ -53,37 +54,69 @@ func (s *Splitter) AnalyzeInput() error {
 	return nil
 }
 
-func (s *Splitter) SplitByOption(oid itto.OptionId, fileName string) error {
+type SplitByOptionsConfig struct {
+	Writer        io.Writer
+	LastPacketNum *int
+	AppendOnly    bool
+}
+
+func (s *Splitter) SplitByOptions(confs map[itto.OptionId]SplitByOptionsConfig) error {
 	inHandle, err := pcap.OpenOffline(s.inputFileName)
 	if err != nil {
 		return err
 	}
 	defer inHandle.Close()
 
-	outFile, err := os.Create(fileName)
-	if err != nil {
-		return err
+	type state struct {
+		SplitByOptionsConfig
+		w             *pcapgo.Writer
+		lastPacketNum *int
 	}
-	defer outFile.Close()
-	w := pcapgo.NewWriter(outFile)
-	if err := w.WriteFileHeader(65536, layers.LinkTypeEthernet); err != nil {
-		return err
+	states := make(map[itto.OptionId]*state)
+
+	for oid, conf := range confs {
+		state := state{
+			SplitByOptionsConfig: conf,
+			w:                    pcapgo.NewWriter(conf.Writer),
+			lastPacketNum:        conf.LastPacketNum,
+		}
+		if state.lastPacketNum == nil {
+			state.lastPacketNum = new(int)
+		}
+		if !conf.AppendOnly {
+			if err := state.w.WriteFileHeader(65536, layers.LinkTypeEthernet); err != nil {
+				return err
+			}
+		}
+		states[oid] = &state
 	}
 
-	for _, poids := range s.allPacketOids[1:] {
+	for i, poids := range s.allPacketOids[1:] {
 		data, ci, err := inHandle.ZeroCopyReadPacketData()
 		if err != nil {
 			return err
 		}
 		for _, poid := range poids {
-			if poid == oid {
-				if err := w.WritePacket(ci, data); err != nil {
+			if state := states[poid]; state != nil && *state.lastPacketNum < i {
+				if err := state.w.WritePacket(ci, data); err != nil {
 					return err
 				}
+				*state.lastPacketNum = i
 			}
 		}
 	}
 	return nil
+}
+
+func (s *Splitter) SplitByOption(oid itto.OptionId, fileName string) error {
+	outFile, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+	confs := make(map[itto.OptionId]SplitByOptionsConfig)
+	confs[oid] = SplitByOptionsConfig{Writer: outFile}
+	return s.SplitByOptions(confs)
 }
 
 func (s *Splitter) HandlePacket(packet gopacket.Packet) {
