@@ -14,16 +14,23 @@ import (
 type Observer interface {
 	MessageArrived(*IttoDbMessage)
 	OperationAppliedToOrders(IttoOperation)
+	BeforeBookUpdate(Book, IttoOperation)
+	AfterBookUpdate(Book, IttoOperation)
 }
 
 type NilObserver struct{}
 
 func (*NilObserver) MessageArrived(*IttoDbMessage)          {}
 func (*NilObserver) OperationAppliedToOrders(IttoOperation) {}
+func (*NilObserver) BeforeBookUpdate(Book, IttoOperation)   {}
+func (*NilObserver) AfterBookUpdate(Book, IttoOperation)    {}
 
 type SimLogger struct {
-	w io.Writer
+	w              io.Writer
+	tobOld, tobNew []PriceLevel
 }
+
+const SimLoggerSupernodeLevels = 32
 
 func NewSimLogger(w io.Writer) *SimLogger {
 	return &SimLogger{w: w}
@@ -137,5 +144,32 @@ func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
 	s.printfln("ORDRESP %d %d %d %08x %08x %08x %08x", or.notFound, or.addOp, or.side, or.size, or.price, or.optionId, or.refNum)
 	if operation.GetOptionId().Valid() {
 		s.printfln("ORDU %08x %08x %d %08x %08x", ou.refNum, ou.optionId, ou.side, ou.price, ou.size)
+	}
+}
+func (s *SimLogger) BeforeBookUpdate(book Book, operation IttoOperation) {
+	s.tobOld = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
+}
+func (s *SimLogger) AfterBookUpdate(book Book, operation IttoOperation) {
+	if operation.GetOptionId().Invalid() {
+		return
+	}
+	s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
+
+	empty := PriceLevel{}
+	if operation.GetSide() == itto.MarketSideAsk {
+		empty.price = -1
+	}
+	for i := 0; i < SimLoggerSupernodeLevels; i++ {
+		plo, pln := empty, empty
+		if i < len(s.tobOld) {
+			plo = s.tobOld[i]
+		}
+		if i < len(s.tobNew) {
+			pln = s.tobNew[i]
+		}
+		s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
+			plo.size, uint32(plo.price),
+			pln.size, uint32(pln.price),
+		)
 	}
 }
