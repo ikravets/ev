@@ -23,19 +23,23 @@ type Obtainer interface {
 type ApplicationMessage interface {
 	Flow() gopacket.Flow
 	Layer() gopacket.Layer
+	SequenceNumber() uint64
 }
 
 type applicationMessage struct {
-	layer gopacket.Layer
-	flow  gopacket.Flow
+	layer  gopacket.Layer
+	flow   gopacket.Flow
+	seqNum uint64
 }
 
 func (am *applicationMessage) Layer() gopacket.Layer {
 	return am.layer
 }
-
 func (am *applicationMessage) Flow() gopacket.Flow {
 	return am.flow
+}
+func (am *applicationMessage) SequenceNumber() uint64 {
+	return am.seqNum
 }
 
 type Handler interface {
@@ -88,22 +92,26 @@ func (p *processor) ProcessAll() error {
 		p.handler.HandlePacket(packet)
 
 		var flow gopacket.Flow = gopacket.InvalidFlow
+		var seqNum uint64
 		for _, l := range packet.Layers() {
 			if mu, ok := l.(*moldudp64.MoldUDP64); ok {
 				if flow != gopacket.InvalidFlow {
 					log.Fatal("duplicate MoldUDP64 layer")
 				}
 				flow = mu.Flow()
+				seqNum = mu.SequenceNumber
 			}
 			if itto.LayerClassItto.Contains(l.LayerType()) {
 				if flow == gopacket.InvalidFlow {
 					log.Fatal("incorrect layer order, flow == nil")
 				}
 				m := applicationMessage{
-					layer: l,
-					flow:  flow,
+					layer:  l,
+					flow:   flow,
+					seqNum: seqNum,
 				}
 				p.handler.HandleMessage(&m)
+				seqNum++
 			}
 		}
 		packetNum++
