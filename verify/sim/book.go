@@ -61,16 +61,16 @@ func (b *book) GetTop(optionId itto.OptionId, side itto.MarketSide, levels int) 
 }
 
 type PriceLevel struct {
-	price int
-	size  int
+	Price int
+	Size  int
 }
 
 func (l *PriceLevel) UpdateSize(delta int) bool {
-	l.size += delta
-	if l.size < 0 {
+	l.Size += delta
+	if l.Size < 0 {
 		log.Fatal("size becomes negative ", l, delta)
 	}
-	return l.size != 0
+	return l.Size != 0
 }
 
 type optionState struct {
@@ -132,7 +132,7 @@ func (s *optionSideState) updateLevel(price int, delta int) {
 		if exists {
 			v = oldV.(PriceLevel)
 		} else {
-			v = PriceLevel{price: price}
+			v = PriceLevel{Price: price}
 		}
 		write = v.UpdateSize(delta)
 		return v, write

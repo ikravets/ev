@@ -157,7 +157,7 @@ func (s *SimLogger) AfterBookUpdate(book Book, operation IttoOperation) {
 
 	empty := PriceLevel{}
 	if operation.GetSide() == itto.MarketSideAsk {
-		empty.price = -1
+		empty.Price = -1
 	}
 	for i := 0; i < SimLoggerSupernodeLevels; i++ {
 		plo, pln := empty, empty
@@ -168,8 +168,8 @@ func (s *SimLogger) AfterBookUpdate(book Book, operation IttoOperation) {
 			pln = s.tobNew[i]
 		}
 		s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
-			plo.size, uint32(plo.price),
-			pln.size, uint32(pln.price),
+			plo.Size, uint32(plo.Price),
+			pln.Size, uint32(pln.Price),
 		)
 	}
 }
