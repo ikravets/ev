@@ -53,6 +53,15 @@ func decodeWithIttoMessageTypePrefix(data []byte, p gopacket.PacketBuilder) erro
 }
 
 /************************************************************************/
+const (
+	PriceScale      = 10000
+	PriceScaleShort = 100
+)
+
+func PriceShortToLong(shortPrice int) int {
+	return shortPrice * PriceScale / PriceScaleShort
+}
+
 type MarketSide byte
 
 const (
@@ -433,7 +442,7 @@ func decodeIttoAddOrder(data []byte, p gopacket.PacketBuilder) error {
 		OId: OptionId(binary.BigEndian.Uint32(data[10:14])),
 	}
 	if m.Type.IsShort() {
-		m.Price = int(binary.BigEndian.Uint16(data[14:16]))
+		m.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[14:16])))
 		m.Size = int(binary.BigEndian.Uint16(data[16:18]))
 	} else {
 		m.Price = int(binary.BigEndian.Uint32(data[14:18]))
@@ -459,9 +468,9 @@ func decodeIttoAddQuote(data []byte, p gopacket.PacketBuilder) error {
 		OId:         OptionId(binary.BigEndian.Uint32(data[13:17])),
 	}
 	if m.Type.IsShort() {
-		m.Bid.Price = int(binary.BigEndian.Uint16(data[17:19]))
+		m.Bid.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[17:19])))
 		m.Bid.Size = int(binary.BigEndian.Uint16(data[19:21]))
-		m.Ask.Price = int(binary.BigEndian.Uint16(data[21:23]))
+		m.Ask.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[21:23])))
 		m.Ask.Size = int(binary.BigEndian.Uint16(data[23:25]))
 	} else {
 		m.Bid.Price = int(binary.BigEndian.Uint32(data[17:21]))
@@ -549,7 +558,7 @@ func decodeIttoSingleSideReplace(data []byte, p gopacket.PacketBuilder) error {
 		},
 	}
 	if m.Type.IsShort() {
-		m.Price = int(binary.BigEndian.Uint16(data[13:15]))
+		m.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[13:15])))
 		m.Size = int(binary.BigEndian.Uint16(data[15:17]))
 	} else {
 		m.Price = int(binary.BigEndian.Uint32(data[13:17]))
@@ -615,9 +624,9 @@ func decodeIttoQuoteReplace(data []byte, p gopacket.PacketBuilder) error {
 		},
 	}
 	if m.Type.IsShort() {
-		m.Bid.Price = int(binary.BigEndian.Uint16(data[21:23]))
+		m.Bid.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[21:23])))
 		m.Bid.Size = int(binary.BigEndian.Uint16(data[23:25]))
-		m.Ask.Price = int(binary.BigEndian.Uint16(data[25:27]))
+		m.Ask.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[25:27])))
 		m.Ask.Size = int(binary.BigEndian.Uint16(data[27:29]))
 	} else {
 		m.Bid.Price = int(binary.BigEndian.Uint32(data[21:25]))
