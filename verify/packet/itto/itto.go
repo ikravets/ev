@@ -6,6 +6,7 @@ package itto
 import (
 	"encoding/binary"
 	"strconv"
+	"time"
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
@@ -135,11 +136,11 @@ type IttoMessageType uint8
 
 const (
 	IttoMessageTypeSeconds                     IttoMessageType = 'T'
-	IttoMessageTypeSystemEvent                 IttoMessageType = 'S' // TODO
-	IttoMessageTypeBaseReference               IttoMessageType = 'L' // TODO
-	IttoMessageTypeOptionDirectory             IttoMessageType = 'R' // TODO
-	IttoMessageTypeOptionsTradingAction        IttoMessageType = 'H' // TODO
-	IttoMessageTypeOptionsOpen                 IttoMessageType = 'O' // TODO
+	IttoMessageTypeSystemEvent                 IttoMessageType = 'S'
+	IttoMessageTypeBaseReference               IttoMessageType = 'L'
+	IttoMessageTypeOptionDirectory             IttoMessageType = 'R'
+	IttoMessageTypeOptionsTradingAction        IttoMessageType = 'H'
+	IttoMessageTypeOptionOpen                  IttoMessageType = 'O'
 	IttoMessageTypeAddOrderShort               IttoMessageType = 'a'
 	IttoMessageTypeAddOrderLong                IttoMessageType = 'A'
 	IttoMessageTypeAddQuoteShort               IttoMessageType = 'j'
@@ -206,11 +207,39 @@ func init() {
 			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSeconds), gopacket.LayerTypeMetadata{"IttoSeconds", nil}),
 		},
 	}
+	IttoMessageTypeMetadata[IttoMessageTypeSystemEvent] = EnumMessageTypeMetadata{
+		EnumMetadata: layers.EnumMetadata{
+			DecodeWith: gopacket.DecodeFunc(decodeIttoSystemEvent),
+			Name:       "SystemEvent",
+			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSystemEvent), gopacket.LayerTypeMetadata{"IttoSystemEvent", nil}),
+		},
+	}
 	IttoMessageTypeMetadata[IttoMessageTypeBaseReference] = EnumMessageTypeMetadata{
 		EnumMetadata: layers.EnumMetadata{
 			DecodeWith: gopacket.DecodeFunc(decodeIttoBaseReference),
 			Name:       "BaseReference",
 			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeBaseReference), gopacket.LayerTypeMetadata{"IttoBaseReference", nil}),
+		},
+	}
+	IttoMessageTypeMetadata[IttoMessageTypeOptionDirectory] = EnumMessageTypeMetadata{
+		EnumMetadata: layers.EnumMetadata{
+			DecodeWith: gopacket.DecodeFunc(decodeIttoOptionDirectory),
+			Name:       "OptionDirectory",
+			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeOptionDirectory), gopacket.LayerTypeMetadata{"IttoOptionDirectory", nil}),
+		},
+	}
+	IttoMessageTypeMetadata[IttoMessageTypeOptionsTradingAction] = EnumMessageTypeMetadata{
+		EnumMetadata: layers.EnumMetadata{
+			DecodeWith: gopacket.DecodeFunc(decodeIttoOptionTradingAction),
+			Name:       "OptionTradingAction",
+			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeOptionsTradingAction), gopacket.LayerTypeMetadata{"IttoOptionTradingAction", nil}),
+		},
+	}
+	IttoMessageTypeMetadata[IttoMessageTypeOptionOpen] = EnumMessageTypeMetadata{
+		EnumMetadata: layers.EnumMetadata{
+			DecodeWith: gopacket.DecodeFunc(decodeIttoOptionOpen),
+			Name:       "OptionOpen",
+			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeOptionOpen), gopacket.LayerTypeMetadata{"IttoOptionOpen", nil}),
 		},
 	}
 	IttoMessageTypeMetadata[IttoMessageTypeAddOrderShort] = EnumMessageTypeMetadata{
@@ -411,6 +440,21 @@ func decodeIttoSeconds(data []byte, p gopacket.PacketBuilder) error {
 }
 
 /************************************************************************/
+type IttoMessageSystemEvent struct {
+	IttoMessage
+	EventCode byte
+}
+
+func decodeIttoSystemEvent(data []byte, p gopacket.PacketBuilder) error {
+	m := &IttoMessageSystemEvent{
+		IttoMessage: decodeIttoMessage(data),
+		EventCode:   data[5],
+	}
+	p.AddLayer(m)
+	return nil
+}
+
+/************************************************************************/
 type IttoMessageBaseReference struct {
 	IttoMessage
 	BaseRefNum uint64
@@ -420,6 +464,73 @@ func decodeIttoBaseReference(data []byte, p gopacket.PacketBuilder) error {
 	m := &IttoMessageBaseReference{
 		IttoMessage: decodeIttoMessage(data),
 		BaseRefNum:  binary.BigEndian.Uint64(data[5:13]),
+	}
+	p.AddLayer(m)
+	return nil
+}
+
+/************************************************************************/
+type IttoMessageOptionDirectory struct {
+	IttoMessage
+	OId              OptionId
+	Symbol           string
+	Expiration       time.Time
+	StrikePrice      int
+	OType            byte
+	Source           uint8
+	UnderlyingSymbol string
+	ClosingType      byte
+	Tradable         byte
+	MPV              byte
+}
+
+func decodeIttoOptionDirectory(data []byte, p gopacket.PacketBuilder) error {
+	m := &IttoMessageOptionDirectory{
+		IttoMessage:      decodeIttoMessage(data),
+		OId:              OptionId(binary.BigEndian.Uint32(data[5:9])),
+		Symbol:           string(data[9:15]),
+		Expiration:       time.Date(2000+int(data[15]), time.Month(data[16]), int(data[17]), 0, 0, 0, 0, time.Local),
+		StrikePrice:      int(binary.BigEndian.Uint32(data[18:22])),
+		OType:            data[22],
+		Source:           data[23],
+		UnderlyingSymbol: string(data[24:37]),
+		ClosingType:      data[37],
+		Tradable:         data[38],
+		MPV:              data[39],
+	}
+	p.AddLayer(m)
+	return nil
+}
+
+/************************************************************************/
+type IttoMessageOptionTradingAction struct {
+	IttoMessage
+	OId   OptionId
+	State byte
+}
+
+func decodeIttoOptionTradingAction(data []byte, p gopacket.PacketBuilder) error {
+	m := &IttoMessageOptionTradingAction{
+		IttoMessage: decodeIttoMessage(data),
+		OId:         OptionId(binary.BigEndian.Uint32(data[5:9])),
+		State:       data[9],
+	}
+	p.AddLayer(m)
+	return nil
+}
+
+/************************************************************************/
+type IttoMessageOptionOpen struct {
+	IttoMessage
+	OId       OptionId
+	OpenState byte
+}
+
+func decodeIttoOptionOpen(data []byte, p gopacket.PacketBuilder) error {
+	m := &IttoMessageOptionOpen{
+		IttoMessage: decodeIttoMessage(data),
+		OId:         OptionId(binary.BigEndian.Uint32(data[5:9])),
+		OpenState:   data[9],
 	}
 	p.AddLayer(m)
 	return nil
