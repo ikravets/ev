@@ -13,39 +13,37 @@ import (
 	"my/itto/verify/pcap2memh"
 )
 
-type cmdPcap2memh struct {
+type cmdOldPcap2memh struct {
 	DestDirName   string                        `short:"d" long:"dest-dir" default:"." default-mask:"current dir" value-name:"DIR" description:"destination directory, will be created if does not exist" `
 	InputFileName string                        `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
 	Args          struct{ TsharkArgs []string } `positional-args:"y"`
 	shouldExecute bool
 }
 
-func (p *cmdPcap2memh) Execute(args []string) error {
-	p.shouldExecute = true
+func (c *cmdOldPcap2memh) Execute(args []string) error {
+	c.shouldExecute = true
 	return nil
 }
 
-func (p *cmdPcap2memh) ConfigParser(parser *flags.Parser) {
-	parser.AddCommand("pcap2memh",
-		"convert pcap file to simulator input",
-		"",
-		p)
+func (c *cmdOldPcap2memh) ConfigParser(parser *flags.Parser) {
+	parser.AddCommand("pcap2memh", "convert pcap file to simulator input", "", c)
 }
 
-func (p *cmdPcap2memh) ParsingFinished() {
-	if !p.shouldExecute {
+func (c *cmdOldPcap2memh) ParsingFinished() {
+	if !c.shouldExecute {
 		return
 	}
-	args := append([]string{"-x"}, p.Args.TsharkArgs...)
-	dumpReader, finisher := packet.TsharkOpen(p.InputFileName, args)
+	args := append([]string{"-x"}, c.Args.TsharkArgs...)
+	dumpReader, finisher := packet.TsharkOpen(c.InputFileName, args)
 	defer finisher()
-	if err := os.MkdirAll(p.DestDirName, 0755); err != nil {
+	if err := os.MkdirAll(c.DestDirName, 0755); err != nil {
 		log.Fatal(err)
 	}
-	pcap2memh.Translate(dumpReader, p.DestDirName)
+	pcap2memh.Translate(dumpReader, c.DestDirName)
 }
 
+/* legacy command, see legacy.go
 func init() {
-	var c cmdPcap2memh
+	var c cmdOldPcap2memh
 	Registry.Register(&c)
-}
+}*/

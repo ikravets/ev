@@ -13,37 +13,34 @@ import (
 	"my/itto/verify/pcap2log"
 )
 
-type cmdPcap2log struct {
+type cmdOldPcap2log struct {
 	InputFileName  string                        `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
 	OutputFileName string                        `long:"output" short:"o" value-name:"FILE" default:"/dev/stdout" default-mask:"stdout" description:"output file"`
 	Args           struct{ TsharkArgs []string } `positional-args:"y"`
 	shouldExecute  bool
 }
 
-func (p *cmdPcap2log) Execute(args []string) error {
-	p.shouldExecute = true
+func (c *cmdOldPcap2log) Execute(args []string) error {
+	c.shouldExecute = true
 	return nil
 }
 
-func (p *cmdPcap2log) ConfigParser(parser *flags.Parser) {
-	parser.AddCommand("pcap2log",
-		"convert pcap file to simulator output",
-		"",
-		p)
+func (c *cmdOldPcap2log) ConfigParser(parser *flags.Parser) {
+	parser.AddCommand("pcap2log", "convert pcap file to simulator output", "", c)
 }
 
-func (p *cmdPcap2log) ParsingFinished() {
-	if !p.shouldExecute {
+func (c *cmdOldPcap2log) ParsingFinished() {
+	if !c.shouldExecute {
 		return
 	}
 	args := []string{
 		"-d", "udp.port==18000:10,moldudp64",
 		"-V",
 	}
-	args = append(args, p.Args.TsharkArgs...)
-	dumpReader, finisher := packet.TsharkOpen(p.InputFileName, args)
+	args = append(args, c.Args.TsharkArgs...)
+	dumpReader, finisher := packet.TsharkOpen(c.InputFileName, args)
 	defer finisher()
-	outFile, err := os.OpenFile(p.OutputFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	outFile, err := os.OpenFile(c.OutputFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,7 +49,8 @@ func (p *cmdPcap2log) ParsingFinished() {
 	t.Translate()
 }
 
+/* legacy command, see legacy.go
 func init() {
-	var c cmdPcap2log
+	var c cmdOldPcap2log
 	Registry.Register(&c)
-}
+}*/
