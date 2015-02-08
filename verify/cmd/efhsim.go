@@ -14,11 +14,13 @@ import (
 )
 
 type cmdEfhsim struct {
-	InputFileName     string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
-	OutputFileNameSim string `long:"output-sim" short:"s" value-name:"FILE" description:"output file for hw simulator"`
-	PacketNumLimit    int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
-	shouldExecute     bool
-	outFiles          []io.Closer
+	InputFileName           string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
+	OutputFileNameSim       string `long:"output-sim" short:"s" value-name:"FILE" description:"output file for hw simulator"`
+	OutputFileNameEfhOrders string `long:"output-efh-orders" short:"a" value-name:"FILE" description:"output file for EFH order messages"`
+	OutputFileNameEfhQuotes string `long:"output-efh-quotes" short:"b" value-name:"FILE" description:"output file for EFH quote messages"`
+	PacketNumLimit          int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
+	shouldExecute           bool
+	outFiles                []io.Closer
 }
 
 func (c *cmdEfhsim) Execute(args []string) error {
@@ -45,6 +47,8 @@ func (c *cmdEfhsim) ParsingFinished() {
 	efh := efhsim.NewEfhSim()
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
 	c.addOut(c.OutputFileNameSim, func(w io.Writer) error { return efh.OutSim(w) })
+	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error { return efh.OutEfhOrders(w) })
+	c.addOut(c.OutputFileNameEfhQuotes, func(w io.Writer) error { return efh.OutEfhQuotes(w) })
 	if err := efh.AnalyzeInput(); err != nil {
 		log.Fatal(err)
 	}

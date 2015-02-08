@@ -40,6 +40,18 @@ func (s *EfhSim) OutSim(w io.Writer) error {
 	s.observer.AppendSlave(sim.NewSimLogger(w))
 	return nil
 }
+func (s *EfhSim) OutEfhOrders(w io.Writer) error {
+	return s.addEfhOut(w, EfhLoggerOutputOrders)
+}
+func (s *EfhSim) OutEfhQuotes(w io.Writer) error {
+	return s.addEfhOut(w, EfhLoggerOutputQuotes)
+}
+func (s *EfhSim) addEfhOut(w io.Writer, mode EfhLoggerOutputMode) error {
+	logger := NewEfhLogger(w)
+	logger.SetOutputMode(mode)
+	s.observer.AppendSlave(logger)
+	return nil
+}
 
 func (s *EfhSim) AnalyzeInput() error {
 	handle, err := pcap.OpenOffline(s.inputFileName)
