@@ -4,8 +4,8 @@
 package efhsim
 
 import (
+	"io"
 	"log"
-	"os"
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/pcap"
@@ -21,7 +21,6 @@ type EfhSim struct {
 	idb              sim.IttoDb
 	book             sim.Book
 	observer         *sim.MuxObserver
-	simLogFile       *os.File
 }
 
 func NewEfhSim() *EfhSim {
@@ -36,13 +35,9 @@ func (s *EfhSim) SetInput(fileName string, limit int) {
 	s.inputFileName = fileName
 	s.inputPacketLimit = limit
 }
-func (s *EfhSim) SetOutputSimLog(fileName string) error {
-	var err error
-	s.simLogFile, err = os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	s.observer.AppendSlave(sim.NewSimLogger(s.simLogFile))
+
+func (s *EfhSim) OutSim(w io.Writer) error {
+	s.observer.AppendSlave(sim.NewSimLogger(w))
 	return nil
 }
 

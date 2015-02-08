@@ -4,7 +4,9 @@
 package cmd
 
 import (
+	"io"
 	"log"
+	"os"
 
 	"github.com/jessevdk/go-flags"
 
@@ -16,6 +18,7 @@ type cmdEfhsim struct {
 	OutputFileNameSim string `long:"output-sim" short:"s" value-name:"FILE" description:"output file for hw simulator"`
 	PacketNumLimit    int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
 	shouldExecute     bool
+	outFiles          []io.Closer
 }
 
 func (c *cmdEfhsim) Execute(args []string) error {
@@ -24,26 +27,42 @@ func (c *cmdEfhsim) Execute(args []string) error {
 }
 
 func (c *cmdEfhsim) ConfigParser(parser *flags.Parser) {
-	parser.AddCommand("efhsim",
-		"simulate efh",
-		"",
-		c)
+	_, err := parser.AddCommand("efhsim", "simulate efh", "", c)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func (c *cmdEfhsim) ParsingFinished() {
 	if !c.shouldExecute {
 		return
 	}
+	defer func() {
+		for _, f := range c.outFiles {
+			f.Close()
+		}
+	}()
 	efh := efhsim.NewEfhSim()
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
-	if c.OutputFileNameSim != "" {
-		if err := efh.SetOutputSimLog(c.OutputFileNameSim); err != nil {
-			log.Fatal(err)
-		}
-	}
+	c.addOut(c.OutputFileNameSim, func(w io.Writer) error { return efh.OutSim(w) })
 	if err := efh.AnalyzeInput(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (c *cmdEfhsim) addOut(fileName string, setOut func(io.Writer) error) {
+	if fileName == "" {
+		return
+	}
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err := setOut(file); err != nil {
+		file.Close()
+		log.Fatalln(err)
+	}
+	c.outFiles = append(c.outFiles, file)
 }
 
 func init() {
