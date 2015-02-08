@@ -380,9 +380,17 @@ func errorFunc(msg string) gopacket.Decoder {
 */
 
 /************************************************************************/
+type IttoMessageCommon interface {
+	Base() *IttoMessage
+}
+
 type IttoMessage struct {
 	Type      IttoMessageType
 	Timestamp uint32
+}
+
+func (m *IttoMessage) Base() *IttoMessage {
+	return m
 }
 
 func (m *IttoMessage) LayerContents() []byte {
