@@ -9,8 +9,8 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/pcap2memh"
+	"my/itto/verify/legacy/packet"
+	"my/itto/verify/legacy/pcap2memh"
 )
 
 type cmdOldPcap2memh struct {
