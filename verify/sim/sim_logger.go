@@ -114,13 +114,13 @@ func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
 			if operation.GetSide() == itto.MarketSideAsk {
 				or.side = 1
 			}
-		}
-		if operation.GetNewSize() != 0 {
-			ou = orduLogInfo{
-				optionId: or.optionId,
-				side:     or.side,
-				price:    or.price,
-				size:     operation.GetNewSize(),
+			if operation.GetNewSize() != 0 {
+				ou = orduLogInfo{
+					optionId: or.optionId,
+					side:     or.side,
+					price:    or.price,
+					size:     operation.GetNewSize(),
+				}
 			}
 		}
 		or.refNum = operation.getOperation().origRefNumD.Delta()
