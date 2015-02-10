@@ -50,6 +50,7 @@ func (c *cmdPcap2memh) ParsingFinished() {
 		log.Fatal(err)
 	}
 	defer printer.Close()
+	printer.AddDummy()
 
 	pp := packet.NewProcessor()
 	pp.LimitPacketNumber(c.PacketNumLimit)
@@ -85,6 +86,12 @@ func newMemhPrinter(dir string) (p *memhPrinter, err error) {
 		return
 	}
 	return
+}
+
+func (p *memhPrinter) AddDummy() {
+	zeroData := make([]byte, 64)
+	packet := gopacket.NewPacket(zeroData, nil, gopacket.Lazy)
+	p.HandlePacket(packet)
 }
 
 func (p *memhPrinter) Close() {
