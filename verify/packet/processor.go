@@ -4,6 +4,8 @@
 package packet
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"log"
 
@@ -76,6 +78,11 @@ func (p *processor) LimitPacketNumber(limit int) {
 	p.packetNumLimit = limit
 }
 
+var EndpointCombinedSessionMetadata = gopacket.EndpointTypeMetadata{"Combined", func(b []byte) string {
+	return fmt.Sprintf("combined %v", b)
+}}
+var EndpointCombinedSession = gopacket.RegisterEndpointType(9999, EndpointCombinedSessionMetadata)
+
 func (p *processor) ProcessAll() error {
 	source := gopacket.NewPacketSource(p.obtainer, p.obtainer.LinkType())
 	source.NoCopy = true
@@ -90,15 +97,29 @@ func (p *processor) ProcessAll() error {
 		}
 		p.decodeAppLayer(packet) // ignore errors
 		p.handler.HandlePacket(packet)
+		packetNum++
+		if packetNum == p.packetNumLimit {
+			break
+		}
 
+		if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.ApplicationLayer() == nil {
+			continue
+		}
+		var flowBufSrc, flowBufDst bytes.Buffer
+		flowBufSrc.Write(packet.NetworkLayer().NetworkFlow().Src().Raw())
+		flowBufDst.Write(packet.NetworkLayer().NetworkFlow().Dst().Raw())
+		flowBufSrc.Write(packet.TransportLayer().TransportFlow().Src().Raw())
+		flowBufDst.Write(packet.TransportLayer().TransportFlow().Dst().Raw())
 		var flow gopacket.Flow = gopacket.InvalidFlow
 		var seqNum uint64
 		for _, l := range packet.Layers() {
 			if mu, ok := l.(*moldudp64.MoldUDP64); ok {
+				flowBufSrc.Write(mu.Flow().Src().Raw())
+				flowBufDst.Write(mu.Flow().Dst().Raw())
 				if flow != gopacket.InvalidFlow {
 					log.Fatal("duplicate MoldUDP64 layer")
 				}
-				flow = mu.Flow()
+				flow = gopacket.NewFlow(EndpointCombinedSession, flowBufSrc.Bytes(), flowBufDst.Bytes())
 				seqNum = mu.SequenceNumber
 			}
 			if itto.LayerClassItto.Contains(l.LayerType()) {
@@ -113,10 +134,6 @@ func (p *processor) ProcessAll() error {
 				p.handler.HandleMessage(&m)
 				seqNum++
 			}
-		}
-		packetNum++
-		if packetNum == p.packetNumLimit {
-			break
 		}
 	}
 	return nil
