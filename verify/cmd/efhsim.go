@@ -11,6 +11,7 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"my/itto/verify/efhsim"
+	"my/itto/verify/sim"
 )
 
 type cmdEfhsim struct {
@@ -46,9 +47,19 @@ func (c *cmdEfhsim) ParsingFinished() {
 	}()
 	efh := efhsim.NewEfhSim()
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
-	c.addOut(c.OutputFileNameSim, func(w io.Writer) error { return efh.OutSim(w) })
-	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error { return efh.OutEfhOrders(w) })
-	c.addOut(c.OutputFileNameEfhQuotes, func(w io.Writer) error { return efh.OutEfhQuotes(w) })
+	c.addOut(c.OutputFileNameSim, func(w io.Writer) error {
+		return efh.AddLogger(sim.NewSimLogger(w))
+	})
+	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error {
+		logger := efhsim.NewEfhLogger(w)
+		logger.SetOutputMode(efhsim.EfhLoggerOutputOrders)
+		return efh.AddLogger(logger)
+	})
+	c.addOut(c.OutputFileNameEfhQuotes, func(w io.Writer) error {
+		logger := efhsim.NewEfhLogger(w)
+		logger.SetOutputMode(efhsim.EfhLoggerOutputQuotes)
+		return efh.AddLogger(logger)
+	})
 	if err := efh.AnalyzeInput(); err != nil {
 		log.Fatal(err)
 	}

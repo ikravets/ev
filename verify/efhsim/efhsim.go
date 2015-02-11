@@ -4,7 +4,6 @@
 package efhsim
 
 import (
-	"io"
 	"log"
 
 	"code.google.com/p/gopacket"
@@ -36,19 +35,7 @@ func (s *EfhSim) SetInput(fileName string, limit int) {
 	s.inputPacketLimit = limit
 }
 
-func (s *EfhSim) OutSim(w io.Writer) error {
-	s.observer.AppendSlave(sim.NewSimLogger(w))
-	return nil
-}
-func (s *EfhSim) OutEfhOrders(w io.Writer) error {
-	return s.addEfhOut(w, EfhLoggerOutputOrders)
-}
-func (s *EfhSim) OutEfhQuotes(w io.Writer) error {
-	return s.addEfhOut(w, EfhLoggerOutputQuotes)
-}
-func (s *EfhSim) addEfhOut(w io.Writer, mode EfhLoggerOutputMode) error {
-	logger := NewEfhLogger(w)
-	logger.SetOutputMode(mode)
+func (s *EfhSim) AddLogger(logger sim.Observer) error {
 	s.observer.AppendSlave(logger)
 	return nil
 }
