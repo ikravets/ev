@@ -26,12 +26,14 @@ type ApplicationMessage interface {
 	Flow() gopacket.Flow
 	Layer() gopacket.Layer
 	SequenceNumber() uint64
+	PacketMetadata() *gopacket.PacketMetadata
 }
 
 type applicationMessage struct {
-	layer  gopacket.Layer
-	flow   gopacket.Flow
-	seqNum uint64
+	layer          gopacket.Layer
+	flow           gopacket.Flow
+	seqNum         uint64
+	packetMetadata *gopacket.PacketMetadata
 }
 
 func (am *applicationMessage) Layer() gopacket.Layer {
@@ -42,6 +44,9 @@ func (am *applicationMessage) Flow() gopacket.Flow {
 }
 func (am *applicationMessage) SequenceNumber() uint64 {
 	return am.seqNum
+}
+func (am *applicationMessage) PacketMetadata() *gopacket.PacketMetadata {
+	return am.packetMetadata
 }
 
 type Handler interface {
@@ -127,9 +132,10 @@ func (p *processor) ProcessAll() error {
 					log.Fatal("incorrect layer order, flow == nil")
 				}
 				m := applicationMessage{
-					layer:  l,
-					flow:   flow,
-					seqNum: seqNum,
+					layer:          l,
+					flow:           flow,
+					seqNum:         seqNum,
+					packetMetadata: packet.Metadata(),
 				}
 				p.handler.HandleMessage(&m)
 				seqNum++
