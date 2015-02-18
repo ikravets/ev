@@ -6,6 +6,8 @@ package efhsim
 import (
 	"log"
 
+	"code.google.com/p/gopacket"
+
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
@@ -18,6 +20,7 @@ type TobLogger struct {
 	ittoSeconds  uint32
 	bid          tob
 	ask          tob
+	seqNum       map[gopacket.Flow]uint64
 }
 type tob struct {
 	Check bool
@@ -28,14 +31,23 @@ type tob struct {
 
 func NewTobLogger() *TobLogger {
 	l := &TobLogger{
-		bid: tob{Side: itto.MarketSideBid},
-		ask: tob{Side: itto.MarketSideAsk},
+		bid:    tob{Side: itto.MarketSideBid},
+		ask:    tob{Side: itto.MarketSideAsk},
+		seqNum: make(map[gopacket.Flow]uint64),
 	}
 	return l
 }
 
 func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 	l.lastMessage = idm
+
+	flow := l.lastMessage.Pam.Flow()
+	seq := l.lastMessage.Pam.SequenceNumber()
+	if prevSeq, ok := l.seqNum[flow]; ok && prevSeq+1 != seq {
+		log.Printf("seqNum gap; expected %d actual %d\n", prevSeq+1, seq)
+	}
+	l.seqNum[flow] = seq
+
 	l.bid.Check, l.ask.Check = false, false
 	switch m := l.lastMessage.Pam.Layer().(type) {
 	case
