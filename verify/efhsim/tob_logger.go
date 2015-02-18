@@ -73,6 +73,9 @@ func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 		l.bid.Check, l.ask.Check = true, true
 	case *itto.IttoMessageSeconds:
 		l.ittoSeconds = m.Second
+	case *itto.IttoMessageNoii:
+		// silently ignore
+		return
 	default:
 		log.Println("wrong message type ", l.lastMessage.Pam.Layer())
 		return
