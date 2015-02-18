@@ -6,7 +6,6 @@ package efhsim
 import (
 	"fmt"
 	"io"
-	"log"
 
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
@@ -134,27 +133,15 @@ func (m efhm_quote) String() string {
 var _ sim.Observer = &EfhLogger{}
 
 type EfhLogger struct {
-	w            io.Writer
-	lastMessage  *sim.IttoDbMessage
-	lastOptionId itto.OptionId
-	consumeOps   int
-	curOps       int
-	ittoSeconds  uint32
-	mode         EfhLoggerOutputMode
-	bid          tob
-	ask          tob
-}
-type tob struct {
-	Check bool
-	Side  itto.MarketSide
-	Old   sim.PriceLevel
-	New   sim.PriceLevel
+	TobLogger
+	w    io.Writer
+	mode EfhLoggerOutputMode
 }
 
 func NewEfhLogger(w io.Writer) *EfhLogger {
-	l := &EfhLogger{w: w,
-		bid: tob{Side: itto.MarketSideBid},
-		ask: tob{Side: itto.MarketSideAsk},
+	l := &EfhLogger{
+		w:         w,
+		TobLogger: *NewTobLogger(),
 	}
 	return l
 }
@@ -170,83 +157,16 @@ func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 	l.mode = mode
 }
 
-func (l *EfhLogger) MessageArrived(idm *sim.IttoDbMessage) {
-	l.lastMessage = idm
-	l.bid.Check, l.ask.Check = false, false
-	switch m := l.lastMessage.Pam.Layer().(type) {
-	case
-		*itto.IttoMessageAddOrder,
-		*itto.IttoMessageSingleSideExecuted,
-		*itto.IttoMessageSingleSideExecutedWithPrice,
-		*itto.IttoMessageOrderCancel,
-		*itto.IttoMessageSingleSideDelete,
-		*itto.IttoMessageBlockSingleSideDelete:
-		l.consumeOps = 1
-	case
-		*itto.IttoMessageSingleSideReplace,
-		*itto.IttoMessageSingleSideUpdate:
-		l.consumeOps = 2
-	case
-		*itto.IttoMessageAddQuote,
-		*itto.IttoMessageQuoteDelete:
-		l.consumeOps = 2
-		l.bid.Check, l.ask.Check = true, true
-	case
-		*itto.IttoMessageQuoteReplace:
-		l.consumeOps = 4
-		l.bid.Check, l.ask.Check = true, true
-	case *itto.IttoMessageSeconds:
-		l.ittoSeconds = m.Second
-	default:
-		log.Println("wrong message type ", l.lastMessage.Pam.Layer())
-		return
-	}
-	l.curOps = 0
-}
-
-func (*EfhLogger) OperationAppliedToOrders(sim.IttoOperation) {}
-
-func (l *EfhLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation) {
-	if l.curOps > 0 {
-		return
-	}
-	l.lastOptionId = operation.GetOptionId()
-	if l.lastOptionId.Invalid() {
-		return
-	}
-	switch operation.GetSide() {
-	case itto.MarketSideBid:
-		l.bid.Check = true
-	case itto.MarketSideAsk:
-		l.ask.Check = true
-	default:
-		log.Fatalln("wrong operation side")
-	}
-	l.bid.update(book, l.lastOptionId, TobUpdateOld)
-	l.ask.update(book, l.lastOptionId, TobUpdateOld)
-}
-
 func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
-	l.curOps++
-	if l.curOps < l.consumeOps {
-		return
-	}
-	l.curOps = 0
-	if l.lastOptionId.Invalid() {
-		return
-	}
-
-	u := TobUpdateNew
-	if l.mode == EfhLoggerOutputQuotes {
-		u = TobUpdateNewForce
-	}
-	l.bid.update(book, l.lastOptionId, u)
-	l.ask.update(book, l.lastOptionId, u)
 	if l.mode == EfhLoggerOutputOrders {
-		l.genUpdateOrders(l.bid)
-		l.genUpdateOrders(l.ask)
+		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNew) {
+			l.genUpdateOrders(l.bid)
+			l.genUpdateOrders(l.ask)
+		}
 	} else {
-		l.genUpdateQuotes()
+		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
+			l.genUpdateQuotes()
+		}
 	}
 }
 
@@ -270,9 +190,6 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 }
 
 func (l *EfhLogger) genUpdateQuotes() {
-	if !l.bid.updated() && !l.ask.updated() {
-		return
-	}
 	eq := efhm_quote{
 		efhm_header: l.genUpdateHeader(EFHM_QUOTE),
 		BidPrice:    uint32(l.bid.New.Price),
@@ -290,29 +207,4 @@ func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
 		SequenceNumber: uint32(l.lastMessage.Pam.SequenceNumber()), // FIXME MoldUDP64 seqNum is 64 bit
 		TimeStamp:      uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessageCommon).Base().Timestamp),
 	}
-}
-
-type TobUpdate byte
-
-const (
-	TobUpdateOld TobUpdate = iota
-	TobUpdateNew
-	TobUpdateNewForce
-)
-
-func (tob *tob) update(book sim.Book, oid itto.OptionId, u TobUpdate) {
-	pl := &tob.New
-	if u == TobUpdateOld {
-		pl = &tob.Old
-	}
-	*pl = sim.PriceLevel{}
-	if tob.Check || u == TobUpdateNewForce {
-		if pls := book.GetTop(oid, tob.Side, 1); len(pls) > 0 {
-			*pl = pls[0]
-		}
-	}
-}
-
-func (tob *tob) updated() bool {
-	return tob.Check && tob.Old != tob.New
 }
