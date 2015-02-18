@@ -236,8 +236,12 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) 
 		return
 	}
 
-	l.bid.update(book, l.lastOptionId, TobUpdateNew)
-	l.ask.update(book, l.lastOptionId, TobUpdateNew)
+	u := TobUpdateNew
+	if l.mode == EfhLoggerOutputQuotes {
+		u = TobUpdateNewForce
+	}
+	l.bid.update(book, l.lastOptionId, u)
+	l.ask.update(book, l.lastOptionId, u)
 	if l.mode == EfhLoggerOutputOrders {
 		l.genUpdateOrders(l.bid)
 		l.genUpdateOrders(l.ask)
@@ -293,6 +297,7 @@ type TobUpdate byte
 const (
 	TobUpdateOld TobUpdate = iota
 	TobUpdateNew
+	TobUpdateNewForce
 )
 
 func (tob *tob) update(book sim.Book, oid itto.OptionId, u TobUpdate) {
@@ -301,7 +306,7 @@ func (tob *tob) update(book sim.Book, oid itto.OptionId, u TobUpdate) {
 		pl = &tob.Old
 	}
 	*pl = sim.PriceLevel{}
-	if tob.Check {
+	if tob.Check || u == TobUpdateNewForce {
 		if pls := book.GetTop(oid, tob.Side, 1); len(pls) > 0 {
 			*pl = pls[0]
 		}
