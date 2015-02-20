@@ -11,15 +11,17 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
+	"my/itto/verify/packet/itto"
 	"my/itto/verify/pcapsplit"
 )
 
 type cmdPcapsplit struct {
-	DestDirName      string `short:"d" long:"dest-dir" default:"." default-mask:"current dir" value-name:"DIR" description:"destination directory, will be created if does not exist" `
-	InputFileName    string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
-	PacketNumLimit   int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
-	MinPacketsPerOid int    `long:"min-chain" short:"m" value-name:"NUM" description:"ignore options which appear in less than NUM packets"`
-	UseEditcap       bool   `long:"editcap" short:"e" description:"don't write pcap files, just output editcap commands"`
+	DestDirName      string          `short:"d" long:"dest-dir" default:"." default-mask:"current dir" value-name:"DIR" description:"destination directory, will be created if does not exist" `
+	InputFileName    string          `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
+	PacketNumLimit   int             `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
+	MinPacketsPerOid int             `long:"min-chain" short:"m" value-name:"NUM" description:"ignore options which appear in less than NUM packets"`
+	UseEditcap       bool            `long:"editcap" short:"e" description:"don't write pcap files, just output editcap commands"`
+	OptionIds        []itto.OptionId `long:"filter" short:"f" value-name:"OPTION_ID" description:"process OPTION_ID only"`
 	shouldExecute    bool
 }
 
@@ -44,6 +46,7 @@ func (p *cmdPcapsplit) ParsingFinished() {
 	}
 	splitter := pcapsplit.NewSplitter()
 	splitter.SetInput(p.InputFileName, p.PacketNumLimit)
+	splitter.Filter(p.OptionIds)
 	if err := splitter.AnalyzeInput(); err != nil {
 		log.Fatal(err)
 	}
