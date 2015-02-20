@@ -64,6 +64,8 @@ type processor struct {
 	obtainer       Obtainer
 	handler        Handler
 	packetNumLimit int
+	flowBufSrc     bytes.Buffer
+	flowBufDst     bytes.Buffer
 }
 
 func NewProcessor() Processor {
@@ -91,6 +93,7 @@ func (p *processor) ProcessAll() error {
 	source := gopacket.NewPacketSource(p.obtainer, p.obtainer.LinkType())
 	source.NoCopy = true
 	packetNum := 0
+	var m applicationMessage
 	for {
 		packet, err := source.NextPacket()
 		if err != nil {
@@ -114,7 +117,7 @@ func (p *processor) ProcessAll() error {
 		flow := p.getFlow(packet)
 		for _, l := range packet.Layers() {
 			if itto.LayerClassItto.Contains(l.LayerType()) {
-				m := applicationMessage{
+				m = applicationMessage{
 					layer:          l,
 					flow:           flow,
 					seqNum:         seqNum,
@@ -130,14 +133,15 @@ func (p *processor) ProcessAll() error {
 
 func (p *processor) getFlow(packet gopacket.Packet) gopacket.Flow {
 	mu := moldudp64Layer(packet)
-	var flowBufSrc, flowBufDst bytes.Buffer
-	flowBufSrc.Write(packet.NetworkLayer().NetworkFlow().Src().Raw())
-	flowBufDst.Write(packet.NetworkLayer().NetworkFlow().Dst().Raw())
-	flowBufSrc.Write(packet.TransportLayer().TransportFlow().Src().Raw())
-	flowBufDst.Write(packet.TransportLayer().TransportFlow().Dst().Raw())
-	flowBufSrc.Write(mu.Flow().Src().Raw())
-	flowBufDst.Write(mu.Flow().Dst().Raw())
-	return gopacket.NewFlow(EndpointCombinedSession, flowBufSrc.Bytes(), flowBufDst.Bytes())
+	p.flowBufSrc.Reset()
+	p.flowBufDst.Reset()
+	p.flowBufSrc.Write(packet.NetworkLayer().NetworkFlow().Src().Raw())
+	p.flowBufDst.Write(packet.NetworkLayer().NetworkFlow().Dst().Raw())
+	p.flowBufSrc.Write(packet.TransportLayer().TransportFlow().Src().Raw())
+	p.flowBufDst.Write(packet.TransportLayer().TransportFlow().Dst().Raw())
+	p.flowBufSrc.Write(mu.Flow().Src().Raw())
+	p.flowBufDst.Write(mu.Flow().Dst().Raw())
+	return gopacket.NewFlow(EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
 }
 
 func (p *processor) decodeAppLayer(packet gopacket.Packet) error {
