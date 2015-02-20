@@ -16,9 +16,9 @@ import (
 var _ = log.Ldate
 
 type IttoDbStats struct {
-	numOrders   int
-	numOptions  int
-	numSessions int
+	Orders   int
+	Sessions int
+	//TODO Options  int
 }
 
 type IttoDbMessage struct {
@@ -83,8 +83,8 @@ func (d *db) getSession(flow gopacket.Flow) session {
 
 func (d *db) Stats() IttoDbStats {
 	s := IttoDbStats{
-		numOrders:   len(d.orders),
-		numSessions: len(d.sessions),
+		Orders:   len(d.orders),
+		Sessions: len(d.sessions),
 	}
 	return s
 }
