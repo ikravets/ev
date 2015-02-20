@@ -25,6 +25,7 @@ type Splitter struct {
 	book             sim.Book
 	packetOids       []itto.OptionId
 	allPacketOids    [][]itto.OptionId
+	oidFilter        map[itto.OptionId]struct{}
 	stats            SplitterStats
 }
 
@@ -150,18 +151,39 @@ func (s *Splitter) HandleMessage(message packet.ApplicationMessage) {
 	//s.idb.AddMessage(&m)
 	ops := s.idb.MessageOperations(&m)
 	for _, op := range ops {
-		//log.Println(op)
-		s.idb.ApplyOperation(op)
-		s.book.ApplyOperation(op)
 		s.stats.Operations++
 		oid := op.GetOptionId()
 		if oid.Valid() {
-			s.packetOids = append(s.packetOids, oid)
-			//log.Println(oid)
+			if s.acceptOid(oid) {
+				s.packetOids = append(s.packetOids, oid)
+				s.idb.ApplyOperation(op)
+				s.book.ApplyOperation(op)
+			} else {
+				s.stats.IgnoredOperations++
+			}
 		} else {
 			s.stats.InvalidOidOps++
 		}
 	}
+}
+
+func (s *Splitter) Filter(oids []itto.OptionId) {
+	for _, oid := range oids {
+		s.FilterAdd(oid)
+	}
+}
+func (s *Splitter) FilterAdd(oid itto.OptionId) {
+	if s.oidFilter == nil {
+		s.oidFilter = make(map[itto.OptionId]struct{})
+	}
+	s.oidFilter[oid] = struct{}{}
+}
+func (s *Splitter) acceptOid(oid itto.OptionId) bool {
+	if s.oidFilter == nil {
+		return true
+	}
+	_, ok := s.oidFilter[oid]
+	return ok
 }
 
 func (s *Splitter) AllPacketOids() [][]itto.OptionId {
@@ -194,6 +216,7 @@ type SplitterStats struct {
 	Packets           int
 	InvalidOidOps     int
 	Operations        int
+	IgnoredOperations int
 }
 
 func (s *Splitter) Stats() SplitterStats {
