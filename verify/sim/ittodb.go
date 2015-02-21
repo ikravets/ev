@@ -59,10 +59,12 @@ type session struct {
 	index int
 }
 
+var orderNotFoundError = errors.New("order not found")
+
 func (d *db) findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order order, err error) {
 	order, ok := d.orders[NewOrderIndex(d, flow, refNumD)]
 	if !ok {
-		err = errors.New("order not found")
+		err = orderNotFoundError
 	}
 	return
 }
