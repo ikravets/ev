@@ -9,48 +9,13 @@ import (
 	"time"
 
 	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
 )
 
-type IttoDecoder struct {
-}
+var LayerTypeItto = gopacket.RegisterLayerType(10002, gopacket.LayerTypeMetadata{"Itto", gopacket.DecodeFunc(decodeItto)})
 
-var LayerTypeItto = gopacket.RegisterLayerType(10002, gopacket.LayerTypeMetadata{"Itto", IttoDecoder{}})
-
-type Itto struct {
-	Type byte
-}
-
-func (m *Itto) LayerType() gopacket.LayerType {
-	return LayerTypeItto
-}
-
-func (m *Itto) LayerContents() []byte {
-	return nil
-}
-
-func (m *Itto) LayerPayload() []byte {
-	return nil
-}
-
-func (d IttoDecoder) Decode(data []byte, p gopacket.PacketBuilder) error {
-	if false {
-		itto := &Itto{
-			Type: data[0],
-		}
-		p.AddLayer(itto)
-		return nil
-	} else {
-		//return p.NextDecoder(ittoMessageTypePrefixDecoder)
-		return decodeWithIttoMessageTypePrefix(data, p)
-	}
-}
-
-var ittoMessageTypePrefixDecoder = gopacket.DecodeFunc(decodeWithIttoMessageTypePrefix)
-
-func decodeWithIttoMessageTypePrefix(data []byte, p gopacket.PacketBuilder) error {
-	chunkType := IttoMessageType(data[0])
-	return chunkType.Decode(data, p)
+func decodeItto(data []byte, p gopacket.PacketBuilder) error {
+	ittoMessageType := IttoMessageType(data[0])
+	return ittoMessageType.Decode(data, p)
 }
 
 /************************************************************************/
@@ -134,12 +99,32 @@ type ReplaceOrderSide struct {
 /************************************************************************/
 type IttoMessageType uint8
 
+func (a IttoMessageType) Decode(data []byte, p gopacket.PacketBuilder) error {
+	layer := IttoMessageTypeMetadata[a].CreateLayer()
+	if err := layer.DecodeFromBytes(data, p); err != nil {
+		return err
+	}
+	p.AddLayer(layer)
+	return p.NextDecoder(layer.NextLayerType())
+}
+func (a IttoMessageType) String() string {
+	return IttoMessageTypeMetadata[a].Name
+}
+func (a IttoMessageType) IsShort() bool {
+	return IttoMessageTypeMetadata[a].IsShort
+}
+func (a IttoMessageType) LayerType() gopacket.LayerType {
+	return IttoMessageTypeMetadata[a].LayerType
+}
+
+/************************************************************************/
 const (
+	IttoMessageTypeUnknown                     IttoMessageType = 0 // not in spec, catch-all
 	IttoMessageTypeSeconds                     IttoMessageType = 'T'
 	IttoMessageTypeSystemEvent                 IttoMessageType = 'S'
 	IttoMessageTypeBaseReference               IttoMessageType = 'L'
 	IttoMessageTypeOptionDirectory             IttoMessageType = 'R'
-	IttoMessageTypeOptionsTradingAction        IttoMessageType = 'H'
+	IttoMessageTypeOptionTradingAction         IttoMessageType = 'H'
 	IttoMessageTypeOptionOpen                  IttoMessageType = 'O'
 	IttoMessageTypeAddOrderShort               IttoMessageType = 'a'
 	IttoMessageTypeAddOrderLong                IttoMessageType = 'A'
@@ -162,225 +147,120 @@ const (
 	IttoMessageTypeNoii                        IttoMessageType = 'I'
 )
 
-func (a IttoMessageType) Decode(data []byte, p gopacket.PacketBuilder) error {
-	return IttoMessageTypeMetadata[a].DecodeWith.Decode(data, p)
-}
-func (a IttoMessageType) String() string {
-	return IttoMessageTypeMetadata[a].Name
-}
-func (a IttoMessageType) IsShort() bool {
-	return IttoMessageTypeMetadata[a].IsShort
-}
-func (a IttoMessageType) LayerType() gopacket.LayerType {
-	return IttoMessageTypeMetadata[a].LayerType
+var IttoMessageTypeNames = [256]string{
+	IttoMessageTypeUnknown:                     "IttoUnknown",
+	IttoMessageTypeSeconds:                     "IttoSeconds",
+	IttoMessageTypeSystemEvent:                 "IttoSystemEvent",
+	IttoMessageTypeBaseReference:               "IttoBaseReference",
+	IttoMessageTypeOptionDirectory:             "IttoOptionDirectory",
+	IttoMessageTypeOptionTradingAction:         "IttoOptionTradingAction",
+	IttoMessageTypeOptionOpen:                  "IttoOptionOpen",
+	IttoMessageTypeAddOrderShort:               "IttoAddOrderShort",
+	IttoMessageTypeAddOrderLong:                "IttoAddOrderLong",
+	IttoMessageTypeAddQuoteShort:               "IttoAddQuoteShort",
+	IttoMessageTypeAddQuoteLong:                "IttoAddQuoteLong",
+	IttoMessageTypeSingleSideExecuted:          "IttoSingleSideExecuted",
+	IttoMessageTypeSingleSideExecutedWithPrice: "IttoSingleSideExecutedWithPrice",
+	IttoMessageTypeOrderCancel:                 "IttoOrderCancel",
+	IttoMessageTypeSingleSideReplaceShort:      "IttoSingleSideReplaceShort",
+	IttoMessageTypeSingleSideReplaceLong:       "IttoSingleSideReplaceLong",
+	IttoMessageTypeSingleSideDelete:            "IttoSingleSideDelete",
+	IttoMessageTypeSingleSideUpdate:            "IttoSingleSideUpdate",
+	IttoMessageTypeQuoteReplaceShort:           "IttoQuoteReplaceShort",
+	IttoMessageTypeQuoteReplaceLong:            "IttoQuoteReplaceLong",
+	IttoMessageTypeQuoteDelete:                 "IttoQuoteDelete",
+	IttoMessageTypeBlockSingleSideDelete:       "IttoBlockSingleSideDelete",
+	IttoMessageTypeNoii:                        "IttoNoii",
 }
 
-/************************************************************************/
+var IttoMessageCreators = [256]func() IttoMessageCommon{
+	IttoMessageTypeUnknown:                     func() IttoMessageCommon { return &IttoMessageUnknown{} },
+	IttoMessageTypeSeconds:                     func() IttoMessageCommon { return &IttoMessageSeconds{} },
+	IttoMessageTypeSystemEvent:                 func() IttoMessageCommon { return &IttoMessageSystemEvent{} },
+	IttoMessageTypeBaseReference:               func() IttoMessageCommon { return &IttoMessageBaseReference{} },
+	IttoMessageTypeOptionDirectory:             func() IttoMessageCommon { return &IttoMessageOptionDirectory{} },
+	IttoMessageTypeOptionTradingAction:         func() IttoMessageCommon { return &IttoMessageOptionTradingAction{} },
+	IttoMessageTypeOptionOpen:                  func() IttoMessageCommon { return &IttoMessageOptionOpen{} },
+	IttoMessageTypeAddOrderShort:               func() IttoMessageCommon { return &IttoMessageAddOrder{} },
+	IttoMessageTypeAddOrderLong:                func() IttoMessageCommon { return &IttoMessageAddOrder{} },
+	IttoMessageTypeAddQuoteShort:               func() IttoMessageCommon { return &IttoMessageAddQuote{} },
+	IttoMessageTypeAddQuoteLong:                func() IttoMessageCommon { return &IttoMessageAddQuote{} },
+	IttoMessageTypeSingleSideExecuted:          func() IttoMessageCommon { return &IttoMessageSingleSideExecuted{} },
+	IttoMessageTypeSingleSideExecutedWithPrice: func() IttoMessageCommon { return &IttoMessageSingleSideExecutedWithPrice{} },
+	IttoMessageTypeOrderCancel:                 func() IttoMessageCommon { return &IttoMessageOrderCancel{} },
+	IttoMessageTypeSingleSideReplaceShort:      func() IttoMessageCommon { return &IttoMessageSingleSideReplace{} },
+	IttoMessageTypeSingleSideReplaceLong:       func() IttoMessageCommon { return &IttoMessageSingleSideReplace{} },
+	IttoMessageTypeSingleSideDelete:            func() IttoMessageCommon { return &IttoMessageSingleSideDelete{} },
+	IttoMessageTypeSingleSideUpdate:            func() IttoMessageCommon { return &IttoMessageSingleSideUpdate{} },
+	IttoMessageTypeQuoteReplaceShort:           func() IttoMessageCommon { return &IttoMessageQuoteReplace{} },
+	IttoMessageTypeQuoteReplaceLong:            func() IttoMessageCommon { return &IttoMessageQuoteReplace{} },
+	IttoMessageTypeQuoteDelete:                 func() IttoMessageCommon { return &IttoMessageQuoteDelete{} },
+	IttoMessageTypeBlockSingleSideDelete:       func() IttoMessageCommon { return &IttoMessageBlockSingleSideDelete{} },
+	IttoMessageTypeNoii:                        func() IttoMessageCommon { return &IttoMessageNoii{} },
+}
+
+var IttoMessageIsShort = [256]bool{
+	IttoMessageTypeAddOrderShort:          true,
+	IttoMessageTypeAddQuoteShort:          true,
+	IttoMessageTypeSingleSideReplaceShort: true,
+	IttoMessageTypeQuoteReplaceShort:      true,
+}
+
 type EnumMessageTypeMetadata struct {
-	layers.EnumMetadata
-	IsShort bool
+	Name        string
+	IsShort     bool
+	LayerType   gopacket.LayerType
+	CreateLayer func() IttoMessageCommon
 }
 
-var IttoMessageTypeMetadata [265]EnumMessageTypeMetadata
+var IttoMessageTypeMetadata [256]EnumMessageTypeMetadata
 var LayerClassItto gopacket.LayerClass
 
 func init() {
+	const ITTO_LAYERS_BASE_NUM = 1100
+
+	layerTypes := make([]gopacket.LayerType, 0, 256)
 	for i := 0; i < 256; i++ {
-		/*
-			IttoMessageTypeMetadata[i] = layers.EnumMetadata{
-				DecodeWith: errorFunc(fmt.Sprintf("Unable to decode ITTO message type %d (%c)", i, i)),
-				Name:       fmt.Sprintf("UnknownIttoMessage(%d)", i),
-			}
-		*/
+		if IttoMessageTypeNames[i] == "" {
+			continue
+		}
+		ittoMessageType := IttoMessageType(i)
+		layerTypeMetadata := gopacket.LayerTypeMetadata{
+			Name:    IttoMessageTypeNames[i],
+			Decoder: ittoMessageType,
+		}
+		layerType := gopacket.RegisterLayerType(ITTO_LAYERS_BASE_NUM+i, layerTypeMetadata)
+		layerTypes = append(layerTypes, layerType)
+		creator := IttoMessageCreators[i]
+		createLayer := func() IttoMessageCommon {
+			m := creator()
+			m.Base().Type = ittoMessageType
+			return m
+		}
 		IttoMessageTypeMetadata[i] = EnumMessageTypeMetadata{
-			EnumMetadata: layers.EnumMetadata{
-				DecodeWith: gopacket.DecodeFunc(decodeIttoUnknown),
-				Name:       "Unknown",
-				LayerType:  LayerTypeIttoUnknown,
-			},
+			Name:        IttoMessageTypeNames[i],
+			IsShort:     IttoMessageIsShort[i],
+			LayerType:   layerType,
+			CreateLayer: createLayer,
 		}
 	}
-	IttoMessageTypeMetadata[IttoMessageTypeSeconds] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSeconds),
-			Name:       "Seconds",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSeconds), gopacket.LayerTypeMetadata{"IttoSeconds", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeSystemEvent] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSystemEvent),
-			Name:       "SystemEvent",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSystemEvent), gopacket.LayerTypeMetadata{"IttoSystemEvent", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeBaseReference] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoBaseReference),
-			Name:       "BaseReference",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeBaseReference), gopacket.LayerTypeMetadata{"IttoBaseReference", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeOptionDirectory] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoOptionDirectory),
-			Name:       "OptionDirectory",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeOptionDirectory), gopacket.LayerTypeMetadata{"IttoOptionDirectory", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeOptionsTradingAction] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoOptionTradingAction),
-			Name:       "OptionTradingAction",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeOptionsTradingAction), gopacket.LayerTypeMetadata{"IttoOptionTradingAction", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeOptionOpen] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoOptionOpen),
-			Name:       "OptionOpen",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeOptionOpen), gopacket.LayerTypeMetadata{"IttoOptionOpen", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeAddOrderShort] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoAddOrder),
-			Name:       "AddOrderShort",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeAddOrderShort), gopacket.LayerTypeMetadata{"IttoAddOrderShort", nil}),
-		},
-		IsShort: true,
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeAddOrderLong] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoAddOrder),
-			Name:       "AddOrderLong",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeAddOrderLong), gopacket.LayerTypeMetadata{"IttoAddOrderLong", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeAddQuoteShort] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoAddQuote),
-			Name:       "AddQuoteShort",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeAddQuoteShort), gopacket.LayerTypeMetadata{"IttoAddQuoteShort", nil}),
-		},
-		IsShort: true,
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeAddQuoteLong] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoAddQuote),
-			Name:       "AddQuoteLong",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeAddQuoteLong), gopacket.LayerTypeMetadata{"IttoAddQuoteLong", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeSingleSideExecuted] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSingleSideExecuted),
-			Name:       "SingleSideExecuted",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSingleSideExecuted), gopacket.LayerTypeMetadata{"IttoSingleSideExecuted", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeSingleSideExecutedWithPrice] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSingleSideExecutedWithPrice),
-			Name:       "SingleSideExecutedWithPrice",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSingleSideExecutedWithPrice), gopacket.LayerTypeMetadata{"IttoSingleSideExecutedWithPrice", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeOrderCancel] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoOrderCancel),
-			Name:       "OrderCancel",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeOrderCancel), gopacket.LayerTypeMetadata{"IttoOrderCancel", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeSingleSideReplaceShort] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSingleSideReplace),
-			Name:       "SingleSideReplaceShort",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSingleSideReplaceShort), gopacket.LayerTypeMetadata{"IttoSingleSideReplaceShort", nil}),
-		},
-		IsShort: true,
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeSingleSideReplaceLong] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSingleSideReplace),
-			Name:       "SingleSideReplaceLong",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSingleSideReplaceLong), gopacket.LayerTypeMetadata{"IttoSingleSideReplaceLong", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeSingleSideDelete] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSingleSideDelete),
-			Name:       "SingleSideDelete",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSingleSideDelete), gopacket.LayerTypeMetadata{"IttoSingleSideDelete", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeSingleSideUpdate] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoSingleSideUpdate),
-			Name:       "SingleSideUpdate",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeSingleSideUpdate), gopacket.LayerTypeMetadata{"IttoSingleSideUpdate", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeQuoteReplaceShort] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoQuoteReplace),
-			Name:       "QuoteReplaceShort",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeQuoteReplaceShort), gopacket.LayerTypeMetadata{"IttoQuoteReplaceShort", nil}),
-		},
-		IsShort: true,
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeQuoteReplaceLong] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoQuoteReplace),
-			Name:       "QuoteReplaceLong",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeQuoteReplaceLong), gopacket.LayerTypeMetadata{"IttoQuoteReplaceLong", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeQuoteDelete] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoQuoteDelete),
-			Name:       "QuoteDelete",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeQuoteDelete), gopacket.LayerTypeMetadata{"IttoQuoteDelete", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeBlockSingleSideDelete] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoBlockSingleSideDelete),
-			Name:       "BlockSingleSideDelete",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeBlockSingleSideDelete), gopacket.LayerTypeMetadata{"IttoBlockSingleSideDelete", nil}),
-		},
-	}
-	IttoMessageTypeMetadata[IttoMessageTypeNoii] = EnumMessageTypeMetadata{
-		EnumMetadata: layers.EnumMetadata{
-			DecodeWith: gopacket.DecodeFunc(decodeIttoNoii),
-			Name:       "Noii",
-			LayerType:  gopacket.RegisterLayerType(1100+int(IttoMessageTypeNoii), gopacket.LayerTypeMetadata{"IttoNoii", nil}),
-		},
-	}
-
-	lts := make([]gopacket.LayerType, 0, 256)
-	lts = append(lts, LayerTypeIttoUnknown)
 	for i := 0; i < 256; i++ {
-		lt := IttoMessageTypeMetadata[i].LayerType
-		if lt != LayerTypeIttoUnknown {
-			lts = append(lts, lt)
+		if IttoMessageTypeMetadata[i].Name == "" {
+			// unknown message type
+			IttoMessageTypeMetadata[i] = IttoMessageTypeMetadata[IttoMessageTypeUnknown]
 		}
 	}
-	LayerClassItto = gopacket.NewLayerClass(lts)
+	LayerClassItto = gopacket.NewLayerClass(layerTypes)
 }
-
-/*
-func errorFunc(msg string) gopacket.Decoder {
-	var e = errors.New(msg)
-	return gopacket.DecodeFunc(func([]byte, gopacket.PacketBuilder) error {
-		return e
-	})
-}
-*/
 
 /************************************************************************/
 type IttoMessageCommon interface {
+	gopacket.DecodingLayer
+	//embed gopacket.Layer by "inlining"
+	//workaround for https://github.com/golang/go/issues/6977
+	LayerType() gopacket.LayerType
+	LayerContents() []byte
+
 	Base() *IttoMessage
 }
 
@@ -389,16 +269,24 @@ type IttoMessage struct {
 	Timestamp uint32
 }
 
-func (m *IttoMessage) Base() *IttoMessage {
-	return m
+func (m *IttoMessage) CanDecode() gopacket.LayerClass {
+	return m.LayerType()
 }
-
+func (m *IttoMessage) NextLayerType() gopacket.LayerType {
+	return gopacket.LayerTypeZero
+}
 func (m *IttoMessage) LayerContents() []byte {
 	return nil
 }
-
 func (m *IttoMessage) LayerPayload() []byte {
 	return nil
+}
+func (m *IttoMessage) LayerType() gopacket.LayerType {
+	return m.Type.LayerType()
+}
+
+func (m *IttoMessage) Base() *IttoMessage {
+	return m
 }
 
 func decodeIttoMessage(data []byte) IttoMessage {
@@ -411,24 +299,17 @@ func decodeIttoMessage(data []byte) IttoMessage {
 	return m
 }
 
-func (m *IttoMessage) LayerType() gopacket.LayerType {
-	return m.Type.LayerType()
-}
-
 /************************************************************************/
-var LayerTypeIttoUnknown = gopacket.RegisterLayerType(1100, gopacket.LayerTypeMetadata{"IttoUnknown", nil})
-
 type IttoMessageUnknown struct {
 	IttoMessage
 	TypeChar string
 }
 
-func decodeIttoUnknown(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageUnknown{
+func (m *IttoMessageUnknown) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageUnknown{
 		IttoMessage: decodeIttoMessage(data),
 		TypeChar:    string(data[0]),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -438,12 +319,11 @@ type IttoMessageSeconds struct {
 	Second uint32
 }
 
-func decodeIttoSeconds(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageSeconds{
+func (m *IttoMessageSeconds) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageSeconds{
 		IttoMessage: decodeIttoMessage(data),
 		Second:      binary.BigEndian.Uint32(data[1:5]),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -453,12 +333,11 @@ type IttoMessageSystemEvent struct {
 	EventCode byte
 }
 
-func decodeIttoSystemEvent(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageSystemEvent{
+func (m *IttoMessageSystemEvent) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageSystemEvent{
 		IttoMessage: decodeIttoMessage(data),
 		EventCode:   data[5],
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -468,12 +347,11 @@ type IttoMessageBaseReference struct {
 	BaseRefNum uint64
 }
 
-func decodeIttoBaseReference(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageBaseReference{
+func (m *IttoMessageBaseReference) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageBaseReference{
 		IttoMessage: decodeIttoMessage(data),
 		BaseRefNum:  binary.BigEndian.Uint64(data[5:13]),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -492,8 +370,8 @@ type IttoMessageOptionDirectory struct {
 	MPV              byte
 }
 
-func decodeIttoOptionDirectory(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageOptionDirectory{
+func (m *IttoMessageOptionDirectory) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageOptionDirectory{
 		IttoMessage:      decodeIttoMessage(data),
 		OId:              OptionId(binary.BigEndian.Uint32(data[5:9])),
 		Symbol:           string(data[9:15]),
@@ -506,7 +384,6 @@ func decodeIttoOptionDirectory(data []byte, p gopacket.PacketBuilder) error {
 		Tradable:         data[38],
 		MPV:              data[39],
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -517,13 +394,12 @@ type IttoMessageOptionTradingAction struct {
 	State byte
 }
 
-func decodeIttoOptionTradingAction(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageOptionTradingAction{
+func (m *IttoMessageOptionTradingAction) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageOptionTradingAction{
 		IttoMessage: decodeIttoMessage(data),
 		OId:         OptionId(binary.BigEndian.Uint32(data[5:9])),
 		State:       data[9],
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -534,13 +410,12 @@ type IttoMessageOptionOpen struct {
 	OpenState byte
 }
 
-func decodeIttoOptionOpen(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageOptionOpen{
+func (m *IttoMessageOptionOpen) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageOptionOpen{
 		IttoMessage: decodeIttoMessage(data),
 		OId:         OptionId(binary.BigEndian.Uint32(data[5:9])),
 		OpenState:   data[9],
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -551,8 +426,8 @@ type IttoMessageAddOrder struct {
 	OrderSide
 }
 
-func decodeIttoAddOrder(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageAddOrder{
+func (m *IttoMessageAddOrder) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageAddOrder{
 		IttoMessage: decodeIttoMessage(data),
 		OrderSide: OrderSide{
 			RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
@@ -567,7 +442,6 @@ func decodeIttoAddOrder(data []byte, p gopacket.PacketBuilder) error {
 		m.Price = int(binary.BigEndian.Uint32(data[14:18]))
 		m.Size = int(binary.BigEndian.Uint32(data[18:22]))
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -579,8 +453,8 @@ type IttoMessageAddQuote struct {
 	Ask OrderSide
 }
 
-func decodeIttoAddQuote(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageAddQuote{
+func (m *IttoMessageAddQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageAddQuote{
 		IttoMessage: decodeIttoMessage(data),
 		Bid:         OrderSide{Side: MarketSideBid, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[5:9]))},
 		Ask:         OrderSide{Side: MarketSideAsk, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
@@ -597,7 +471,6 @@ func decodeIttoAddQuote(data []byte, p gopacket.PacketBuilder) error {
 		m.Ask.Price = int(binary.BigEndian.Uint32(data[25:29]))
 		m.Ask.Size = int(binary.BigEndian.Uint32(data[29:33]))
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -610,15 +483,14 @@ type IttoMessageSingleSideExecuted struct {
 	Match       uint32
 }
 
-func decodeIttoSingleSideExecuted(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageSingleSideExecuted{
+func (m *IttoMessageSingleSideExecuted) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageSingleSideExecuted{
 		IttoMessage: decodeIttoMessage(data),
 		OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 		Size:        int(binary.BigEndian.Uint32(data[9:13])),
 		Cross:       binary.BigEndian.Uint32(data[13:17]),
 		Match:       binary.BigEndian.Uint32(data[17:21]),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -629,8 +501,8 @@ type IttoMessageSingleSideExecutedWithPrice struct {
 	Price     int
 }
 
-func decodeIttoSingleSideExecutedWithPrice(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageSingleSideExecutedWithPrice{
+func (m *IttoMessageSingleSideExecutedWithPrice) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageSingleSideExecutedWithPrice{
 		IttoMessageSingleSideExecuted: IttoMessageSingleSideExecuted{
 			IttoMessage: decodeIttoMessage(data),
 			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
@@ -641,7 +513,6 @@ func decodeIttoSingleSideExecutedWithPrice(data []byte, p gopacket.PacketBuilder
 		Printable: data[17],
 		Price:     int(binary.BigEndian.Uint32(data[18:22])),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -652,13 +523,12 @@ type IttoMessageOrderCancel struct {
 	Size        int
 }
 
-func decodeIttoOrderCancel(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageOrderCancel{
+func (m *IttoMessageOrderCancel) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageOrderCancel{
 		IttoMessage: decodeIttoMessage(data),
 		OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 		Size:        int(binary.BigEndian.Uint32(data[9:13])),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -668,8 +538,8 @@ type IttoMessageSingleSideReplace struct {
 	ReplaceOrderSide
 }
 
-func decodeIttoSingleSideReplace(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageSingleSideReplace{
+func (m *IttoMessageSingleSideReplace) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageSingleSideReplace{
 		IttoMessage: decodeIttoMessage(data),
 		ReplaceOrderSide: ReplaceOrderSide{
 			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
@@ -683,7 +553,6 @@ func decodeIttoSingleSideReplace(data []byte, p gopacket.PacketBuilder) error {
 		m.Price = int(binary.BigEndian.Uint32(data[13:17]))
 		m.Size = int(binary.BigEndian.Uint32(data[17:21]))
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -693,12 +562,11 @@ type IttoMessageSingleSideDelete struct {
 	OrigRefNumD RefNumDelta
 }
 
-func decodeIttoSingleSideDelete(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageSingleSideDelete{
+func (m *IttoMessageSingleSideDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageSingleSideDelete{
 		IttoMessage: decodeIttoMessage(data),
 		OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -709,8 +577,8 @@ type IttoMessageSingleSideUpdate struct {
 	Reason byte
 }
 
-func decodeIttoSingleSideUpdate(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageSingleSideUpdate{
+func (m *IttoMessageSingleSideUpdate) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageSingleSideUpdate{
 		IttoMessage: decodeIttoMessage(data),
 		OrderSide: OrderSide{
 			RefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
@@ -719,7 +587,6 @@ func decodeIttoSingleSideUpdate(data []byte, p gopacket.PacketBuilder) error {
 		},
 		Reason: data[9],
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -730,8 +597,8 @@ type IttoMessageQuoteReplace struct {
 	Ask ReplaceOrderSide
 }
 
-func decodeIttoQuoteReplace(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageQuoteReplace{
+func (m *IttoMessageQuoteReplace) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageQuoteReplace{
 		IttoMessage: decodeIttoMessage(data),
 		Bid: ReplaceOrderSide{
 			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
@@ -753,7 +620,6 @@ func decodeIttoQuoteReplace(data []byte, p gopacket.PacketBuilder) error {
 		m.Ask.Price = int(binary.BigEndian.Uint32(data[29:33]))
 		m.Ask.Size = int(binary.BigEndian.Uint32(data[33:37]))
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -764,13 +630,12 @@ type IttoMessageQuoteDelete struct {
 	AskOrigRefNumD RefNumDelta
 }
 
-func decodeIttoQuoteDelete(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageQuoteDelete{
+func (m *IttoMessageQuoteDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageQuoteDelete{
 		IttoMessage:    decodeIttoMessage(data),
 		BidOrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 		AskOrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[9:13])),
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -781,8 +646,8 @@ type IttoMessageBlockSingleSideDelete struct {
 	RefNumDs []RefNumDelta
 }
 
-func decodeIttoBlockSingleSideDelete(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageBlockSingleSideDelete{
+func (m *IttoMessageBlockSingleSideDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageBlockSingleSideDelete{
 		IttoMessage: decodeIttoMessage(data),
 		Number:      int(binary.BigEndian.Uint16(data[5:9])),
 	}
@@ -791,7 +656,6 @@ func decodeIttoBlockSingleSideDelete(data []byte, p gopacket.PacketBuilder) erro
 		off := 7 + 4*i
 		m.RefNumDs[i] = OrigRefNumDelta(binary.BigEndian.Uint32(data[off : off+4]))
 	}
-	p.AddLayer(m)
 	return nil
 }
 
@@ -805,8 +669,8 @@ type IttoMessageNoii struct {
 	Imbalance   OrderSide
 }
 
-func decodeIttoNoii(data []byte, p gopacket.PacketBuilder) error {
-	m := &IttoMessageNoii{
+func (m *IttoMessageNoii) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageNoii{
 		IttoMessage: decodeIttoMessage(data),
 		AuctionId:   binary.BigEndian.Uint32(data[5:9]),
 		AuctionType: data[9],
@@ -818,6 +682,5 @@ func decodeIttoNoii(data []byte, p gopacket.PacketBuilder) error {
 		},
 		OId: OptionId(binary.BigEndian.Uint32(data[15:19])),
 	}
-	p.AddLayer(m)
 	return nil
 }
