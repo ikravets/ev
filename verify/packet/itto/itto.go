@@ -173,30 +173,30 @@ var IttoMessageTypeNames = [256]string{
 	IttoMessageTypeNoii:                        "IttoNoii",
 }
 
-var IttoMessageCreators = [256]func() IttoMessageCommon{
-	IttoMessageTypeUnknown:                     func() IttoMessageCommon { return &IttoMessageUnknown{} },
-	IttoMessageTypeSeconds:                     func() IttoMessageCommon { return &IttoMessageSeconds{} },
-	IttoMessageTypeSystemEvent:                 func() IttoMessageCommon { return &IttoMessageSystemEvent{} },
-	IttoMessageTypeBaseReference:               func() IttoMessageCommon { return &IttoMessageBaseReference{} },
-	IttoMessageTypeOptionDirectory:             func() IttoMessageCommon { return &IttoMessageOptionDirectory{} },
-	IttoMessageTypeOptionTradingAction:         func() IttoMessageCommon { return &IttoMessageOptionTradingAction{} },
-	IttoMessageTypeOptionOpen:                  func() IttoMessageCommon { return &IttoMessageOptionOpen{} },
-	IttoMessageTypeAddOrderShort:               func() IttoMessageCommon { return &IttoMessageAddOrder{} },
-	IttoMessageTypeAddOrderLong:                func() IttoMessageCommon { return &IttoMessageAddOrder{} },
-	IttoMessageTypeAddQuoteShort:               func() IttoMessageCommon { return &IttoMessageAddQuote{} },
-	IttoMessageTypeAddQuoteLong:                func() IttoMessageCommon { return &IttoMessageAddQuote{} },
-	IttoMessageTypeSingleSideExecuted:          func() IttoMessageCommon { return &IttoMessageSingleSideExecuted{} },
-	IttoMessageTypeSingleSideExecutedWithPrice: func() IttoMessageCommon { return &IttoMessageSingleSideExecutedWithPrice{} },
-	IttoMessageTypeOrderCancel:                 func() IttoMessageCommon { return &IttoMessageOrderCancel{} },
-	IttoMessageTypeSingleSideReplaceShort:      func() IttoMessageCommon { return &IttoMessageSingleSideReplace{} },
-	IttoMessageTypeSingleSideReplaceLong:       func() IttoMessageCommon { return &IttoMessageSingleSideReplace{} },
-	IttoMessageTypeSingleSideDelete:            func() IttoMessageCommon { return &IttoMessageSingleSideDelete{} },
-	IttoMessageTypeSingleSideUpdate:            func() IttoMessageCommon { return &IttoMessageSingleSideUpdate{} },
-	IttoMessageTypeQuoteReplaceShort:           func() IttoMessageCommon { return &IttoMessageQuoteReplace{} },
-	IttoMessageTypeQuoteReplaceLong:            func() IttoMessageCommon { return &IttoMessageQuoteReplace{} },
-	IttoMessageTypeQuoteDelete:                 func() IttoMessageCommon { return &IttoMessageQuoteDelete{} },
-	IttoMessageTypeBlockSingleSideDelete:       func() IttoMessageCommon { return &IttoMessageBlockSingleSideDelete{} },
-	IttoMessageTypeNoii:                        func() IttoMessageCommon { return &IttoMessageNoii{} },
+var IttoMessageCreators = [256]func() IttoMessage{
+	IttoMessageTypeUnknown:                     func() IttoMessage { return &IttoMessageUnknown{} },
+	IttoMessageTypeSeconds:                     func() IttoMessage { return &IttoMessageSeconds{} },
+	IttoMessageTypeSystemEvent:                 func() IttoMessage { return &IttoMessageSystemEvent{} },
+	IttoMessageTypeBaseReference:               func() IttoMessage { return &IttoMessageBaseReference{} },
+	IttoMessageTypeOptionDirectory:             func() IttoMessage { return &IttoMessageOptionDirectory{} },
+	IttoMessageTypeOptionTradingAction:         func() IttoMessage { return &IttoMessageOptionTradingAction{} },
+	IttoMessageTypeOptionOpen:                  func() IttoMessage { return &IttoMessageOptionOpen{} },
+	IttoMessageTypeAddOrderShort:               func() IttoMessage { return &IttoMessageAddOrder{} },
+	IttoMessageTypeAddOrderLong:                func() IttoMessage { return &IttoMessageAddOrder{} },
+	IttoMessageTypeAddQuoteShort:               func() IttoMessage { return &IttoMessageAddQuote{} },
+	IttoMessageTypeAddQuoteLong:                func() IttoMessage { return &IttoMessageAddQuote{} },
+	IttoMessageTypeSingleSideExecuted:          func() IttoMessage { return &IttoMessageSingleSideExecuted{} },
+	IttoMessageTypeSingleSideExecutedWithPrice: func() IttoMessage { return &IttoMessageSingleSideExecutedWithPrice{} },
+	IttoMessageTypeOrderCancel:                 func() IttoMessage { return &IttoMessageOrderCancel{} },
+	IttoMessageTypeSingleSideReplaceShort:      func() IttoMessage { return &IttoMessageSingleSideReplace{} },
+	IttoMessageTypeSingleSideReplaceLong:       func() IttoMessage { return &IttoMessageSingleSideReplace{} },
+	IttoMessageTypeSingleSideDelete:            func() IttoMessage { return &IttoMessageSingleSideDelete{} },
+	IttoMessageTypeSingleSideUpdate:            func() IttoMessage { return &IttoMessageSingleSideUpdate{} },
+	IttoMessageTypeQuoteReplaceShort:           func() IttoMessage { return &IttoMessageQuoteReplace{} },
+	IttoMessageTypeQuoteReplaceLong:            func() IttoMessage { return &IttoMessageQuoteReplace{} },
+	IttoMessageTypeQuoteDelete:                 func() IttoMessage { return &IttoMessageQuoteDelete{} },
+	IttoMessageTypeBlockSingleSideDelete:       func() IttoMessage { return &IttoMessageBlockSingleSideDelete{} },
+	IttoMessageTypeNoii:                        func() IttoMessage { return &IttoMessageNoii{} },
 }
 
 var IttoMessageIsShort = [256]bool{
@@ -210,7 +210,7 @@ type EnumMessageTypeMetadata struct {
 	Name        string
 	IsShort     bool
 	LayerType   gopacket.LayerType
-	CreateLayer func() IttoMessageCommon
+	CreateLayer func() IttoMessage
 }
 
 var IttoMessageTypeMetadata [256]EnumMessageTypeMetadata
@@ -232,7 +232,7 @@ func init() {
 		layerType := gopacket.RegisterLayerType(ITTO_LAYERS_BASE_NUM+i, layerTypeMetadata)
 		layerTypes = append(layerTypes, layerType)
 		creator := IttoMessageCreators[i]
-		createLayer := func() IttoMessageCommon {
+		createLayer := func() IttoMessage {
 			m := creator()
 			m.Base().Type = ittoMessageType
 			return m
@@ -254,43 +254,43 @@ func init() {
 }
 
 /************************************************************************/
-type IttoMessageCommon interface {
+type IttoMessage interface {
 	gopacket.DecodingLayer
 	//embed gopacket.Layer by "inlining"
 	//workaround for https://github.com/golang/go/issues/6977
 	LayerType() gopacket.LayerType
 	LayerContents() []byte
 
-	Base() *IttoMessage
+	Base() *IttoMessageCommon
 }
 
-type IttoMessage struct {
+type IttoMessageCommon struct {
 	Type      IttoMessageType
 	Timestamp uint32
 }
 
-func (m *IttoMessage) CanDecode() gopacket.LayerClass {
+func (m *IttoMessageCommon) CanDecode() gopacket.LayerClass {
 	return m.LayerType()
 }
-func (m *IttoMessage) NextLayerType() gopacket.LayerType {
+func (m *IttoMessageCommon) NextLayerType() gopacket.LayerType {
 	return gopacket.LayerTypeZero
 }
-func (m *IttoMessage) LayerContents() []byte {
+func (m *IttoMessageCommon) LayerContents() []byte {
 	return nil
 }
-func (m *IttoMessage) LayerPayload() []byte {
+func (m *IttoMessageCommon) LayerPayload() []byte {
 	return nil
 }
-func (m *IttoMessage) LayerType() gopacket.LayerType {
+func (m *IttoMessageCommon) LayerType() gopacket.LayerType {
 	return m.Type.LayerType()
 }
 
-func (m *IttoMessage) Base() *IttoMessage {
+func (m *IttoMessageCommon) Base() *IttoMessageCommon {
 	return m
 }
 
-func decodeIttoMessage(data []byte) IttoMessage {
-	m := IttoMessage{
+func decodeIttoMessage(data []byte) IttoMessageCommon {
+	m := IttoMessageCommon{
 		Type: IttoMessageType(data[0]),
 	}
 	if m.Type != IttoMessageTypeSeconds && len(data) >= 5 {
@@ -301,63 +301,63 @@ func decodeIttoMessage(data []byte) IttoMessage {
 
 /************************************************************************/
 type IttoMessageUnknown struct {
-	IttoMessage
+	IttoMessageCommon
 	TypeChar string
 }
 
 func (m *IttoMessageUnknown) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageUnknown{
-		IttoMessage: decodeIttoMessage(data),
-		TypeChar:    string(data[0]),
+		IttoMessageCommon: decodeIttoMessage(data),
+		TypeChar:          string(data[0]),
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageSeconds struct {
-	IttoMessage
+	IttoMessageCommon
 	Second uint32
 }
 
 func (m *IttoMessageSeconds) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSeconds{
-		IttoMessage: decodeIttoMessage(data),
-		Second:      binary.BigEndian.Uint32(data[1:5]),
+		IttoMessageCommon: decodeIttoMessage(data),
+		Second:            binary.BigEndian.Uint32(data[1:5]),
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageSystemEvent struct {
-	IttoMessage
+	IttoMessageCommon
 	EventCode byte
 }
 
 func (m *IttoMessageSystemEvent) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSystemEvent{
-		IttoMessage: decodeIttoMessage(data),
-		EventCode:   data[5],
+		IttoMessageCommon: decodeIttoMessage(data),
+		EventCode:         data[5],
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageBaseReference struct {
-	IttoMessage
+	IttoMessageCommon
 	BaseRefNum uint64
 }
 
 func (m *IttoMessageBaseReference) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageBaseReference{
-		IttoMessage: decodeIttoMessage(data),
-		BaseRefNum:  binary.BigEndian.Uint64(data[5:13]),
+		IttoMessageCommon: decodeIttoMessage(data),
+		BaseRefNum:        binary.BigEndian.Uint64(data[5:13]),
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageOptionDirectory struct {
-	IttoMessage
+	IttoMessageCommon
 	OId              OptionId
 	Symbol           string
 	Expiration       time.Time
@@ -372,63 +372,63 @@ type IttoMessageOptionDirectory struct {
 
 func (m *IttoMessageOptionDirectory) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOptionDirectory{
-		IttoMessage:      decodeIttoMessage(data),
-		OId:              OptionId(binary.BigEndian.Uint32(data[5:9])),
-		Symbol:           string(data[9:15]),
-		Expiration:       time.Date(2000+int(data[15]), time.Month(data[16]), int(data[17]), 0, 0, 0, 0, time.Local),
-		StrikePrice:      int(binary.BigEndian.Uint32(data[18:22])),
-		OType:            data[22],
-		Source:           data[23],
-		UnderlyingSymbol: string(data[24:37]),
-		ClosingType:      data[37],
-		Tradable:         data[38],
-		MPV:              data[39],
+		IttoMessageCommon: decodeIttoMessage(data),
+		OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+		Symbol:            string(data[9:15]),
+		Expiration:        time.Date(2000+int(data[15]), time.Month(data[16]), int(data[17]), 0, 0, 0, 0, time.Local),
+		StrikePrice:       int(binary.BigEndian.Uint32(data[18:22])),
+		OType:             data[22],
+		Source:            data[23],
+		UnderlyingSymbol:  string(data[24:37]),
+		ClosingType:       data[37],
+		Tradable:          data[38],
+		MPV:               data[39],
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageOptionTradingAction struct {
-	IttoMessage
+	IttoMessageCommon
 	OId   OptionId
 	State byte
 }
 
 func (m *IttoMessageOptionTradingAction) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOptionTradingAction{
-		IttoMessage: decodeIttoMessage(data),
-		OId:         OptionId(binary.BigEndian.Uint32(data[5:9])),
-		State:       data[9],
+		IttoMessageCommon: decodeIttoMessage(data),
+		OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+		State:             data[9],
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageOptionOpen struct {
-	IttoMessage
+	IttoMessageCommon
 	OId       OptionId
 	OpenState byte
 }
 
 func (m *IttoMessageOptionOpen) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOptionOpen{
-		IttoMessage: decodeIttoMessage(data),
-		OId:         OptionId(binary.BigEndian.Uint32(data[5:9])),
-		OpenState:   data[9],
+		IttoMessageCommon: decodeIttoMessage(data),
+		OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+		OpenState:         data[9],
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageAddOrder struct {
-	IttoMessage
+	IttoMessageCommon
 	OId OptionId
 	OrderSide
 }
 
 func (m *IttoMessageAddOrder) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageAddOrder{
-		IttoMessage: decodeIttoMessage(data),
+		IttoMessageCommon: decodeIttoMessage(data),
 		OrderSide: OrderSide{
 			RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 			Side:    MarketSideParse(data[9]),
@@ -447,7 +447,7 @@ func (m *IttoMessageAddOrder) DecodeFromBytes(data []byte, df gopacket.DecodeFee
 
 /************************************************************************/
 type IttoMessageAddQuote struct {
-	IttoMessage
+	IttoMessageCommon
 	OId OptionId
 	Bid OrderSide
 	Ask OrderSide
@@ -455,10 +455,10 @@ type IttoMessageAddQuote struct {
 
 func (m *IttoMessageAddQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageAddQuote{
-		IttoMessage: decodeIttoMessage(data),
-		Bid:         OrderSide{Side: MarketSideBid, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[5:9]))},
-		Ask:         OrderSide{Side: MarketSideAsk, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
-		OId:         OptionId(binary.BigEndian.Uint32(data[13:17])),
+		IttoMessageCommon: decodeIttoMessage(data),
+		Bid:               OrderSide{Side: MarketSideBid, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[5:9]))},
+		Ask:               OrderSide{Side: MarketSideAsk, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
+		OId:               OptionId(binary.BigEndian.Uint32(data[13:17])),
 	}
 	if m.Type.IsShort() {
 		m.Bid.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[17:19])))
@@ -476,7 +476,7 @@ func (m *IttoMessageAddQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFee
 
 /************************************************************************/
 type IttoMessageSingleSideExecuted struct {
-	IttoMessage
+	IttoMessageCommon
 	OrigRefNumD RefNumDelta
 	Size        int
 	Cross       uint32
@@ -485,11 +485,11 @@ type IttoMessageSingleSideExecuted struct {
 
 func (m *IttoMessageSingleSideExecuted) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideExecuted{
-		IttoMessage: decodeIttoMessage(data),
-		OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-		Size:        int(binary.BigEndian.Uint32(data[9:13])),
-		Cross:       binary.BigEndian.Uint32(data[13:17]),
-		Match:       binary.BigEndian.Uint32(data[17:21]),
+		IttoMessageCommon: decodeIttoMessage(data),
+		OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+		Size:              int(binary.BigEndian.Uint32(data[9:13])),
+		Cross:             binary.BigEndian.Uint32(data[13:17]),
+		Match:             binary.BigEndian.Uint32(data[17:21]),
 	}
 	return nil
 }
@@ -504,11 +504,11 @@ type IttoMessageSingleSideExecutedWithPrice struct {
 func (m *IttoMessageSingleSideExecutedWithPrice) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideExecutedWithPrice{
 		IttoMessageSingleSideExecuted: IttoMessageSingleSideExecuted{
-			IttoMessage: decodeIttoMessage(data),
-			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-			Cross:       binary.BigEndian.Uint32(data[9:13]),
-			Match:       binary.BigEndian.Uint32(data[13:17]),
-			Size:        int(binary.BigEndian.Uint32(data[22:26])),
+			IttoMessageCommon: decodeIttoMessage(data),
+			OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+			Cross:             binary.BigEndian.Uint32(data[9:13]),
+			Match:             binary.BigEndian.Uint32(data[13:17]),
+			Size:              int(binary.BigEndian.Uint32(data[22:26])),
 		},
 		Printable: data[17],
 		Price:     int(binary.BigEndian.Uint32(data[18:22])),
@@ -518,29 +518,29 @@ func (m *IttoMessageSingleSideExecutedWithPrice) DecodeFromBytes(data []byte, df
 
 /************************************************************************/
 type IttoMessageOrderCancel struct {
-	IttoMessage
+	IttoMessageCommon
 	OrigRefNumD RefNumDelta
 	Size        int
 }
 
 func (m *IttoMessageOrderCancel) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOrderCancel{
-		IttoMessage: decodeIttoMessage(data),
-		OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-		Size:        int(binary.BigEndian.Uint32(data[9:13])),
+		IttoMessageCommon: decodeIttoMessage(data),
+		OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+		Size:              int(binary.BigEndian.Uint32(data[9:13])),
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageSingleSideReplace struct {
-	IttoMessage
+	IttoMessageCommon
 	ReplaceOrderSide
 }
 
 func (m *IttoMessageSingleSideReplace) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideReplace{
-		IttoMessage: decodeIttoMessage(data),
+		IttoMessageCommon: decodeIttoMessage(data),
 		ReplaceOrderSide: ReplaceOrderSide{
 			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 			OrderSide:   OrderSide{RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
@@ -558,28 +558,28 @@ func (m *IttoMessageSingleSideReplace) DecodeFromBytes(data []byte, df gopacket.
 
 /************************************************************************/
 type IttoMessageSingleSideDelete struct {
-	IttoMessage
+	IttoMessageCommon
 	OrigRefNumD RefNumDelta
 }
 
 func (m *IttoMessageSingleSideDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideDelete{
-		IttoMessage: decodeIttoMessage(data),
-		OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+		IttoMessageCommon: decodeIttoMessage(data),
+		OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageSingleSideUpdate struct {
-	IttoMessage
+	IttoMessageCommon
 	OrderSide
 	Reason byte
 }
 
 func (m *IttoMessageSingleSideUpdate) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideUpdate{
-		IttoMessage: decodeIttoMessage(data),
+		IttoMessageCommon: decodeIttoMessage(data),
 		OrderSide: OrderSide{
 			RefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 			Price:   int(binary.BigEndian.Uint32(data[10:14])),
@@ -592,14 +592,14 @@ func (m *IttoMessageSingleSideUpdate) DecodeFromBytes(data []byte, df gopacket.D
 
 /************************************************************************/
 type IttoMessageQuoteReplace struct {
-	IttoMessage
+	IttoMessageCommon
 	Bid ReplaceOrderSide
 	Ask ReplaceOrderSide
 }
 
 func (m *IttoMessageQuoteReplace) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageQuoteReplace{
-		IttoMessage: decodeIttoMessage(data),
+		IttoMessageCommon: decodeIttoMessage(data),
 		Bid: ReplaceOrderSide{
 			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
 			OrderSide:   OrderSide{Side: MarketSideBid, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
@@ -625,31 +625,31 @@ func (m *IttoMessageQuoteReplace) DecodeFromBytes(data []byte, df gopacket.Decod
 
 /************************************************************************/
 type IttoMessageQuoteDelete struct {
-	IttoMessage
+	IttoMessageCommon
 	BidOrigRefNumD RefNumDelta
 	AskOrigRefNumD RefNumDelta
 }
 
 func (m *IttoMessageQuoteDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageQuoteDelete{
-		IttoMessage:    decodeIttoMessage(data),
-		BidOrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-		AskOrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[9:13])),
+		IttoMessageCommon: decodeIttoMessage(data),
+		BidOrigRefNumD:    OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+		AskOrigRefNumD:    OrigRefNumDelta(binary.BigEndian.Uint32(data[9:13])),
 	}
 	return nil
 }
 
 /************************************************************************/
 type IttoMessageBlockSingleSideDelete struct {
-	IttoMessage
+	IttoMessageCommon
 	Number   int
 	RefNumDs []RefNumDelta
 }
 
 func (m *IttoMessageBlockSingleSideDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageBlockSingleSideDelete{
-		IttoMessage: decodeIttoMessage(data),
-		Number:      int(binary.BigEndian.Uint16(data[5:9])),
+		IttoMessageCommon: decodeIttoMessage(data),
+		Number:            int(binary.BigEndian.Uint16(data[5:9])),
 	}
 	m.RefNumDs = make([]RefNumDelta, m.Number)
 	for i := 0; i < m.Number; i++ {
@@ -661,7 +661,7 @@ func (m *IttoMessageBlockSingleSideDelete) DecodeFromBytes(data []byte, df gopac
 
 /************************************************************************/
 type IttoMessageNoii struct {
-	IttoMessage
+	IttoMessageCommon
 	AuctionId   uint32
 	AuctionType byte
 	Size        uint32
@@ -671,10 +671,10 @@ type IttoMessageNoii struct {
 
 func (m *IttoMessageNoii) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageNoii{
-		IttoMessage: decodeIttoMessage(data),
-		AuctionId:   binary.BigEndian.Uint32(data[5:9]),
-		AuctionType: data[9],
-		Size:        binary.BigEndian.Uint32(data[10:14]),
+		IttoMessageCommon: decodeIttoMessage(data),
+		AuctionId:         binary.BigEndian.Uint32(data[5:9]),
+		AuctionType:       data[9],
+		Size:              binary.BigEndian.Uint32(data[10:14]),
 		Imbalance: OrderSide{
 			Side:  MarketSideParse(data[14]),
 			Price: int(binary.BigEndian.Uint32(data[19:23])),

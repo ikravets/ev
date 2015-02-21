@@ -205,6 +205,6 @@ func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
 		Type:           messageType,
 		SecurityId:     uint32(l.lastOptionId),
 		SequenceNumber: uint32(l.lastMessage.Pam.SequenceNumber()), // FIXME MoldUDP64 seqNum is 64 bit
-		TimeStamp:      uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessageCommon).Base().Timestamp),
+		TimeStamp:      uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessage).Base().Timestamp),
 	}
 }

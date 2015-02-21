@@ -86,7 +86,7 @@ func (l *AvtLogger) genUpdate() {
 	packetTimestamp := l.lastMessage.Pam.PacketMetadata().Timestamp.In(l.location)
 	dateTime := packetTimestamp.Format("20060102,15:04:05.000.")
 	dateTime += fmt.Sprintf("%03d", packetTimestamp.Nanosecond()/1000%1000)
-	ittoTimestamp := uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessageCommon).Base().Timestamp)
+	ittoTimestamp := uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessage).Base().Timestamp)
 	avtTimestamp := time.Date(packetTimestamp.Year(), packetTimestamp.Month(), packetTimestamp.Day(), 0, 0, 0, 0, l.location).Add(time.Duration(ittoTimestamp)).UnixNano() / 1000000
 	if false {
 		// OptionMarketDataNASDAQ2,date,time,Security,Underlying,SecurityType,BidSize,BidPrice,OrderBidSize,AskSize,AskPrice,OrderAskSize,TradeStatus,TickCondition,ExchangeTimestamp
