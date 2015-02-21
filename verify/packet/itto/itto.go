@@ -141,9 +141,9 @@ const (
 	IttoMessageTypeQuoteReplaceLong            IttoMessageType = 'K'
 	IttoMessageTypeQuoteDelete                 IttoMessageType = 'Y'
 	IttoMessageTypeBlockSingleSideDelete       IttoMessageType = 'Z'
-	IttoMessageTypeOptionsTrade                IttoMessageType = 'P' // TODO
-	IttoMessageTypeOptionsCrossTrade           IttoMessageType = 'Q' // TODO
-	IttoMessageTypeBrokenTrade                 IttoMessageType = 'B' // TODO
+	IttoMessageTypeOptionsTrade                IttoMessageType = 'P'
+	IttoMessageTypeOptionsCrossTrade           IttoMessageType = 'Q'
+	IttoMessageTypeBrokenTrade                 IttoMessageType = 'B'
 	IttoMessageTypeNoii                        IttoMessageType = 'I'
 )
 
@@ -170,6 +170,9 @@ var IttoMessageTypeNames = [256]string{
 	IttoMessageTypeQuoteReplaceLong:            "IttoQuoteReplaceLong",
 	IttoMessageTypeQuoteDelete:                 "IttoQuoteDelete",
 	IttoMessageTypeBlockSingleSideDelete:       "IttoBlockSingleSideDelete",
+	IttoMessageTypeOptionsTrade:                "IttoOptionsTrade",
+	IttoMessageTypeOptionsCrossTrade:           "IttoOptionsCrossTrade",
+	IttoMessageTypeBrokenTrade:                 "IttoBrokenTrade",
 	IttoMessageTypeNoii:                        "IttoNoii",
 }
 
@@ -196,6 +199,9 @@ var IttoMessageCreators = [256]func() IttoMessage{
 	IttoMessageTypeQuoteReplaceLong:            func() IttoMessage { return &IttoMessageQuoteReplace{} },
 	IttoMessageTypeQuoteDelete:                 func() IttoMessage { return &IttoMessageQuoteDelete{} },
 	IttoMessageTypeBlockSingleSideDelete:       func() IttoMessage { return &IttoMessageBlockSingleSideDelete{} },
+	IttoMessageTypeOptionsTrade:                func() IttoMessage { return &IttoMessageOptionsTrade{} },
+	IttoMessageTypeOptionsCrossTrade:           func() IttoMessage { return &IttoMessageOptionsCrossTrade{} },
+	IttoMessageTypeBrokenTrade:                 func() IttoMessage { return &IttoMessageBrokenTrade{} },
 	IttoMessageTypeNoii:                        func() IttoMessage { return &IttoMessageNoii{} },
 }
 
@@ -655,6 +661,67 @@ func (m *IttoMessageBlockSingleSideDelete) DecodeFromBytes(data []byte, df gopac
 	for i := 0; i < m.Number; i++ {
 		off := 7 + 4*i
 		m.RefNumDs[i] = OrigRefNumDelta(binary.BigEndian.Uint32(data[off : off+4]))
+	}
+	return nil
+}
+
+/************************************************************************/
+type IttoMessageOptionsTrade struct {
+	IttoMessageCommon
+	Side  MarketSide
+	OId   OptionId
+	Cross uint32
+	Match uint32
+	Price int
+	Size  int
+}
+
+func (m *IttoMessageOptionsTrade) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageOptionsTrade{
+		IttoMessageCommon: decodeIttoMessage(data),
+		Side:              MarketSideParse(data[5]),
+		OId:               OptionId(binary.BigEndian.Uint32(data[6:10])),
+		Cross:             binary.BigEndian.Uint32(data[10:14]),
+		Match:             binary.BigEndian.Uint32(data[14:18]),
+		Price:             int(binary.BigEndian.Uint32(data[18:22])),
+		Size:              int(binary.BigEndian.Uint32(data[22:26])),
+	}
+	return nil
+}
+
+/************************************************************************/
+type IttoMessageOptionsCrossTrade struct {
+	IttoMessageOptionsTrade
+	CrossType byte
+}
+
+func (m *IttoMessageOptionsCrossTrade) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageOptionsCrossTrade{
+		IttoMessageOptionsTrade: IttoMessageOptionsTrade{
+			IttoMessageCommon: decodeIttoMessage(data),
+			OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+			Cross:             binary.BigEndian.Uint32(data[9:13]),
+			Match:             binary.BigEndian.Uint32(data[13:17]),
+			Price:             int(binary.BigEndian.Uint32(data[18:22])),
+			Size:              int(binary.BigEndian.Uint32(data[22:26])),
+		},
+		CrossType: data[17],
+	}
+	return nil
+}
+
+/************************************************************************/
+type IttoMessageBrokenTrade struct {
+	IttoMessageCommon
+	Cross uint32
+	Match uint32
+}
+
+func (m *IttoMessageBrokenTrade) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = IttoMessageBrokenTrade{
+		IttoMessageCommon: decodeIttoMessage(data),
+		Cross:             binary.BigEndian.Uint32(data[5:9]),
+		Match:             binary.BigEndian.Uint32(data[9:13]),
 	}
 	return nil
 }
