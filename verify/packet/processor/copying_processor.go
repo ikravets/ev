@@ -136,7 +136,7 @@ func (p *processor) decodeAppLayer(pkt gopacket.Packet) error {
 		return err
 	}
 	for _, l := range pkt.Layers() {
-		if mb, ok := l.(*moldudp64.MoldUDP64MessageBlock); ok {
+		if mb, ok := l.(*moldudp64.MoldUDP64MessageBlockChained); ok {
 			ittoDecoder.Decode(mb.Payload, packetBuilder)
 		}
 	}
