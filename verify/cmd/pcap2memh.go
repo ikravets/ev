@@ -17,6 +17,7 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"my/itto/verify/packet"
+	"my/itto/verify/packet/processor"
 )
 
 type cmdPcap2memh struct {
@@ -52,7 +53,7 @@ func (c *cmdPcap2memh) ParsingFinished() {
 	defer printer.Close()
 	printer.AddDummy()
 
-	pp := packet.NewProcessor()
+	pp := processor.NewCopyingProcessor()
 	pp.LimitPacketNumber(c.PacketNumLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)

@@ -15,6 +15,7 @@ import (
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet/processor"
 	"my/itto/verify/sim"
 )
 
@@ -47,7 +48,7 @@ func (s *Splitter) AnalyzeInput() error {
 		return err
 	}
 	defer handle.Close()
-	pp := packet.NewProcessor()
+	pp := processor.NewCopyingProcessor()
 	pp.LimitPacketNumber(s.inputPacketLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(s)

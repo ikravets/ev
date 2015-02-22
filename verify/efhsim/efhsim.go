@@ -10,6 +10,7 @@ import (
 	"code.google.com/p/gopacket/pcap"
 
 	"my/itto/verify/packet"
+	"my/itto/verify/packet/processor"
 	"my/itto/verify/sim"
 )
 
@@ -46,7 +47,7 @@ func (s *EfhSim) AnalyzeInput() error {
 		return err
 	}
 	defer handle.Close()
-	pp := packet.NewProcessor()
+	pp := processor.NewCopyingProcessor()
 	pp.LimitPacketNumber(s.inputPacketLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(s)

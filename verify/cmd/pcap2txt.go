@@ -14,6 +14,7 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"my/itto/verify/packet"
+	"my/itto/verify/packet/processor"
 )
 
 type cmdPcap2txt struct {
@@ -47,7 +48,7 @@ func (c *cmdPcap2txt) ParsingFinished() {
 	defer outFile.Close()
 
 	printer := &packetPrinter{w: outFile}
-	pp := packet.NewProcessor()
+	pp := processor.NewCopyingProcessor()
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)
 	pp.ProcessAll()
