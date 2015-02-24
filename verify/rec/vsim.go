@@ -4,6 +4,8 @@
 package rec
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -15,12 +17,15 @@ import (
 type SimLogger struct {
 	w              io.Writer
 	tobOld, tobNew []sim.PriceLevel
+	efhLogger      EfhLogger
 }
 
 const SimLoggerSupernodeLevels = 32
 
 func NewSimLogger(w io.Writer) *SimLogger {
-	return &SimLogger{w: w}
+	s := &SimLogger{w: w}
+	s.efhLogger = *NewEfhLogger(s)
+	return s
 }
 func (s *SimLogger) printf(format string, vs ...interface{}) {
 	if _, err := fmt.Fprintf(s.w, format, vs...); err != nil {
@@ -71,6 +76,7 @@ func (s *SimLogger) MessageArrived(idm *sim.IttoDbMessage) {
 			out("ORDER", im.Type, "%08x", r.Delta())
 		}
 	}
+	s.efhLogger.MessageArrived(idm)
 }
 func (s *SimLogger) OperationAppliedToOrders(operation sim.IttoOperation) {
 	type ordrespLogInfo struct {
@@ -139,6 +145,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.IttoOperation) {
 }
 func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation) {
 	s.tobOld = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
+	s.efhLogger.BeforeBookUpdate(book, operation)
 }
 func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
 	if operation.GetOptionId().Invalid() {
@@ -163,4 +170,32 @@ func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) 
 			pln.Size, uint32(pln.Price),
 		)
 	}
+	s.efhLogger.AfterBookUpdate(book, operation)
+}
+
+func (s *SimLogger) PrintOrder(o efhm_order) {
+	s.genAppUpdate(o)
+}
+func (s *SimLogger) PrintQuote(q efhm_quote) {
+	s.genAppUpdate(q)
+}
+
+func (s *SimLogger) genAppUpdate(appMessage interface{}) {
+	var bb bytes.Buffer
+	if err := binary.Write(&bb, binary.LittleEndian, appMessage); err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		var qw uint64
+		if err := binary.Read(&bb, binary.LittleEndian, &qw); err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Fatal(err)
+		} else {
+			s.printfln("DMATOHOST_DATA %016x", qw)
+		}
+	}
+	s.printfln("DMATOHOST_TRAILER 00656e696c616b45")
 }
