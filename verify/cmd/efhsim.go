@@ -53,12 +53,12 @@ func (c *cmdEfhsim) ParsingFinished() {
 		return efh.AddLogger(rec.NewSimLogger(w))
 	})
 	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error {
-		logger := rec.NewEfhLogger(w)
+		logger := rec.NewEfhLogger(rec.NewTestefhPrinter(w))
 		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
 		return efh.AddLogger(logger)
 	})
 	c.addOut(c.OutputFileNameEfhQuotes, func(w io.Writer) error {
-		logger := rec.NewEfhLogger(w)
+		logger := rec.NewEfhLogger(rec.NewTestefhPrinter(w))
 		logger.SetOutputMode(rec.EfhLoggerOutputQuotes)
 		return efh.AddLogger(logger)
 	})

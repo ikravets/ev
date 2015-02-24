@@ -130,17 +130,38 @@ func (m efhm_quote) String() string {
 	)
 }
 
-var _ sim.Observer = &EfhLogger{}
+type EfhLoggerPrinter interface {
+	PrintOrder(efhm_order)
+	PrintQuote(efhm_quote)
+}
+
+type testefhPrinter struct {
+	w io.Writer
+}
+
+var _ EfhLoggerPrinter = &testefhPrinter{}
+
+func NewTestefhPrinter(w io.Writer) EfhLoggerPrinter {
+	return &testefhPrinter{w: w}
+}
+func (p *testefhPrinter) PrintOrder(o efhm_order) {
+	fmt.Fprintln(p.w, o)
+}
+func (p *testefhPrinter) PrintQuote(o efhm_quote) {
+	fmt.Fprintln(p.w, o)
+}
 
 type EfhLogger struct {
 	TobLogger
-	w    io.Writer
-	mode EfhLoggerOutputMode
+	printer EfhLoggerPrinter
+	mode    EfhLoggerOutputMode
 }
 
-func NewEfhLogger(w io.Writer) *EfhLogger {
+var _ sim.Observer = &EfhLogger{}
+
+func NewEfhLogger(p EfhLoggerPrinter) *EfhLogger {
 	l := &EfhLogger{
-		w:         w,
+		printer:   p,
 		TobLogger: *NewTobLogger(),
 	}
 	return l
@@ -186,7 +207,7 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 	case itto.MarketSideAsk:
 		eo.OrderSide = EFH_ORDER_ASK
 	}
-	fmt.Fprintln(l.w, eo)
+	l.printer.PrintOrder(eo)
 }
 
 func (l *EfhLogger) genUpdateQuotes() {
@@ -197,7 +218,7 @@ func (l *EfhLogger) genUpdateQuotes() {
 		AskPrice:    uint32(l.ask.New.Price),
 		AskSize:     uint32(l.ask.New.Size),
 	}
-	fmt.Fprintln(l.w, eq)
+	l.printer.PrintQuote(eq)
 }
 
 func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
