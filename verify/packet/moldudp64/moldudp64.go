@@ -9,6 +9,8 @@ import (
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
+
+	"my/itto/verify/packet/itto"
 )
 
 var EndpointMoldUDP64SessionMetadata = gopacket.EndpointTypeMetadata{"MoldUDP64", func(b []byte) string {
@@ -62,6 +64,58 @@ func (m *MoldUDP64) Flow() gopacket.Flow {
 
 func decodeMoldUDP64(data []byte, p gopacket.PacketBuilder) error {
 	m := &MoldUDP64{}
+	if err := m.DecodeFromBytes(data, p); err != nil {
+		return err
+	}
+	p.AddLayer(m)
+	return p.NextDecoder(m.NextLayerType())
+}
+
+/************************************************************************/
+// initialized in init() to avoid false detection of potential initialization loop
+var LayerTypeMoldUDP64MessageBlock gopacket.LayerType
+
+func init() {
+	LayerTypeMoldUDP64MessageBlock = gopacket.RegisterLayerType(10001, gopacket.LayerTypeMetadata{"MoldUDP64MessageBlock", gopacket.DecodeFunc(decodeMoldUDP64MessageBlock)})
+}
+
+type MoldUDP64MessageBlock struct {
+	layers.BaseLayer
+	MessageLength uint16
+	Payload       []byte
+}
+
+var (
+	_ gopacket.Layer         = &MoldUDP64MessageBlock{}
+	_ gopacket.DecodingLayer = &MoldUDP64MessageBlock{}
+)
+
+func (m *MoldUDP64MessageBlock) LayerType() gopacket.LayerType {
+	return LayerTypeMoldUDP64MessageBlock
+}
+
+func (m *MoldUDP64MessageBlock) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	if len(data) < 2 {
+		return errors.New("moldUDP64 message block is too short")
+	}
+	length := binary.BigEndian.Uint16(data[:2])
+	*m = MoldUDP64MessageBlock{
+		MessageLength: length,
+		BaseLayer:     layers.BaseLayer{data[:2], data[2:]},
+	}
+	return nil
+}
+
+func (m *MoldUDP64MessageBlock) CanDecode() gopacket.LayerClass {
+	return LayerTypeMoldUDP64MessageBlock
+}
+
+func (m *MoldUDP64MessageBlock) NextLayerType() gopacket.LayerType {
+	return itto.LayerTypeItto
+}
+
+func decodeMoldUDP64MessageBlock(data []byte, p gopacket.PacketBuilder) error {
+	m := &MoldUDP64MessageBlock{}
 	if err := m.DecodeFromBytes(data, p); err != nil {
 		return err
 	}
