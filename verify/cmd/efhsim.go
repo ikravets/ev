@@ -11,6 +11,7 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"my/itto/verify/efhsim"
+	"my/itto/verify/rec"
 	"my/itto/verify/sim"
 )
 
@@ -53,13 +54,13 @@ func (c *cmdEfhsim) ParsingFinished() {
 		return efh.AddLogger(sim.NewSimLogger(w))
 	})
 	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error {
-		logger := efhsim.NewEfhLogger(w)
-		logger.SetOutputMode(efhsim.EfhLoggerOutputOrders)
+		logger := rec.NewEfhLogger(w)
+		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
 		return efh.AddLogger(logger)
 	})
 	c.addOut(c.OutputFileNameEfhQuotes, func(w io.Writer) error {
-		logger := efhsim.NewEfhLogger(w)
-		logger.SetOutputMode(efhsim.EfhLoggerOutputQuotes)
+		logger := rec.NewEfhLogger(w)
+		logger.SetOutputMode(rec.EfhLoggerOutputQuotes)
 		return efh.AddLogger(logger)
 	})
 	c.addOut(c.OutputFileNameAvt, func(w io.Writer) (err error) {
@@ -71,7 +72,7 @@ func (c *cmdEfhsim) ParsingFinished() {
 				c.outFiles = append(c.outFiles, dict)
 			}
 		}
-		return efh.AddLogger(efhsim.NewAvtLogger(w, dict))
+		return efh.AddLogger(rec.NewAvtLogger(w, dict))
 	})
 	if err := efh.AnalyzeInput(); err != nil {
 		log.Fatal(err)
