@@ -1,7 +1,7 @@
 // Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
-package sim
+package rec
 
 import (
 	"fmt"
@@ -9,11 +9,12 @@ import (
 	"log"
 
 	"my/itto/verify/packet/itto"
+	"my/itto/verify/sim"
 )
 
 type SimLogger struct {
 	w              io.Writer
-	tobOld, tobNew []PriceLevel
+	tobOld, tobNew []sim.PriceLevel
 }
 
 const SimLoggerSupernodeLevels = 32
@@ -30,7 +31,7 @@ func (s *SimLogger) printfln(format string, vs ...interface{}) {
 	f := format + "\n"
 	s.printf(f, vs...)
 }
-func (s *SimLogger) MessageArrived(idm *IttoDbMessage) {
+func (s *SimLogger) MessageArrived(idm *sim.IttoDbMessage) {
 	out := func(name string, typ itto.IttoMessageType, f string, vs ...interface{}) {
 		s.printf("NORM %s %c ", name, typ)
 		s.printfln(f, vs...)
@@ -71,7 +72,7 @@ func (s *SimLogger) MessageArrived(idm *IttoDbMessage) {
 		}
 	}
 }
-func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
+func (s *SimLogger) OperationAppliedToOrders(operation sim.IttoOperation) {
 	type ordrespLogInfo struct {
 		notFound, addOp, refNum uint32
 		optionId                itto.OptionId
@@ -86,7 +87,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
 
 	var or ordrespLogInfo
 	var ou orduLogInfo
-	if op, ok := operation.(*OperationAdd); ok {
+	if op, ok := operation.(*sim.OperationAdd); ok {
 		var oid itto.OptionId
 		if op.Independent() {
 			oid = op.GetOptionId()
@@ -136,16 +137,16 @@ func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
 		s.printfln("ORDU %08x %08x %d %08x %08x", ou.refNum, ou.optionId, ou.side, ou.price, ou.size)
 	}
 }
-func (s *SimLogger) BeforeBookUpdate(book Book, operation IttoOperation) {
+func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation) {
 	s.tobOld = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
 }
-func (s *SimLogger) AfterBookUpdate(book Book, operation IttoOperation) {
+func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
 	if operation.GetOptionId().Invalid() {
 		return
 	}
 	s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
 
-	empty := PriceLevel{}
+	empty := sim.PriceLevel{}
 	if operation.GetSide() == itto.MarketSideAsk {
 		empty.Price = -1
 	}

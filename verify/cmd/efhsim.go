@@ -12,7 +12,6 @@ import (
 
 	"my/itto/verify/efhsim"
 	"my/itto/verify/rec"
-	"my/itto/verify/sim"
 )
 
 type cmdEfhsim struct {
@@ -51,7 +50,7 @@ func (c *cmdEfhsim) ParsingFinished() {
 	efh := efhsim.NewEfhSim()
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
 	c.addOut(c.OutputFileNameSim, func(w io.Writer) error {
-		return efh.AddLogger(sim.NewSimLogger(w))
+		return efh.AddLogger(rec.NewSimLogger(w))
 	})
 	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error {
 		logger := rec.NewEfhLogger(w)
