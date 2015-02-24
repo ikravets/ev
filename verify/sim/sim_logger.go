@@ -87,11 +87,15 @@ func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
 	var or ordrespLogInfo
 	var ou orduLogInfo
 	if op, ok := operation.(*OperationAdd); ok {
+		var oid itto.OptionId
+		if op.Independent() {
+			oid = op.GetOptionId()
+		}
 		or = ordrespLogInfo{
 			addOp:      1,
 			refNum:     op.RefNumD.Delta(),
-			optionId:   op.optionId,
-			ordlSuffix: fmt.Sprintf(" %08x", op.optionId),
+			optionId:   oid,
+			ordlSuffix: fmt.Sprintf(" %08x", oid),
 		}
 		ou = orduLogInfo{
 			refNum:   or.refNum,
@@ -123,7 +127,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation IttoOperation) {
 				}
 			}
 		}
-		or.refNum = operation.getOperation().origRefNumD.Delta()
+		or.refNum = operation.GetOrigRef().Delta()
 		ou.refNum = or.refNum
 	}
 	s.printfln("ORDL %d %08x%s", or.addOp, or.refNum, or.ordlSuffix)

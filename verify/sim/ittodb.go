@@ -130,6 +130,7 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 
 type IttoOperation interface {
 	GetOptionId() itto.OptionId
+	GetOrigRef() itto.RefNumDelta
 	GetSide() itto.MarketSide
 	GetSizeDelta() int
 	GetNewSize() int
@@ -145,6 +146,9 @@ type Operation struct {
 	sibling     IttoOperation
 }
 
+func (op *Operation) GetOrigRef() itto.RefNumDelta {
+	return op.origRefNumD
+}
 func (op *Operation) populate() {
 	if op.origOrder != nil {
 		return
@@ -185,6 +189,9 @@ type OperationAdd struct {
 
 func (o *OperationAdd) getOperation() *Operation {
 	return &o.Operation
+}
+func (o *OperationAdd) Independent() bool {
+	return o.optionId.Valid()
 }
 func (o *OperationAdd) GetOptionId() itto.OptionId {
 	if o.optionId.Valid() {
