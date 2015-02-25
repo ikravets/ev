@@ -56,13 +56,16 @@ func (c *cmdSoupbin2memh) ParsingFinished() {
 			break
 		}
 		errs.CheckE(err)
-		if int(header.Size) > cap(buf) {
-			buf = make([]byte, header.Size)
+		payloadSize := header.Size - 1
+		sendSize := int(payloadSize) + 2
+		if sendSize > cap(buf) {
+			buf = make([]byte, sendSize)
 		}
-		buf = buf[:header.Size-1]
-		n, err := inputFile.Read(buf)
+		buf = buf[:sendSize]
+		n, err := inputFile.Read(buf[2:])
 		errs.CheckE(err)
-		errs.Check(n == len(buf), n, len(buf))
+		errs.Check(n == int(payloadSize), n, payloadSize)
+		binary.BigEndian.PutUint16(buf, payloadSize)
 		if header.Type == 'S' {
 			errs.CheckE(printer.AddData(buf))
 		} else {
