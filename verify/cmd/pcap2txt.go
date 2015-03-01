@@ -60,11 +60,13 @@ func init() {
 }
 
 type packetPrinter struct {
-	w io.Writer
+	w            io.Writer
+	packetNumber int
 }
 
 func (p *packetPrinter) HandlePacket(packet gopacket.Packet) {
-	fmt.Fprintln(p.w, packet)
+	p.packetNumber++
+	fmt.Fprintf(p.w, "%d %s\n", p.packetNumber, packet)
 }
 func (_ *packetPrinter) HandleMessage(_ packet.ApplicationMessage) {
 }
