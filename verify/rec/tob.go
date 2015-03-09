@@ -17,6 +17,7 @@ type TobLogger struct {
 	lastOptionId itto.OptionId
 	consumeOps   int
 	curOps       int
+	hasOldTob    bool
 	ittoSeconds  uint32
 	bid          tob
 	ask          tob
@@ -81,12 +82,13 @@ func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 		return
 	}
 	l.curOps = 0
+	l.hasOldTob = false
 }
 
 func (*TobLogger) OperationAppliedToOrders(sim.IttoOperation) {}
 
 func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation) {
-	if l.curOps > 0 {
+	if l.hasOldTob {
 		return
 	}
 	l.lastOptionId = operation.GetOptionId()
@@ -103,6 +105,7 @@ func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation)
 	}
 	l.bid.update(book, l.lastOptionId, TobUpdateOld)
 	l.ask.update(book, l.lastOptionId, TobUpdateOld)
+	l.hasOldTob = true
 }
 
 func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation, tobUpdate TobUpdate) bool {
@@ -111,6 +114,7 @@ func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation, 
 		return false
 	}
 	l.curOps = 0
+	l.hasOldTob = false
 	if l.lastOptionId.Invalid() {
 		return false
 	}
