@@ -148,27 +148,26 @@ func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation)
 	s.efhLogger.BeforeBookUpdate(book, operation)
 }
 func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
-	if operation.GetOptionId().Invalid() {
-		return
-	}
-	s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
+	if operation.GetOptionId().Valid() {
+		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
 
-	empty := sim.PriceLevel{}
-	if operation.GetSide() == itto.MarketSideAsk {
-		empty.Price = -1
-	}
-	for i := 0; i < SimLoggerSupernodeLevels; i++ {
-		plo, pln := empty, empty
-		if i < len(s.tobOld) {
-			plo = s.tobOld[i]
+		empty := sim.PriceLevel{}
+		if operation.GetSide() == itto.MarketSideAsk {
+			empty.Price = -1
 		}
-		if i < len(s.tobNew) {
-			pln = s.tobNew[i]
+		for i := 0; i < SimLoggerSupernodeLevels; i++ {
+			plo, pln := empty, empty
+			if i < len(s.tobOld) {
+				plo = s.tobOld[i]
+			}
+			if i < len(s.tobNew) {
+				pln = s.tobNew[i]
+			}
+			s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
+				plo.Size, uint32(plo.Price),
+				pln.Size, uint32(pln.Price),
+			)
 		}
-		s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
-			plo.Size, uint32(plo.Price),
-			pln.Size, uint32(pln.Price),
-		)
 	}
 	s.efhLogger.AfterBookUpdate(book, operation)
 }
