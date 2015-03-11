@@ -172,11 +172,11 @@ func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) 
 	s.efhLogger.AfterBookUpdate(book, operation)
 }
 
-func (s *SimLogger) PrintOrder(o efhm_order) {
-	s.genAppUpdate(o)
+func (s *SimLogger) PrintOrder(m efhm_order) {
+	s.genAppUpdate(m)
 }
-func (s *SimLogger) PrintQuote(q efhm_quote) {
-	s.genAppUpdate(q)
+func (s *SimLogger) PrintQuote(m efhm_quote) {
+	s.genAppUpdate(m)
 }
 
 func (s *SimLogger) genAppUpdate(appMessage interface{}) {

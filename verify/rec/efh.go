@@ -87,7 +87,6 @@ func (m efhm_header) String() string {
 		return fmt.Sprintf("HDR{T:%d}", m.Type)
 	}
 }
-
 func (m efhm_order) String() string {
 	return fmt.Sprintf("%s ORD{TS:%d, OT:%d, OS:%+d, P:%10d, S:%d, AS:%d, CS:%d, CAS:%d, BS:%d, BAS:%d}",
 		m.efhm_header,
@@ -103,7 +102,6 @@ func (m efhm_order) String() string {
 		m.BDAoNSize,
 	)
 }
-
 func (m efhm_quote) String() string {
 	return fmt.Sprintf("%s QUO{TS:%d, "+
 		"Bid{P:%10d, S:%d, OS:%d, AS:%d, CS:%d, CAS:%d, BS:%d, BAS:%d}, "+
@@ -191,36 +189,6 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) 
 	}
 }
 
-func (l *EfhLogger) genUpdateOrders(tob tob) {
-	if !tob.updated() {
-		return
-	}
-	eo := efhm_order{
-		efhm_header: l.genUpdateHeader(EFHM_ORDER),
-		Price:       uint32(tob.New.Price),
-		Size:        uint32(tob.New.Size),
-		OrderType:   1,
-	}
-	switch tob.Side {
-	case itto.MarketSideBid:
-		eo.OrderSide = EFH_ORDER_BID
-	case itto.MarketSideAsk:
-		eo.OrderSide = EFH_ORDER_ASK
-	}
-	l.printer.PrintOrder(eo)
-}
-
-func (l *EfhLogger) genUpdateQuotes() {
-	eq := efhm_quote{
-		efhm_header: l.genUpdateHeader(EFHM_QUOTE),
-		BidPrice:    uint32(l.bid.New.Price),
-		BidSize:     uint32(l.bid.New.Size),
-		AskPrice:    uint32(l.ask.New.Price),
-		AskSize:     uint32(l.ask.New.Size),
-	}
-	l.printer.PrintQuote(eq)
-}
-
 func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
 	return efhm_header{
 		Type:           messageType,
@@ -228,4 +196,32 @@ func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
 		SequenceNumber: uint32(l.lastMessage.Pam.SequenceNumber()), // FIXME MoldUDP64 seqNum is 64 bit
 		TimeStamp:      uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessage).Base().Timestamp),
 	}
+}
+func (l *EfhLogger) genUpdateOrders(tob tob) {
+	if !tob.updated() {
+		return
+	}
+	m := efhm_order{
+		efhm_header: l.genUpdateHeader(EFHM_ORDER),
+		Price:       uint32(tob.New.Price),
+		Size:        uint32(tob.New.Size),
+		OrderType:   1,
+	}
+	switch tob.Side {
+	case itto.MarketSideBid:
+		m.OrderSide = EFH_ORDER_BID
+	case itto.MarketSideAsk:
+		m.OrderSide = EFH_ORDER_ASK
+	}
+	l.printer.PrintOrder(m)
+}
+func (l *EfhLogger) genUpdateQuotes() {
+	m := efhm_quote{
+		efhm_header: l.genUpdateHeader(EFHM_QUOTE),
+		BidPrice:    uint32(l.bid.New.Price),
+		BidSize:     uint32(l.bid.New.Size),
+		AskPrice:    uint32(l.ask.New.Price),
+		AskSize:     uint32(l.ask.New.Size),
+	}
+	l.printer.PrintQuote(m)
 }
