@@ -71,6 +71,13 @@ type efhm_quote struct {
 	AskBDAoNSize       uint32
 }
 
+type efhm_trade struct {
+	efhm_header
+	Price          uint32
+	Size           uint32
+	TradeCondition uint8
+}
+
 func (m efhm_header) String() string {
 	switch m.Type {
 	case EFHM_QUOTE, EFHM_ORDER:
@@ -127,10 +134,19 @@ func (m efhm_quote) String() string {
 		m.AskBDAoNSize,
 	)
 }
+func (m efhm_trade) String() string {
+	return fmt.Sprintf("%s TRD{P:%10d, S:%d, TC:%d}",
+		m.efhm_header,
+		m.Price,
+		m.Size,
+		m.TradeCondition,
+	)
+}
 
 type EfhLoggerPrinter interface {
 	PrintOrder(efhm_order)
 	PrintQuote(efhm_quote)
+	PrintTrade(efhm_trade)
 }
 
 type testefhPrinter struct {
@@ -147,6 +163,9 @@ func (p *testefhPrinter) PrintOrder(o efhm_order) {
 }
 func (p *testefhPrinter) PrintQuote(o efhm_quote) {
 	fmt.Fprintln(p.w, o)
+}
+func (p *testefhPrinter) PrintTrade(m efhm_trade) {
+	fmt.Fprintln(p.w, m)
 }
 
 type EfhLogger struct {
@@ -174,6 +193,18 @@ const (
 
 func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 	l.mode = mode
+}
+
+func (l *EfhLogger) MessageArrived(idm *sim.IttoDbMessage) {
+	l.TobLogger.MessageArrived(idm)
+	switch m := l.lastMessage.Pam.Layer().(type) {
+	case *itto.IttoMessageOptionsTrade:
+		l.lastOptionId = m.OId
+		l.genUpdateTrades(m.Price, m.Size)
+	case *itto.IttoMessageOptionsCrossTrade:
+		l.lastOptionId = m.OId
+		l.genUpdateTrades(m.Price, m.Size)
+	}
 }
 
 func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
@@ -224,4 +255,12 @@ func (l *EfhLogger) genUpdateQuotes() {
 		AskSize:     uint32(l.ask.New.Size),
 	}
 	l.printer.PrintQuote(m)
+}
+func (l *EfhLogger) genUpdateTrades(price, size int) {
+	m := efhm_trade{
+		efhm_header: l.genUpdateHeader(EFHM_TRADE),
+		Price:       uint32(price),
+		Size:        uint32(size),
+	}
+	l.printer.PrintTrade(m)
 }

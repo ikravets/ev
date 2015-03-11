@@ -178,6 +178,9 @@ func (s *SimLogger) PrintOrder(m efhm_order) {
 func (s *SimLogger) PrintQuote(m efhm_quote) {
 	s.genAppUpdate(m)
 }
+func (s *SimLogger) PrintTrade(m efhm_trade) {
+	s.genAppUpdate(m)
+}
 
 func (s *SimLogger) genAppUpdate(appMessage interface{}) {
 	var bb bytes.Buffer

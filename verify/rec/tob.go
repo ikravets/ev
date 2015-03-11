@@ -74,7 +74,11 @@ func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 		l.bid.Check, l.ask.Check = true, true
 	case *itto.IttoMessageSeconds:
 		l.ittoSeconds = m.Second
-	case *itto.IttoMessageNoii:
+	case
+		*itto.IttoMessageNoii,
+		*itto.IttoMessageOptionsTrade,
+		*itto.IttoMessageOptionsCrossTrade,
+		*itto.IttoMessageOptionDirectory:
 		// silently ignore
 		return
 	default:
