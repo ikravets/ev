@@ -113,16 +113,26 @@ func (s *replayServer) run() {
 			SequenceNumber: binary.BigEndian.Uint64(buf[10:18]),
 			MessageCount:   binary.BigEndian.Uint16(buf[18:20]),
 		}
-		log.Printf("got request: %v\n", req)
-		resp := createPacket(int(req.SequenceNumber), 1)
-		log.Printf("send response: %v\n", resp)
+		go func() {
+			const MAX_MESSAGES = (1500 - 34 - 20) / 28
+			log.Printf("got request: %v\n", req)
+			num := int(req.SequenceNumber) - 10
+			if num <= 0 {
+				num = 1
+			} else if num > MAX_MESSAGES {
+				num = MAX_MESSAGES
+			}
+			resp := createPacket(int(req.SequenceNumber), num)
+			errs.Check(len(resp) < 1500-34)
 
-		//addr, err = net.ResolveUDPAddr("udp", "233.54.12.1:18001")
-		//errs.CheckE(err)
-
-		n, err = conn.WriteToUDP(resp, addr)
-		errs.CheckE(err)
-		errs.Check(n == len(resp), n, len(resp))
+			sleep := time.Duration(250+2500/num) * time.Millisecond
+			log.Printf("waiting for %s\n", sleep)
+			time.Sleep(sleep)
+			log.Printf("send response: %v\n", resp)
+			n, err = conn.WriteToUDP(resp, addr)
+			errs.CheckE(err)
+			errs.Check(n == len(resp), n, len(resp))
+		}()
 	}
 }
 
