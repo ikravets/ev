@@ -172,6 +172,7 @@ type EfhLogger struct {
 	TobLogger
 	printer EfhLoggerPrinter
 	mode    EfhLoggerOutputMode
+	stream  Stream
 }
 
 var _ sim.Observer = &EfhLogger{}
@@ -180,6 +181,7 @@ func NewEfhLogger(p EfhLoggerPrinter) *EfhLogger {
 	l := &EfhLogger{
 		printer:   p,
 		TobLogger: *NewTobLogger(),
+		stream:    *NewStream(),
 	}
 	return l
 }
@@ -196,8 +198,9 @@ func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 }
 
 func (l *EfhLogger) MessageArrived(idm *sim.IttoDbMessage) {
+	l.stream.MessageArrived(idm)
 	l.TobLogger.MessageArrived(idm)
-	switch m := l.lastMessage.Pam.Layer().(type) {
+	switch m := l.stream.getIttoMessage().(type) {
 	case *itto.IttoMessageOptionsTrade:
 		l.lastOptionId = m.OId
 		l.genUpdateTrades(m.Price, m.Size)
@@ -224,8 +227,8 @@ func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
 	return efhm_header{
 		Type:           messageType,
 		SecurityId:     uint32(l.lastOptionId),
-		SequenceNumber: uint32(l.lastMessage.Pam.SequenceNumber()), // FIXME MoldUDP64 seqNum is 64 bit
-		TimeStamp:      uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessage).Base().Timestamp),
+		SequenceNumber: uint32(l.stream.getSeqNum()), // FIXME MoldUDP64 seqNum is 64 bit
+		TimeStamp:      l.stream.getTimestamp(),
 	}
 }
 func (l *EfhLogger) genUpdateOrders(tob tob) {

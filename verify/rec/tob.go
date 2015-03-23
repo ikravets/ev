@@ -6,22 +6,17 @@ package rec
 import (
 	"log"
 
-	"code.google.com/p/gopacket"
-
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
 
 type TobLogger struct {
-	lastMessage  *sim.IttoDbMessage
 	lastOptionId itto.OptionId
 	consumeOps   int
 	curOps       int
 	hasOldTob    bool
-	ittoSeconds  uint32
 	bid          tob
 	ask          tob
-	seqNum       map[gopacket.Flow]uint64
 }
 type tob struct {
 	Check bool
@@ -32,25 +27,15 @@ type tob struct {
 
 func NewTobLogger() *TobLogger {
 	l := &TobLogger{
-		bid:    tob{Side: itto.MarketSideBid},
-		ask:    tob{Side: itto.MarketSideAsk},
-		seqNum: make(map[gopacket.Flow]uint64),
+		bid: tob{Side: itto.MarketSideBid},
+		ask: tob{Side: itto.MarketSideAsk},
 	}
 	return l
 }
 
 func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
-	l.lastMessage = idm
-
-	flow := l.lastMessage.Pam.Flow()
-	seq := l.lastMessage.Pam.SequenceNumber()
-	if prevSeq, ok := l.seqNum[flow]; ok && prevSeq+1 != seq {
-		log.Printf("seqNum gap; expected %d actual %d\n", prevSeq+1, seq)
-	}
-	l.seqNum[flow] = seq
-
 	l.bid.Check, l.ask.Check = false, false
-	switch m := l.lastMessage.Pam.Layer().(type) {
+	switch idm.Pam.Layer().(type) {
 	case
 		*itto.IttoMessageAddOrder,
 		*itto.IttoMessageSingleSideExecuted,
@@ -72,17 +57,8 @@ func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 		*itto.IttoMessageQuoteReplace:
 		l.consumeOps = 4
 		l.bid.Check, l.ask.Check = true, true
-	case *itto.IttoMessageSeconds:
-		l.ittoSeconds = m.Second
-	case
-		*itto.IttoMessageNoii,
-		*itto.IttoMessageOptionsTrade,
-		*itto.IttoMessageOptionsCrossTrade,
-		*itto.IttoMessageOptionDirectory:
-		// silently ignore
-		return
 	default:
-		log.Println("wrong message type ", l.lastMessage.Pam.Layer())
+		// silently ignore
 		return
 	}
 	l.curOps = 0

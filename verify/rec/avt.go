@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
 
@@ -23,12 +22,14 @@ type AvtLogger struct {
 	location    *time.Location
 	oid2AvtName map[int]string
 	TobLogger
+	stream Stream
 }
 
 func NewAvtLogger(w io.Writer, rDict io.Reader) *AvtLogger {
 	l := &AvtLogger{
 		w:         w,
 		TobLogger: *NewTobLogger(),
+		stream:    *NewStream(),
 	}
 	var err error
 	if l.location, err = time.LoadLocation("EST"); err != nil {
@@ -59,6 +60,11 @@ func NewAvtLogger(w io.Writer, rDict io.Reader) *AvtLogger {
 	return l
 }
 
+func (l *AvtLogger) MessageArrived(idm *sim.IttoDbMessage) {
+	l.stream.MessageArrived(idm)
+	l.TobLogger.MessageArrived(idm)
+}
+
 func (l *AvtLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
 	if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
 		l.genUpdate()
@@ -83,10 +89,10 @@ func (l *AvtLogger) genUpdate() {
 		optName = fmt.Sprintf("<%d>", l.lastOptionId)
 		underlying = "<?>"
 	}
-	packetTimestamp := l.lastMessage.Pam.PacketMetadata().Timestamp.In(l.location)
+	packetTimestamp := l.stream.getPacketTimestamp().In(l.location)
 	dateTime := packetTimestamp.Format("20060102,15:04:05.000.")
 	dateTime += fmt.Sprintf("%03d", packetTimestamp.Nanosecond()/1000%1000)
-	ittoTimestamp := uint64(l.ittoSeconds)*1e9 + uint64(l.lastMessage.Pam.Layer().(itto.IttoMessage).Base().Timestamp)
+	ittoTimestamp := l.stream.getTimestamp()
 	avtTimestamp := time.Date(packetTimestamp.Year(), packetTimestamp.Month(), packetTimestamp.Day(), 0, 0, 0, 0, l.location).Add(time.Duration(ittoTimestamp)).UnixNano() / 1000000
 	if false {
 		// OptionMarketDataNASDAQ2,date,time,Security,Underlying,SecurityType,BidSize,BidPrice,OrderBidSize,AskSize,AskPrice,OrderAskSize,TradeStatus,TickCondition,ExchangeTimestamp
