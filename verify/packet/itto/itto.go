@@ -4,7 +4,9 @@
 package itto
 
 import (
+	"bytes"
 	"encoding/binary"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -663,6 +665,21 @@ func (m *IttoMessageBlockSingleSideDelete) DecodeFromBytes(data []byte, df gopac
 		m.RefNumDs[i] = OrigRefNumDelta(binary.BigEndian.Uint32(data[off : off+4]))
 	}
 	return nil
+}
+func (m *IttoMessageBlockSingleSideDelete) String() string {
+	// similar to default gopacket.LayerString format
+	// {Type=IttoBlockSingleSideDelete Timestamp=450423694 Number=286 RefNumDs=[..286..]}
+	// but with expanded RefNumDs slice
+	var bb bytes.Buffer
+	fmt.Fprintf(&bb, "{Type=IttoBlockSingleSideDelete Timestamp=%d Number=%d RefNumDs=[", m.Timestamp, m.Number)
+	for i, ref := range m.RefNumDs {
+		if i > 0 {
+			bb.WriteString(" ")
+		}
+		bb.WriteString(ref.String())
+	}
+	bb.WriteString("]}")
+	return bb.String()
 }
 
 /************************************************************************/
