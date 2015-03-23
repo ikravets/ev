@@ -15,13 +15,14 @@ import (
 
 type Stream struct {
 	message     *sim.IttoDbMessage
-	ittoSeconds uint32
+	ittoSeconds map[gopacket.Flow]uint32
 	seqNum      map[gopacket.Flow]uint64
 }
 
 func NewStream() *Stream {
 	l := &Stream{
-		seqNum: make(map[gopacket.Flow]uint64),
+		ittoSeconds: make(map[gopacket.Flow]uint32),
+		seqNum:      make(map[gopacket.Flow]uint64),
 	}
 	return l
 }
@@ -37,7 +38,7 @@ func (l *Stream) MessageArrived(idm *sim.IttoDbMessage) {
 
 	switch m := l.message.Pam.Layer().(type) {
 	case *itto.IttoMessageSeconds:
-		l.ittoSeconds = m.Second
+		l.ittoSeconds[flow] = m.Second
 	case
 		*itto.IttoMessageAddOrder,
 		*itto.IttoMessageSingleSideExecuted,
@@ -66,7 +67,8 @@ func (l *Stream) getSeqNum() uint64 {
 	return l.seqNum[flow]
 }
 func (l *Stream) getTimestamp() uint64 {
-	return uint64(l.ittoSeconds)*1e9 + uint64(l.message.Pam.Layer().(itto.IttoMessage).Base().Timestamp)
+	flow := l.message.Pam.Flow()
+	return uint64(l.ittoSeconds[flow])*1e9 + uint64(l.message.Pam.Layer().(itto.IttoMessage).Base().Timestamp)
 }
 func (l *Stream) getIttoMessage() itto.IttoMessage {
 	return l.message.Pam.Layer().(itto.IttoMessage)
