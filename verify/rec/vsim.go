@@ -149,7 +149,12 @@ func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation)
 }
 func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
 	if operation.GetOptionId().Valid() {
-		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
+		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), 0)
+		if len(s.tobNew) > SimLoggerSupernodeLevels {
+			log.Printf("WARNING book (oid %d, side %s) has %d levels (>%d)",
+				operation.GetOptionId(), operation.GetSide(),
+				len(s.tobNew), SimLoggerSupernodeLevels)
+		}
 
 		empty := sim.PriceLevel{}
 		if operation.GetSide() == itto.MarketSideAsk {

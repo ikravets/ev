@@ -48,7 +48,7 @@ func (b *book) GetTop(optionId itto.OptionId, side itto.MarketSide, levels int) 
 
 	pl := make([]PriceLevel, 0, levels)
 	if it, err := s.levels.SeekFirst(); err == nil {
-		for i := 0; i < levels; i++ {
+		for i := 0; i < levels || levels == 0; i++ {
 			if _, v, err := it.Next(); err != nil {
 				break
 			} else {
