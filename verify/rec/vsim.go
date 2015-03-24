@@ -20,7 +20,7 @@ type SimLogger struct {
 	efhLogger      EfhLogger
 }
 
-const SimLoggerSupernodeLevels = 32
+const SimLoggerSupernodeLevels = 256
 
 func NewSimLogger(w io.Writer) *SimLogger {
 	s := &SimLogger{w: w}
