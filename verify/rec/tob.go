@@ -126,5 +126,5 @@ func (tob *tob) update(book sim.Book, oid itto.OptionId, u TobUpdate) {
 }
 
 func (tob *tob) updated() bool {
-	return tob.Check && tob.Old != tob.New
+	return tob.Check && tob.Old != tob.New && (tob.Old.Price != 0 || tob.New.Price != 0)
 }
