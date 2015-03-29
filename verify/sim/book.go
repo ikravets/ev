@@ -36,7 +36,9 @@ func (b *book) ApplyOperation(operation IttoOperation) {
 		os = NewOptionState()
 		b.options[oid] = os
 	}
-	os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
+	if operation.GetPrice() != 0 {
+		os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
+	}
 }
 
 func (b *book) GetTop(optionId itto.OptionId, side itto.MarketSide, levels int) []PriceLevel {
