@@ -4,12 +4,14 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
 
 	"github.com/jessevdk/go-flags"
 
+	"my/itto/verify/anal"
 	"my/itto/verify/efhsim"
 	"my/itto/verify/rec"
 )
@@ -22,6 +24,7 @@ type cmdEfhsim struct {
 	OutputFileNameEfhQuotes string `long:"output-efh-quotes" value-name:"FILE" description:"output file for EFH quote messages"`
 	OutputFileNameAvt       string `long:"output-avt" value-name:"FILE" description:"output file for AVT CSV"`
 	InputFileNameAvtDict    string `long:"avt-dict" value-name:"DICT" description:"read dictionary for AVT CSV output"`
+	OutputFileNameStats     string `long:"output-stats" value-name:"FILE" description:"output file for stats"`
 	PacketNumLimit          int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
 	shouldExecute           bool
 	outFiles                []io.Closer
@@ -81,8 +84,25 @@ func (c *cmdEfhsim) ParsingFinished() {
 		}
 		return efh.AddLogger(rec.NewAvtLogger(w, dict))
 	})
+
+	var analyzer *anal.Analyzer
+	var analyzerWriter io.Writer
+	c.addOut(c.OutputFileNameStats, func(w io.Writer) error {
+		analyzer = anal.NewAnalyzer()
+		analyzerWriter = w
+		return efh.AddLogger(analyzer.Observer())
+	})
+
 	if err := efh.AnalyzeInput(); err != nil {
 		log.Fatal(err)
+	}
+
+	if analyzer != nil {
+		bsh := analyzer.BookSizeHist()
+		fmt.Fprintf(analyzerWriter, "size\tbooks\tsample\n")
+		for _, bsv := range bsh {
+			fmt.Fprintf(analyzerWriter, "%d\t%d\t%v\n", bsv.Levels, bsv.OptionNumber, bsv.Sample)
+		}
 	}
 }
 
