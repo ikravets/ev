@@ -192,6 +192,11 @@ func (s *SimLogger) genAppUpdate(appMessage interface{}) {
 	if err := binary.Write(&bb, binary.LittleEndian, appMessage); err != nil {
 		log.Fatal(err)
 	}
+	if r := bb.Len() % 8; r > 0 {
+		// pad to  multiple of 8 bytes
+		z := make([]byte, 8)
+		bb.Write(z[0 : 8-r])
+	}
 
 	for {
 		var qw uint64
