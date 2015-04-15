@@ -21,7 +21,7 @@ func processArgs() {
 		ProfileMem  string `long:"profile-mem" value-name:"FILE"`
 	}
 
-	parser := flags.NewParser(&opts, flags.PassDoubleDash|flags.HelpFlag|flags.IgnoreUnknown)
+	parser := flags.NewParser(&opts, flags.PassDoubleDash|flags.HelpFlag)
 	cmd.Registry.ConfigParser(parser)
 	if _, err := parser.Parse(); err != nil {
 		fmt.Println(err.(*flags.Error).Message)
