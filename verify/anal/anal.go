@@ -4,8 +4,9 @@
 package anal
 
 import (
-	"my/errs"
 	"sort"
+
+	"my/errs"
 
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
@@ -15,9 +16,17 @@ type bookStat struct {
 	maxLevels int
 }
 
+type HashFunc func(uint64) uint64
+
+type orderHashStat struct {
+	f             HashFunc
+	bucketSize    map[uint64]int
+	maxBucketSize map[uint64]int
+}
 type Analyzer struct {
-	observer  observer
-	bookStats map[uint64]*bookStat
+	observer      observer
+	bookStats     map[uint64]*bookStat
+	orderHashStat []orderHashStat
 }
 
 func NewAnalyzer() *Analyzer {
@@ -34,8 +43,30 @@ type observer struct {
 
 var _ sim.Observer = &observer{}
 
-func (*observer) MessageArrived(*sim.IttoDbMessage)            {}
-func (*observer) OperationAppliedToOrders(sim.IttoOperation)   {}
+func (*observer) MessageArrived(*sim.IttoDbMessage) {}
+func (o *observer) OperationAppliedToOrders(op sim.IttoOperation) {
+	sess := op.GetMessage().Session.Index()
+	errs.Check(sess < 4, sess)
+	var key uint64
+	var delta int
+	switch o := op.(type) {
+	case *sim.OperationAdd:
+		key = uint64(sess)<<32 | uint64(o.RefNumD.Delta())
+		delta = 1
+	case *sim.OperationRemove:
+		key = uint64(sess)<<32 | uint64(o.GetOrigRef().Delta())
+		delta = -1
+	}
+	for _, ohs := range o.analyzer.orderHashStat {
+		keyHash := ohs.f(key)
+		ohs.bucketSize[keyHash] += delta
+		if ohs.bucketSize[keyHash] > ohs.maxBucketSize[keyHash] {
+			ohs.maxBucketSize[keyHash] = ohs.bucketSize[keyHash]
+		} else if ohs.bucketSize[keyHash] == 0 {
+			delete(ohs.bucketSize, keyHash)
+		}
+	}
+}
 func (*observer) BeforeBookUpdate(sim.Book, sim.IttoOperation) {}
 func (o *observer) AfterBookUpdate(book sim.Book, op sim.IttoOperation) {
 	oid := op.GetOptionId()
@@ -55,6 +86,15 @@ func (o *observer) AfterBookUpdate(book sim.Book, op sim.IttoOperation) {
 func (a *Analyzer) Observer() sim.Observer {
 	return &a.observer
 }
+func (a *Analyzer) AddOrderHashFunction(f HashFunc) {
+	ohs := orderHashStat{
+		f:             f,
+		bucketSize:    make(map[uint64]int),
+		maxBucketSize: make(map[uint64]int),
+	}
+	a.orderHashStat = append(a.orderHashStat, ohs)
+}
+
 func (a *Analyzer) book(oid itto.OptionId, side itto.MarketSide) (bs *bookStat) {
 	errs.Check(side == itto.MarketSideBid || side == itto.MarketSideAsk)
 	key := uint64(oid) | uint64(side)<<32
@@ -102,4 +142,31 @@ func (a *Analyzer) BookSizeHist() BSHist {
 		bsh = append(bsh, bsv[l])
 	}
 	return bsh
+}
+
+type HistVal struct {
+	Bin   int
+	Count int
+}
+type Hist []HistVal
+
+func (a *Analyzer) OrdersHashCollisionHist() []Hist {
+	var hists []Hist
+	for _, ohs := range a.orderHashStat {
+		collisionHist := make(map[int]int)
+		for _, c := range ohs.maxBucketSize {
+			collisionHist[c]++
+		}
+		var chKeys []int
+		for k, _ := range collisionHist {
+			chKeys = append(chKeys, k)
+		}
+		sort.Ints(chKeys)
+		var hist Hist
+		for _, k := range chKeys {
+			hist = append(hist, HistVal{k, collisionHist[k]})
+		}
+		hists = append(hists, hist)
+	}
+	return hists
 }
