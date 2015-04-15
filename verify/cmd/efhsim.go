@@ -4,12 +4,14 @@
 package cmd
 
 import (
-	"fmt"
+	"encoding/binary"
+	"hash/crc32"
 	"io"
 	"log"
 	"os"
 
 	"github.com/jessevdk/go-flags"
+	"my/errs"
 
 	"my/itto/verify/anal"
 	"my/itto/verify/efhsim"
@@ -24,7 +26,7 @@ type cmdEfhsim struct {
 	OutputFileNameEfhQuotes string `long:"output-efh-quotes" value-name:"FILE" description:"output file for EFH quote messages"`
 	OutputFileNameAvt       string `long:"output-avt" value-name:"FILE" description:"output file for AVT CSV"`
 	InputFileNameAvtDict    string `long:"avt-dict" value-name:"DICT" description:"read dictionary for AVT CSV output"`
-	OutputFileNameStats     string `long:"output-stats" value-name:"FILE" description:"output file for stats"`
+	OutputDirStats          string `long:"output-stats" value-name:"DIR" description:"output dir for stats"`
 	PacketNumLimit          int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
 	shouldExecute           bool
 	outFiles                []io.Closer
@@ -85,24 +87,10 @@ func (c *cmdEfhsim) ParsingFinished() {
 		return efh.AddLogger(rec.NewAvtLogger(w, dict))
 	})
 
-	var analyzer *anal.Analyzer
-	var analyzerWriter io.Writer
-	c.addOut(c.OutputFileNameStats, func(w io.Writer) error {
-		analyzer = anal.NewAnalyzer()
-		analyzerWriter = w
-		return efh.AddLogger(analyzer.Observer())
-	})
-
-	if err := efh.AnalyzeInput(); err != nil {
-		log.Fatal(err)
-	}
-
-	if analyzer != nil {
-		bsh := analyzer.BookSizeHist()
-		fmt.Fprintf(analyzerWriter, "size\tbooks\tsample\n")
-		for _, bsv := range bsh {
-			fmt.Fprintf(analyzerWriter, "%d\t%d\t%v\n", bsv.Levels, bsv.OptionNumber, bsv.Sample)
-		}
+	reporter := c.addAnalyzer(efh)
+	errs.CheckE(efh.AnalyzeInput())
+	if reporter != nil {
+		reporter.SaveAll()
 	}
 }
 
@@ -119,6 +107,24 @@ func (c *cmdEfhsim) addOut(fileName string, setOut func(io.Writer) error) {
 		log.Fatalln(err)
 	}
 	c.outFiles = append(c.outFiles, file)
+}
+func (c *cmdEfhsim) addAnalyzer(efh *efhsim.EfhSim) *anal.Reporter {
+	if c.OutputDirStats == "" {
+		return nil
+	}
+	hashFn := func(v uint64) uint64 {
+		data := make([]byte, 8)
+		binary.BigEndian.PutUint64(data, v)
+		h := crc32.ChecksumIEEE(data)
+		return uint64(h & (1<<24 - 1))
+	}
+	analyzer := anal.NewAnalyzer()
+	analyzer.AddOrderHashFunction(hashFn)
+	efh.AddLogger(analyzer.Observer())
+	reporter := anal.NewReporter()
+	reporter.SetAnalyzer(analyzer)
+	reporter.SetOutputDir(c.OutputDirStats)
+	return reporter
 }
 
 func init() {
