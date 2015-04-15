@@ -16,7 +16,8 @@ import (
 
 type cmdEfhsim struct {
 	InputFileName           string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
-	OutputFileNameSim       string `long:"output-sim" value-name:"FILE" description:"output file for hw simulator"`
+	OutputFileNameSimOrders string `long:"output-sim-orders" value-name:"FILE" description:"output file for hw simulator"`
+	OutputFileNameSimQuotes string `long:"output-sim-quotes" value-name:"FILE" description:"output file for hw simulator"`
 	OutputFileNameEfhOrders string `long:"output-efh-orders" value-name:"FILE" description:"output file for EFH order messages"`
 	OutputFileNameEfhQuotes string `long:"output-efh-quotes" value-name:"FILE" description:"output file for EFH quote messages"`
 	OutputFileNameAvt       string `long:"output-avt" value-name:"FILE" description:"output file for AVT CSV"`
@@ -49,8 +50,15 @@ func (c *cmdEfhsim) ParsingFinished() {
 	}()
 	efh := efhsim.NewEfhSim()
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
-	c.addOut(c.OutputFileNameSim, func(w io.Writer) error {
-		return efh.AddLogger(rec.NewSimLogger(w))
+	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
+		logger := rec.NewSimLogger(w)
+		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
+		return efh.AddLogger(logger)
+	})
+	c.addOut(c.OutputFileNameSimQuotes, func(w io.Writer) error {
+		logger := rec.NewSimLogger(w)
+		logger.SetOutputMode(rec.EfhLoggerOutputQuotes)
+		return efh.AddLogger(logger)
 	})
 	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error {
 		logger := rec.NewEfhLogger(rec.NewTestefhPrinter(w))
