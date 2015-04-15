@@ -27,6 +27,10 @@ func NewSimLogger(w io.Writer) *SimLogger {
 	s.efhLogger = *NewEfhLogger(s)
 	return s
 }
+func (s *SimLogger) SetOutputMode(mode EfhLoggerOutputMode) {
+	s.efhLogger.SetOutputMode(mode)
+}
+
 func (s *SimLogger) printf(format string, vs ...interface{}) {
 	if _, err := fmt.Fprintf(s.w, format, vs...); err != nil {
 		log.Fatal("output error", err)
