@@ -22,11 +22,13 @@ type IttoDbStats struct {
 }
 
 type IttoDbMessage struct {
-	Pam packet.ApplicationMessage
+	Pam     packet.ApplicationMessage
+	Session *Session
 }
 
 type IttoDb interface {
 	Stats() IttoDbStats
+	NewMessage(packet.ApplicationMessage) *IttoDbMessage
 	MessageOperations(*IttoDbMessage) []IttoOperation
 	ApplyOperation(operation IttoOperation)
 }
@@ -38,7 +40,7 @@ func NewIttoDb() IttoDb {
 }
 
 type db struct {
-	sessions []session
+	sessions []Session
 	orders   map[orderIndex]order
 }
 
@@ -54,9 +56,13 @@ type order struct {
 	itto.OrderSide
 }
 
-type session struct {
+type Session struct {
 	flow  gopacket.Flow
 	index int
+}
+
+func (s *Session) Index() int {
+	return s.index
 }
 
 var orderNotFoundError = errors.New("order not found")
@@ -69,13 +75,13 @@ func (d *db) findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order orde
 	return
 }
 
-func (d *db) getSession(flow gopacket.Flow) session {
+func (d *db) getSession(flow gopacket.Flow) Session {
 	for _, s := range d.sessions {
 		if s.flow == flow {
 			return s
 		}
 	}
-	s := session{
+	s := Session{
 		flow:  flow,
 		index: len(d.sessions),
 	}
@@ -89,6 +95,15 @@ func (d *db) Stats() IttoDbStats {
 		Sessions: len(d.sessions),
 	}
 	return s
+}
+
+func (d *db) NewMessage(pam packet.ApplicationMessage) *IttoDbMessage {
+	s := d.getSession(pam.Flow())
+	m := &IttoDbMessage{
+		Pam:     pam,
+		Session: &s,
+	}
+	return m
 }
 
 func (d *db) ApplyOperation(operation IttoOperation) {
@@ -129,6 +144,7 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 }
 
 type IttoOperation interface {
+	GetMessage() *IttoDbMessage
 	GetOptionId() itto.OptionId
 	GetOrigRef() itto.RefNumDelta
 	GetSide() itto.MarketSide
@@ -146,6 +162,9 @@ type Operation struct {
 	sibling     IttoOperation
 }
 
+func (op *Operation) GetMessage() *IttoDbMessage {
+	return op.m
+}
 func (op *Operation) GetOrigRef() itto.RefNumDelta {
 	return op.origRefNumD
 }

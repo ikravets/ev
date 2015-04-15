@@ -64,9 +64,9 @@ func (s *EfhSim) HandlePacket(packet gopacket.Packet) {
 
 func (s *EfhSim) HandleMessage(message packet.ApplicationMessage) {
 	//log.Println(message.Layer())
-	m := sim.IttoDbMessage{Pam: message}
-	s.observer.MessageArrived(&m)
-	ops := s.idb.MessageOperations(&m)
+	m := s.idb.NewMessage(message)
+	s.observer.MessageArrived(m)
+	ops := s.idb.MessageOperations(m)
 	for _, op := range ops {
 		//log.Println(op)
 		s.idb.ApplyOperation(op)
