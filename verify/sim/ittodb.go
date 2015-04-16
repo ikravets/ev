@@ -16,8 +16,9 @@ import (
 var _ = log.Ldate
 
 type IttoDbStats struct {
-	Orders   int
-	Sessions int
+	Orders     int
+	PeakOrders int
+	Sessions   int
 	//TODO Options  int
 }
 
@@ -39,9 +40,13 @@ func NewIttoDb() IttoDb {
 	}
 }
 
+type dbStatSupport struct {
+	maxOrders int
+}
 type db struct {
 	sessions []Session
 	orders   map[orderIndex]order
+	stat     dbStatSupport
 }
 
 type orderIndex uint64
@@ -91,8 +96,9 @@ func (d *db) getSession(flow gopacket.Flow) Session {
 
 func (d *db) Stats() IttoDbStats {
 	s := IttoDbStats{
-		Orders:   len(d.orders),
-		Sessions: len(d.sessions),
+		Orders:     len(d.orders),
+		PeakOrders: d.stat.maxOrders,
+		Sessions:   len(d.sessions),
 	}
 	return s
 }
@@ -127,6 +133,9 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 			o.Side = op.origOrder.Side
 		}
 		d.orders[op.orderIndex()] = o
+		if l := len(d.orders); l > d.stat.maxOrders {
+			d.stat.maxOrders = l
+		}
 	default:
 		o := *operation.getOperation().origOrder
 		oidx := operation.getOperation().origOrderIndex()
