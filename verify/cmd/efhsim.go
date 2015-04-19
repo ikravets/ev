@@ -118,8 +118,12 @@ func (c *cmdEfhsim) addAnalyzer(efh *efhsim.EfhSim) *anal.Reporter {
 		h := crc32.ChecksumIEEE(data)
 		return uint64(h & (1<<24 - 1))
 	}
+	moduloFn := func(v uint64) uint64 {
+		return v & (1<<24 - 1)
+	}
 	analyzer := anal.NewAnalyzer()
 	analyzer.AddOrderHashFunction(hashFn)
+	analyzer.AddOrderHashFunction(moduloFn)
 	efh.AddLogger(analyzer.Observer())
 	reporter := anal.NewReporter()
 	reporter.SetAnalyzer(analyzer)
