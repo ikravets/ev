@@ -14,6 +14,7 @@ import (
 type Book interface {
 	ApplyOperation(operation IttoOperation)
 	GetTop(itto.OptionId, itto.MarketSide, int) []PriceLevel
+	NumOptions() int
 }
 
 func NewBook() Book {
@@ -40,7 +41,6 @@ func (b *book) ApplyOperation(operation IttoOperation) {
 		os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
 	}
 }
-
 func (b *book) GetTop(optionId itto.OptionId, side itto.MarketSide, levels int) []PriceLevel {
 	os, ok := b.options[optionId]
 	if !ok {
@@ -60,6 +60,9 @@ func (b *book) GetTop(optionId itto.OptionId, side itto.MarketSide, levels int) 
 		it.Close()
 	}
 	return pl
+}
+func (b *book) NumOptions() int {
+	return len(b.options)
 }
 
 type PriceLevel struct {
