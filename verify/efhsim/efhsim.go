@@ -58,7 +58,17 @@ func (s *EfhSim) AnalyzeInput() error {
 func (s *EfhSim) HandlePacket(packet gopacket.Packet) {
 	s.packetNum++
 	if s.packetNum%10000 == 0 {
-		log.Printf("stats packets:%d %#v\n", s.packetNum, s.idb.Stats())
+		type Stats struct {
+			Packets int
+			Itto    sim.IttoDbStats
+			Options int
+		}
+		s := Stats{
+			Packets: s.packetNum,
+			Itto:    s.idb.Stats(),
+			Options: s.book.NumOptions(),
+		}
+		log.Printf("%#v", s)
 	}
 }
 

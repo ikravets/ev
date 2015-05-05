@@ -19,7 +19,6 @@ type IttoDbStats struct {
 	Orders     int
 	PeakOrders int
 	Sessions   int
-	//TODO Options  int
 }
 
 type IttoDbMessage struct {
