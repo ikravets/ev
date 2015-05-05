@@ -58,8 +58,8 @@ func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 		l.consumeOps = 4
 		l.bid.Check, l.ask.Check = true, true
 	default:
-		// silently ignore
-		return
+		// expect no book operations
+		l.consumeOps = 0
 	}
 	l.curOps = 0
 	l.hasOldTob = false
@@ -68,6 +68,9 @@ func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 func (*TobLogger) OperationAppliedToOrders(sim.IttoOperation) {}
 
 func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation) {
+	if l.consumeOps == 0 {
+		log.Fatal("book operation is not expected")
+	}
 	if l.hasOldTob {
 		return
 	}
@@ -89,6 +92,9 @@ func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation)
 }
 
 func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation, tobUpdate TobUpdate) bool {
+	if l.consumeOps == 0 {
+		log.Fatal("book operation is not expected")
+	}
 	l.curOps++
 	if l.curOps < l.consumeOps {
 		return false
