@@ -103,13 +103,13 @@ func (p *processor) ProcessAll() error {
 
 func (p *processor) getFlow(pkt gopacket.Packet) gopacket.Flow {
 	mu := moldudp64Layer(pkt)
-	p.flowBufSrc.Reset()
+	//p.flowBufSrc.Reset()
+	//p.flowBufSrc.Write(pkt.NetworkLayer().NetworkFlow().Src().Raw())
+	//p.flowBufSrc.Write(pkt.TransportLayer().TransportFlow().Src().Raw())
+	//p.flowBufSrc.Write(mu.Flow().Src().Raw())
 	p.flowBufDst.Reset()
-	p.flowBufSrc.Write(pkt.NetworkLayer().NetworkFlow().Src().Raw())
 	p.flowBufDst.Write(pkt.NetworkLayer().NetworkFlow().Dst().Raw())
-	p.flowBufSrc.Write(pkt.TransportLayer().TransportFlow().Src().Raw())
 	p.flowBufDst.Write(pkt.TransportLayer().TransportFlow().Dst().Raw())
-	p.flowBufSrc.Write(mu.Flow().Src().Raw())
 	p.flowBufDst.Write(mu.Flow().Dst().Raw())
 	return gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
 }
