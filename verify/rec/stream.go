@@ -54,7 +54,9 @@ func (l *Stream) MessageArrived(idm *sim.IttoDbMessage) {
 		*itto.IttoMessageNoii,
 		*itto.IttoMessageOptionsTrade,
 		*itto.IttoMessageOptionsCrossTrade,
-		*itto.IttoMessageOptionDirectory:
+		*itto.IttoMessageOptionDirectory,
+		*itto.IttoMessageOptionOpen,
+		*itto.IttoMessageOptionTradingAction:
 		// silently ignore
 		return
 	default:
