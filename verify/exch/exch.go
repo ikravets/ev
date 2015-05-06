@@ -116,7 +116,8 @@ func (s *replayServer) run() {
 		go func() {
 			const MAX_MESSAGES = (1500 - 34 - 20) / 28
 			log.Printf("got request: %v\n", req)
-			num := int(req.SequenceNumber) - 10
+			//num := int(req.SequenceNumber) - 10
+			num := int(req.MessageCount)
 			if num <= 0 {
 				num = 1
 			} else if num > MAX_MESSAGES {
@@ -125,9 +126,12 @@ func (s *replayServer) run() {
 			resp := createPacket(int(req.SequenceNumber), num)
 			errs.Check(len(resp) < 1500-34)
 
-			sleep := time.Duration(250+2500/num) * time.Millisecond
-			log.Printf("waiting for %s\n", sleep)
-			time.Sleep(sleep)
+			const SLEEP_ENABLED = true
+			if SLEEP_ENABLED {
+				sleep := time.Duration(250+2500/num) * time.Millisecond
+				log.Printf("sleeping for %s\n", sleep)
+				time.Sleep(sleep)
+			}
 			log.Printf("send response: %v\n", resp)
 			n, err = conn.WriteToUDP(resp, addr)
 			errs.CheckE(err)
@@ -142,12 +146,13 @@ type mcastServer struct {
 }
 
 func (s *mcastServer) run() {
+	const MCAST_PPS = 1
 	laddr, err := net.ResolveUDPAddr("udp", s.laddr)
 	errs.CheckE(err)
 	raddr, err := net.ResolveUDPAddr("udp", s.raddr)
 	errs.CheckE(err)
 	conn, err := net.DialUDP("udp", laddr, raddr)
-	var seq int
+	seq := 1000
 	for {
 		p := createPacket(seq, 1)
 		log.Printf("send mcast: %v\n", p)
@@ -155,7 +160,8 @@ func (s *mcastServer) run() {
 		errs.CheckE(err)
 		errs.Check(n == len(p), n, len(p))
 
-		time.Sleep(time.Second)
+		delay := time.Duration(1000/MCAST_PPS) * time.Millisecond
+		time.Sleep(delay)
 		seq++
 		/*
 			if seq > 30 {
