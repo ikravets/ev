@@ -4,6 +4,7 @@
 package efhsim
 
 import (
+	"io"
 	"log"
 
 	"code.google.com/p/gopacket"
@@ -21,19 +22,26 @@ type EfhSim struct {
 	idb              sim.IttoDb
 	book             sim.Book
 	observer         *sim.MuxObserver
+	subscr           *sim.Subscr
 }
 
 func NewEfhSim() *EfhSim {
-	return &EfhSim{
+	s := &EfhSim{
 		idb:      sim.NewIttoDb(),
 		book:     sim.NewBook(),
 		observer: new(sim.MuxObserver),
+		subscr:   sim.NewSubscr(),
 	}
+	s.idb.SetSubscription(s.subscr)
+	return s
 }
 
 func (s *EfhSim) SetInput(fileName string, limit int) {
 	s.inputFileName = fileName
 	s.inputPacketLimit = limit
+}
+func (s *EfhSim) SubscribeFromReader(r io.Reader) error {
+	return s.subscr.SubscribeFromReader(r)
 }
 
 func (s *EfhSim) AddLogger(logger sim.Observer) error {
