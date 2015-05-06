@@ -6,7 +6,9 @@ package itto
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"my/errs"
 	"strconv"
 	"time"
 
@@ -29,6 +31,9 @@ const (
 func PriceShortToLong(shortPrice int) int {
 	return shortPrice * PriceScale / PriceScaleShort
 }
+func PriceLongToShort(longPrice int) int {
+	return longPrice * PriceScaleShort / PriceScale
+}
 
 type MarketSide byte
 
@@ -48,6 +53,18 @@ func (ms MarketSide) String() string {
 		return "?"
 	}
 }
+func (ms MarketSide) ToByte() (byte, error) {
+	switch ms {
+	case MarketSideBid:
+		return 'B', nil
+	case MarketSideAsk:
+		return 'S', nil
+	default:
+		return 0, MarketSideUnknownError
+	}
+}
+
+var MarketSideUnknownError = errors.New("MarketSide unknown")
 
 func MarketSideParse(b byte) MarketSide {
 	switch b {
@@ -306,6 +323,19 @@ func decodeIttoMessage(data []byte) IttoMessageCommon {
 	}
 	return m
 }
+func (m *IttoMessageCommon) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
+	errs.PassE(&err)
+	buf, err := b.AppendBytes(1)
+	errs.CheckE(err)
+	buf[0] = byte(m.Type)
+
+	if m.Type != IttoMessageTypeSeconds {
+		buf, err := b.AppendBytes(4)
+		errs.CheckE(err)
+		binary.BigEndian.PutUint32(buf, m.Timestamp)
+	}
+	return
+}
 
 /************************************************************************/
 type IttoMessageUnknown struct {
@@ -334,6 +364,14 @@ func (m *IttoMessageSeconds) DecodeFromBytes(data []byte, df gopacket.DecodeFeed
 	}
 	return nil
 }
+func (m *IttoMessageSeconds) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
+	errs.PassE(&err)
+	errs.CheckE(m.IttoMessageCommon.SerializeTo(b, opts))
+	buf, err := b.AppendBytes(4)
+	errs.CheckE(err)
+	binary.BigEndian.PutUint32(buf, m.Second)
+	return
+}
 
 /************************************************************************/
 type IttoMessageSystemEvent struct {
@@ -361,6 +399,14 @@ func (m *IttoMessageBaseReference) DecodeFromBytes(data []byte, df gopacket.Deco
 		BaseRefNum:        binary.BigEndian.Uint64(data[5:13]),
 	}
 	return nil
+}
+func (m *IttoMessageBaseReference) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
+	errs.PassE(&err)
+	errs.CheckE(m.IttoMessageCommon.SerializeTo(b, opts))
+	buf, err := b.AppendBytes(8)
+	errs.CheckE(err)
+	binary.BigEndian.PutUint64(buf, m.BaseRefNum)
+	return
 }
 
 /************************************************************************/
@@ -451,6 +497,28 @@ func (m *IttoMessageAddOrder) DecodeFromBytes(data []byte, df gopacket.DecodeFee
 		m.Size = int(binary.BigEndian.Uint32(data[18:22]))
 	}
 	return nil
+}
+func (m *IttoMessageAddOrder) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
+	errs.PassE(&err)
+	errs.CheckE(m.IttoMessageCommon.SerializeTo(b, opts))
+	buf, err := b.AppendBytes(9)
+	errs.CheckE(err)
+	binary.BigEndian.PutUint32(buf, m.RefNumD.Delta())
+	buf[4], err = m.Side.ToByte()
+	errs.CheckE(err)
+	binary.BigEndian.PutUint32(buf[5:9], uint32(m.OId))
+	if m.Type.IsShort() {
+		buf, err := b.AppendBytes(4)
+		errs.CheckE(err)
+		binary.BigEndian.PutUint16(buf, uint16(PriceLongToShort(m.Price)))
+		binary.BigEndian.PutUint16(buf[2:], uint16(m.Size))
+	} else {
+		buf, err := b.AppendBytes(8)
+		errs.CheckE(err)
+		binary.BigEndian.PutUint32(buf, uint32(m.Price))
+		binary.BigEndian.PutUint32(buf[4:], uint32(m.Size))
+	}
+	return
 }
 
 /************************************************************************/
