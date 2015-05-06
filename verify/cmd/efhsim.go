@@ -20,6 +20,7 @@ import (
 
 type cmdEfhsim struct {
 	InputFileName           string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
+	SubscriptionFileName    string `long:"subscribe" short:"s" value-name:"SUBSCRIPTION_FILE" description:"read subscriptions from file"`
 	OutputFileNameSimOrders string `long:"output-sim-orders" value-name:"FILE" description:"output file for hw simulator"`
 	OutputFileNameSimQuotes string `long:"output-sim-quotes" value-name:"FILE" description:"output file for hw simulator"`
 	OutputFileNameEfhOrders string `long:"output-efh-orders" value-name:"FILE" description:"output file for EFH order messages"`
@@ -55,6 +56,12 @@ func (c *cmdEfhsim) ParsingFinished() {
 	}()
 	efh := efhsim.NewEfhSim()
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
+	if c.SubscriptionFileName != "" {
+		file, err := os.Open(c.SubscriptionFileName)
+		errs.CheckE(err)
+		errs.CheckE(efh.SubscribeFromReader(file))
+		file.Close()
+	}
 	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
 		logger := rec.NewSimLogger(w)
 		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
