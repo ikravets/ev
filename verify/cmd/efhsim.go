@@ -62,6 +62,7 @@ func (c *cmdEfhsim) ParsingFinished() {
 		errs.CheckE(efh.SubscribeFromReader(file))
 		file.Close()
 	}
+	efh.AddLogger(rec.NewHwLimChecker())
 	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
 		logger := rec.NewSimLogger(w)
 		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
