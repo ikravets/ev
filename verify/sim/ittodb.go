@@ -24,6 +24,25 @@ type IttoDbStats struct {
 type IttoDbMessage struct {
 	Pam     packet.ApplicationMessage
 	Session *Session
+	subscr  *Subscr
+}
+
+func (m *IttoDbMessage) IgnoredBySubscriber() bool {
+	if m.subscr == nil {
+		return false
+	}
+	var oid itto.OptionId
+	switch im := m.Pam.Layer().(type) {
+	case *itto.IttoMessageAddOrder:
+		oid = im.OId
+	case *itto.IttoMessageAddQuote:
+		oid = im.OId
+	case *itto.IttoMessageOptionsTrade:
+		oid = im.OId
+	case *itto.IttoMessageOptionsCrossTrade:
+		oid = im.OId
+	}
+	return oid.Valid() && !m.subscr.Subscribed(oid)
 }
 
 type IttoDb interface {
@@ -31,6 +50,7 @@ type IttoDb interface {
 	NewMessage(packet.ApplicationMessage) *IttoDbMessage
 	MessageOperations(*IttoDbMessage) []IttoOperation
 	ApplyOperation(operation IttoOperation)
+	SetSubscription(s *Subscr)
 }
 
 func NewIttoDb() IttoDb {
@@ -46,6 +66,7 @@ type db struct {
 	sessions []Session
 	orders   map[orderIndex]order
 	stat     dbStatSupport
+	subscr   *Subscr
 }
 
 type orderIndex uint64
@@ -107,6 +128,7 @@ func (d *db) NewMessage(pam packet.ApplicationMessage) *IttoDbMessage {
 	m := &IttoDbMessage{
 		Pam:     pam,
 		Session: &s,
+		subscr:  d.subscr,
 	}
 	return m
 }
@@ -331,10 +353,18 @@ func (d *db) MessageOperations(m *IttoDbMessage) []IttoOperation {
 	}
 	switch im := m.Pam.Layer().(type) {
 	case *itto.IttoMessageAddOrder:
-		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: im.OId, OrderSide: im.OrderSide})
+		var oid itto.OptionId
+		if !m.IgnoredBySubscriber() {
+			oid = im.OId
+		}
+		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: oid, OrderSide: im.OrderSide})
 	case *itto.IttoMessageAddQuote:
-		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: im.OId, OrderSide: im.Bid})
-		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: im.OId, OrderSide: im.Ask})
+		var oid itto.OptionId
+		if !m.IgnoredBySubscriber() {
+			oid = im.OId
+		}
+		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: oid, OrderSide: im.Bid})
+		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: oid, OrderSide: im.Ask})
 	case *itto.IttoMessageSingleSideExecuted:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
 	case *itto.IttoMessageSingleSideExecutedWithPrice:
@@ -359,4 +389,8 @@ func (d *db) MessageOperations(m *IttoDbMessage) []IttoOperation {
 		}
 	}
 	return ops
+}
+
+func (d *db) SetSubscription(s *Subscr) {
+	d.subscr = s
 }
