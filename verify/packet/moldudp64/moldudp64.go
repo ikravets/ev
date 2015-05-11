@@ -10,6 +10,8 @@ import (
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
 
+	"my/errs"
+
 	"my/itto/verify/packet/itto"
 )
 
@@ -69,6 +71,16 @@ func decodeMoldUDP64(data []byte, p gopacket.PacketBuilder) error {
 	}
 	p.AddLayer(m)
 	return p.NextDecoder(m.NextLayerType())
+}
+
+func (m *MoldUDP64) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
+	errs.PassE(&err)
+	bytes, err := b.PrependBytes(20)
+	errs.CheckE(err)
+	copy(bytes[0:10], m.Session[0:10])
+	binary.BigEndian.PutUint64(bytes[10:18], m.SequenceNumber)
+	binary.BigEndian.PutUint16(bytes[18:20], m.MessageCount)
+	return
 }
 
 /************************************************************************/
@@ -187,4 +199,16 @@ func decodeMoldUDP64MessageBlockChained(data []byte, p gopacket.PacketBuilder) e
 	}
 	p.AddLayer(m)
 	return p.NextDecoder(m.NextLayerType())
+}
+
+func (m *MoldUDP64MessageBlockChained) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
+	errs.PassE(&err)
+	payload := b.Bytes()
+	bytes, err := b.PrependBytes(2)
+	errs.CheckE(err)
+	if opts.FixLengths {
+		m.MessageLength = uint16(len(payload))
+	}
+	binary.BigEndian.PutUint16(bytes, uint16(m.MessageLength))
+	return
 }
