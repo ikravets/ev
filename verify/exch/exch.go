@@ -24,10 +24,20 @@ type ExchangeSimulator interface {
 
 func NewExchangeSimulatorServer() ExchangeSimulator {
 	return &exchange{
-		glimpse: &glimpseServer{laddr: ":16001"},
-		replay:  &replayServer{laddr: ":17001"},
-		//mcast:   &mcastServer{laddr: "10.1.0.11:0", raddr: "233.54.12.1:18001"},
-		mcast: &mcastServer{laddr: "10.2.0.5:0", raddr: "233.54.12.1:18001"},
+		glimpse: &glimpseServer{
+			laddr:          ":16001",
+			snapshotSeqNum: 5,
+		},
+		replay: &replayServer{
+			laddr:        ":17001",
+			sleepEnabled: true,
+		},
+		mcast: &mcastServer{
+			laddr: "10.2.0.5:0",
+			raddr: "233.54.12.1:18001",
+			seq:   1000,
+			pps:   1,
+		},
 	}
 }
 
@@ -46,7 +56,8 @@ func (e *exchange) Run() {
 }
 
 type glimpseServer struct {
-	laddr string
+	laddr          string
+	snapshotSeqNum int
 }
 
 func (s *glimpseServer) run() {
@@ -60,7 +71,6 @@ func (s *glimpseServer) run() {
 		go s.handleClient(conn)
 	}
 }
-
 func (s *glimpseServer) handleClient(conn net.Conn) {
 	defer conn.Close()
 	m, err := sbtcp.ReadMessage(conn)
@@ -76,16 +86,22 @@ func (s *glimpseServer) handleClient(conn net.Conn) {
 	errs.CheckE(sbtcp.WriteMessage(conn, &la))
 	log.Printf("glimpse send: %v\n", la)
 
-	seqNum := 5
-	snap := fmt.Sprintf("M%020d", seqNum)
+	for i := 0; i < s.snapshotSeqNum; i++ {
+		s.sendSeqData(conn, generateIttoMessage(i))
+	}
+	snap := fmt.Sprintf("M%020d", s.snapshotSeqNum)
+	s.sendSeqData(conn, []byte(snap))
+}
+func (s *glimpseServer) sendSeqData(conn net.Conn, data []byte) {
 	sd := sbtcp.MessageSequencedData{}
-	sd.SetPayload([]byte(snap))
+	sd.SetPayload(data)
 	errs.CheckE(sbtcp.WriteMessage(conn, &sd))
 	log.Printf("glimpse send: %v\n", sd)
 }
 
 type replayServer struct {
-	laddr string
+	laddr        string
+	sleepEnabled bool
 }
 
 func (s *replayServer) run() {
@@ -114,7 +130,7 @@ func (s *replayServer) run() {
 			MessageCount:   binary.BigEndian.Uint16(buf[18:20]),
 		}
 		go func() {
-			const MAX_MESSAGES = (1500 - 34 - 20) / 28
+			const MAX_MESSAGES = (1500 - 34 - 20) / 40
 			log.Printf("got request: %v\n", req)
 			//num := int(req.SequenceNumber) - 10
 			num := int(req.MessageCount)
@@ -123,11 +139,10 @@ func (s *replayServer) run() {
 			} else if num > MAX_MESSAGES {
 				num = MAX_MESSAGES
 			}
-			resp := createPacket(int(req.SequenceNumber), num)
+			resp := createMoldPacket(int(req.SequenceNumber), num)
 			errs.Check(len(resp) < 1500-34)
 
-			const SLEEP_ENABLED = true
-			if SLEEP_ENABLED {
+			if s.sleepEnabled {
 				sleep := time.Duration(250+2500/num) * time.Millisecond
 				log.Printf("sleeping for %s\n", sleep)
 				time.Sleep(sleep)
@@ -143,54 +158,40 @@ func (s *replayServer) run() {
 type mcastServer struct {
 	laddr string
 	raddr string
+	seq   int
+	pps   int
 }
 
 func (s *mcastServer) run() {
-	const MCAST_PPS = 1
+	errs.Check(s.pps != 0)
 	laddr, err := net.ResolveUDPAddr("udp", s.laddr)
 	errs.CheckE(err)
 	raddr, err := net.ResolveUDPAddr("udp", s.raddr)
 	errs.CheckE(err)
 	conn, err := net.DialUDP("udp", laddr, raddr)
-	seq := 1000
 	for {
-		p := createPacket(seq, 1)
+		p := createMoldPacket(s.seq, 1)
 		log.Printf("send mcast: %v\n", p)
 		n, err := conn.Write(p)
 		errs.CheckE(err)
 		errs.Check(n == len(p), n, len(p))
 
-		delay := time.Duration(1000/MCAST_PPS) * time.Millisecond
+		delay := time.Duration(1000/s.pps) * time.Millisecond
 		time.Sleep(delay)
-		seq++
-		/*
-			if seq > 30 {
-				seq = 1
-			}
-		*/
+		s.seq++
 	}
 	defer conn.Close()
 }
 
-func createPacket(startSeqNum, count int) []byte {
+func createMoldPacket(startSeqNum, count int) []byte {
 	type moldUDP64 struct {
 		Session        string `struc:"[10]byte"`
 		SequenceNumber uint64
 		MessageCount   uint16
 	}
-	type ittoMessageOptionsTrade struct {
-		Type      byte
-		Timestamp uint32
-		Side      byte
-		OId       uint32
-		Cross     uint32
-		Match     uint32
-		Price     uint32
-		Size      uint32
-	}
 	type moldUDP64MessageBlock struct {
-		MessageLength uint16 //`struc:"sizeof=Payload"`
-		Payload       ittoMessageOptionsTrade
+		MessageLength int16 `struc:"sizeof=Payload"`
+		Payload       []uint8
 	}
 
 	errs.Check(startSeqNum >= 0)
@@ -204,12 +205,75 @@ func createPacket(startSeqNum, count int) []byte {
 	errs.CheckE(struc.Pack(&bb, &mh))
 	for i := 0; i < count; i++ {
 		mb := moldUDP64MessageBlock{
-			MessageLength: 26,
-			Payload: ittoMessageOptionsTrade{
-				Type: 'P',
-			},
+			Payload: generateIttoMessage(startSeqNum + i),
 		}
 		errs.CheckE(struc.Pack(&bb, &mb))
+	}
+	return bb.Bytes()
+}
+
+func generateIttoMessage(seqNum int) []byte {
+	type ittoMessageOptionsTrade struct {
+		Type      byte
+		Timestamp uint32
+		Side      byte
+		OId       uint32
+		Cross     uint32
+		Match     uint32
+		Price     uint32
+		Size      uint32
+	}
+	type ittoMessageOptionDirectory struct {
+		Type             byte
+		Timestamp        uint32
+		OId              uint32
+		Symbol           [6]byte
+		ExpirationYear   byte
+		ExpirationMonth  byte
+		ExpirationDay    byte
+		StrikePrice      uint32
+		OType            byte
+		Source           uint8
+		UnderlyingSymbol [13]byte
+		ClosingType      byte
+		Tradable         byte
+		MPV              byte
+	}
+	type ittoMessageAddOrder struct {
+		Type      byte
+		Timestamp uint32
+		RefNumD   uint32
+		Side      byte
+		OId       uint32
+		Price     uint32
+		Size      uint32
+	}
+
+	errs.Check(seqNum >= 0)
+	var bb bytes.Buffer
+	switch seqNum % 3 {
+	case 0:
+		m := ittoMessageOptionDirectory{
+			Type: 'R',
+			OId:  uint32(seqNum / 3),
+		}
+		errs.CheckE(struc.Pack(&bb, &m))
+	case 1:
+		m := ittoMessageOptionsTrade{
+			Type: 'P',
+			OId:  uint32(seqNum / 3),
+		}
+		errs.CheckE(struc.Pack(&bb, &m))
+	case 2:
+		m := ittoMessageAddOrder{
+			Type:    'A',
+			RefNumD: uint32(seqNum),
+			Side:    'B',
+			OId:     uint32(seqNum/9) + 0x10000,
+			Price:   uint32(seqNum % 10 * 1000),
+			Size:    uint32(seqNum % 10),
+		}
+		errs.CheckE(struc.Pack(&bb, &m))
 	}
 	return bb.Bytes()
 }
