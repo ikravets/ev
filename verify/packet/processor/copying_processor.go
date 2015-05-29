@@ -6,6 +6,7 @@ package processor
 import (
 	"bytes"
 	"io"
+	"time"
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
@@ -16,10 +17,10 @@ import (
 )
 
 type applicationMessage struct {
-	layer          gopacket.Layer
-	flow           gopacket.Flow
-	seqNum         uint64
-	packetMetadata *gopacket.PacketMetadata
+	layer     gopacket.Layer
+	flow      gopacket.Flow
+	seqNum    uint64
+	timestamp time.Time
 }
 
 func (am *applicationMessage) Layer() gopacket.Layer {
@@ -31,8 +32,8 @@ func (am *applicationMessage) Flow() gopacket.Flow {
 func (am *applicationMessage) SequenceNumber() uint64 {
 	return am.seqNum
 }
-func (am *applicationMessage) PacketMetadata() *gopacket.PacketMetadata {
-	return am.packetMetadata
+func (am *applicationMessage) Timestamp() time.Time {
+	return am.timestamp
 }
 
 type processor struct {
@@ -73,7 +74,7 @@ func (p *processor) ProcessAll() error {
 			return err
 		}
 		p.decodeAppLayer(pkt) // ignore errors
-		p.handler.HandlePacket(pkt)
+		p.handler.HandlePacket(packet.NewFromGoPacket(pkt))
 		packetNum++
 		if packetNum == p.packetNumLimit {
 			break
@@ -88,10 +89,10 @@ func (p *processor) ProcessAll() error {
 		for _, l := range pkt.Layers() {
 			if itto.LayerClassItto.Contains(l.LayerType()) {
 				m = applicationMessage{
-					layer:          l,
-					flow:           flow,
-					seqNum:         seqNum,
-					packetMetadata: pkt.Metadata(),
+					layer:     l,
+					flow:      flow,
+					seqNum:    seqNum,
+					timestamp: pkt.Metadata().Timestamp,
 				}
 				p.handler.HandleMessage(&m)
 				seqNum++

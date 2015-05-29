@@ -11,8 +11,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"code.google.com/p/gopacket"
-
 	"my/errs"
 	"my/itto/verify/packet"
 )
@@ -79,7 +77,7 @@ func (p *MemhRecorder) AddDummy() error {
 
 var _ packet.Handler = &MemhRecorder{}
 
-func (p *MemhRecorder) HandlePacket(packet gopacket.Packet) {
+func (p *MemhRecorder) HandlePacket(packet packet.Packet) {
 	errs.CheckE(p.AddData(packet.Data()))
 }
 func (_ *MemhRecorder) HandleMessage(_ packet.ApplicationMessage) {}

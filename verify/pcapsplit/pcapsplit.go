@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 
-	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
 	"code.google.com/p/gopacket/pcap"
 	"code.google.com/p/gopacket/pcapgo"
@@ -122,7 +121,7 @@ func (s *Splitter) SplitByOption(oid itto.OptionId, fileName string) error {
 	return s.SplitByOptions(confs)
 }
 
-func (s *Splitter) HandlePacket(packet gopacket.Packet) {
+func (s *Splitter) HandlePacket(packet packet.Packet) {
 	s.stats.Packets++
 	if s.stats.Packets%10000 == 0 {
 		log.Printf("stats: %#v %#v\n", s.stats, s.idb.Stats())

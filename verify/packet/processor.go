@@ -5,6 +5,7 @@ package packet
 
 import (
 	"fmt"
+	"time"
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
@@ -20,11 +21,11 @@ type ApplicationMessage interface {
 	Flow() gopacket.Flow
 	Layer() gopacket.Layer
 	SequenceNumber() uint64
-	PacketMetadata() *gopacket.PacketMetadata
+	Timestamp() time.Time
 }
 
 type Handler interface {
-	HandlePacket(gopacket.Packet)
+	HandlePacket(Packet)
 	HandleMessage(ApplicationMessage)
 }
 

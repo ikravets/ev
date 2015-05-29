@@ -76,5 +76,5 @@ func (l *Stream) getIttoMessage() itto.IttoMessage {
 	return l.message.Pam.Layer().(itto.IttoMessage)
 }
 func (l *Stream) getPacketTimestamp() time.Time {
-	return l.message.Pam.PacketMetadata().Timestamp
+	return l.message.Pam.Timestamp()
 }

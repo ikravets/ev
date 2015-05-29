@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 
-	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/pcap"
 	"github.com/jessevdk/go-flags"
 
@@ -64,7 +63,7 @@ type packetPrinter struct {
 	packetNumber int
 }
 
-func (p *packetPrinter) HandlePacket(packet gopacket.Packet) {
+func (p *packetPrinter) HandlePacket(packet packet.Packet) {
 	p.packetNumber++
 	fmt.Fprintf(p.w, "%d %s\n", p.packetNumber, packet)
 }

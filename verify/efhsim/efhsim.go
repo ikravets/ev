@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 
-	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/pcap"
 
 	"my/itto/verify/packet"
@@ -63,7 +62,7 @@ func (s *EfhSim) AnalyzeInput() error {
 	return nil
 }
 
-func (s *EfhSim) HandlePacket(packet gopacket.Packet) {
+func (s *EfhSim) HandlePacket(packet packet.Packet) {
 	s.packetNum++
 	if s.packetNum%10000 == 0 {
 		type Stats struct {
