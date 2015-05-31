@@ -242,7 +242,7 @@ var IttoMessageTypeMetadata [256]EnumMessageTypeMetadata
 var LayerClassItto gopacket.LayerClass
 
 func init() {
-	const ITTO_LAYERS_BASE_NUM = 1100
+	const ITTO_LAYERS_BASE_NUM = 10100
 
 	layerTypes := make([]gopacket.LayerType, 0, 256)
 	for i := 0; i < 256; i++ {
