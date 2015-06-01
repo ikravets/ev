@@ -9,43 +9,39 @@ import (
 
 	"code.google.com/p/gopacket"
 
-	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
 )
 
-type IttoDb interface {
-	Stats() IttoDbStats
-	NewMessage(packet.ApplicationMessage) *IttoDbMessage
-	MessageOperations(*IttoDbMessage) []IttoOperation
-	ApplyOperation(operation IttoOperation)
-	SetSubscription(s *Subscr)
+type OrderDb interface {
+	Stats() OrderDbStats
+	ApplyOperation(operation SimOperation)
+	findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order order, err error) // TODO refactor
 }
-
-type IttoDbStats struct {
+type OrderDbStats struct {
 	Orders     int
 	PeakOrders int
-	Sessions   int
 }
-type db struct {
-	sessions []Session
-	orders   map[orderIndex]order
-	stat     dbStatSupport
-	subscr   *Subscr
+
+type orderDb struct {
+	sim    Sim
+	orders map[orderIndex]order
+	stat   dbStatSupport
 }
 type dbStatSupport struct {
 	maxOrders int
 }
 
-func NewIttoDb() IttoDb {
-	return &db{
+func NewOrderDb(sim Sim) OrderDb {
+	return &orderDb{
+		sim:    sim,
 		orders: make(map[orderIndex]order),
 	}
 }
 
 type orderIndex uint64
 
-func NewOrderIndex(d *db, flow gopacket.Flow, refNumD itto.RefNumDelta) orderIndex {
-	s := d.getSession(flow)
+func newOrderIndex(sim Sim, flow gopacket.Flow, refNumD itto.RefNumDelta) orderIndex {
+	s := sim.Session(flow)
 	return orderIndex(uint64(s.index)<<32 + uint64(refNumD.Delta()))
 }
 
@@ -56,15 +52,15 @@ type order struct {
 
 var orderNotFoundError = errors.New("order not found")
 
-func (d *db) findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order order, err error) {
-	order, ok := d.orders[NewOrderIndex(d, flow, refNumD)]
+func (d *orderDb) findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order order, err error) {
+	order, ok := d.orders[newOrderIndex(d.sim, flow, refNumD)]
 	if !ok {
 		err = orderNotFoundError
 	}
 	return
 }
 
-func (d *db) ApplyOperation(operation IttoOperation) {
+func (d *orderDb) ApplyOperation(operation SimOperation) {
 	operation.getOperation().populate()
 	oid := operation.GetOptionId()
 	if oid.Invalid() {
@@ -104,11 +100,10 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 	}
 }
 
-func (d *db) Stats() IttoDbStats {
-	s := IttoDbStats{
+func (d *orderDb) Stats() OrderDbStats {
+	s := OrderDbStats{
 		Orders:     len(d.orders),
 		PeakOrders: d.stat.maxOrders,
-		Sessions:   len(d.sessions),
 	}
 	return s
 }

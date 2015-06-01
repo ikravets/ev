@@ -19,10 +19,10 @@ const supernodes = 256 * 1024
 func NewHwLimChecker() *HwLimChecker {
 	return &HwLimChecker{}
 }
-func (hlc *HwLimChecker) MessageArrived(*sim.IttoDbMessage)            {}
-func (hlc *HwLimChecker) OperationAppliedToOrders(sim.IttoOperation)   {}
-func (hlc *HwLimChecker) BeforeBookUpdate(sim.Book, sim.IttoOperation) {}
-func (hlc *HwLimChecker) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
+func (hlc *HwLimChecker) MessageArrived(*sim.SimMessage)              {}
+func (hlc *HwLimChecker) OperationAppliedToOrders(sim.SimOperation)   {}
+func (hlc *HwLimChecker) BeforeBookUpdate(sim.Book, sim.SimOperation) {}
+func (hlc *HwLimChecker) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	opa, ok := operation.(*sim.OperationAdd)
 	if !ok || operation.GetOptionId().Invalid() {
 		return

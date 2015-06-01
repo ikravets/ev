@@ -21,8 +21,7 @@ import (
 type Splitter struct {
 	inputFileName    string
 	inputPacketLimit int
-	idb              sim.IttoDb
-	book             sim.Book
+	simu             sim.Sim
 	packetOids       []itto.OptionId
 	allPacketOids    [][]itto.OptionId
 	oidFilter        map[itto.OptionId]struct{}
@@ -31,8 +30,7 @@ type Splitter struct {
 
 func NewSplitter() *Splitter {
 	return &Splitter{
-		idb:  sim.NewIttoDb(),
-		book: sim.NewBook(),
+		simu: sim.NewSim(),
 	}
 }
 
@@ -124,7 +122,7 @@ func (s *Splitter) SplitByOption(oid itto.OptionId, fileName string) error {
 func (s *Splitter) HandlePacket(packet packet.Packet) {
 	s.stats.Packets++
 	if s.stats.Packets%10000 == 0 {
-		log.Printf("stats: %#v %#v\n", s.stats, s.idb.Stats())
+		log.Printf("stats: %#v %#v\n", s.stats, s.simu.OrderDb().Stats())
 	}
 	// process *previous* packet info
 
@@ -147,17 +145,16 @@ func (s *Splitter) HandlePacket(packet packet.Packet) {
 
 func (s *Splitter) HandleMessage(message packet.ApplicationMessage) {
 	//log.Println(message.Layer())
-	m := sim.IttoDbMessage{Pam: message}
-	//s.idb.AddMessage(&m)
-	ops := s.idb.MessageOperations(&m)
+	m := s.simu.NewMessage(message)
+	ops := m.MessageOperations()
 	for _, op := range ops {
 		s.stats.Operations++
 		oid := op.GetOptionId()
 		if oid.Valid() {
 			if s.acceptOid(oid) {
 				s.packetOids = append(s.packetOids, oid)
-				s.idb.ApplyOperation(op)
-				s.book.ApplyOperation(op)
+				s.simu.OrderDb().ApplyOperation(op)
+				s.simu.Book().ApplyOperation(op)
 			} else {
 				s.stats.IgnoredOperations++
 			}

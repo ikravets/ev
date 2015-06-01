@@ -33,7 +33,7 @@ func NewTobLogger() *TobLogger {
 	return l
 }
 
-func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
+func (l *TobLogger) MessageArrived(idm *sim.SimMessage) {
 	l.bid.Check, l.ask.Check = false, false
 	switch idm.Pam.Layer().(type) {
 	case
@@ -65,9 +65,9 @@ func (l *TobLogger) MessageArrived(idm *sim.IttoDbMessage) {
 	l.hasOldTob = false
 }
 
-func (*TobLogger) OperationAppliedToOrders(sim.IttoOperation) {}
+func (*TobLogger) OperationAppliedToOrders(sim.SimOperation) {}
 
-func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation) {
+func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if l.consumeOps == 0 {
 		log.Fatal("book operation is not expected")
 	}
@@ -91,7 +91,7 @@ func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation)
 	l.hasOldTob = true
 }
 
-func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation, tobUpdate TobUpdate) bool {
+func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation, tobUpdate TobUpdate) bool {
 	if l.consumeOps == 0 {
 		log.Fatal("book operation is not expected")
 	}

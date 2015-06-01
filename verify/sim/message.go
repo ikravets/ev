@@ -8,24 +8,24 @@ import (
 	"my/itto/verify/packet/itto"
 )
 
-type IttoDbMessage struct {
+type SimMessage struct {
 	Pam     packet.ApplicationMessage
 	Session *Session
-	subscr  *Subscr
+	sim     Sim
 }
 
-func (d *db) NewMessage(pam packet.ApplicationMessage) *IttoDbMessage {
-	s := d.getSession(pam.Flow())
-	m := &IttoDbMessage{
+func NewSimMessage(sim Sim, pam packet.ApplicationMessage) *SimMessage {
+	s := sim.Session(pam.Flow())
+	m := &SimMessage{
 		Pam:     pam,
 		Session: &s,
-		subscr:  d.subscr,
+		sim:     sim,
 	}
 	return m
 }
 
-func (m *IttoDbMessage) IgnoredBySubscriber() bool {
-	if m.subscr == nil {
+func (m *SimMessage) IgnoredBySubscriber() bool {
+	if m.sim.Subscr() == nil {
 		return false
 	}
 	var oid itto.OptionId
@@ -39,15 +39,15 @@ func (m *IttoDbMessage) IgnoredBySubscriber() bool {
 	case *itto.IttoMessageOptionsCrossTrade:
 		oid = im.OId
 	}
-	return oid.Valid() && !m.subscr.Subscribed(oid)
+	return oid.Valid() && !m.sim.Subscr().Subscribed(oid)
 }
 
-func (d *db) MessageOperations(m *IttoDbMessage) []IttoOperation {
-	var ops []IttoOperation
-	addOperation := func(origRefNumD itto.RefNumDelta, operation IttoOperation) {
+func (m *SimMessage) MessageOperations() []SimOperation {
+	var ops []SimOperation
+	addOperation := func(origRefNumD itto.RefNumDelta, operation SimOperation) {
 		opop := operation.getOperation()
 		opop.m = m
-		opop.d = d
+		opop.sim = m.sim
 		opop.origRefNumD = origRefNumD
 		ops = append(ops, operation)
 	}

@@ -60,12 +60,12 @@ func NewAvtLogger(w io.Writer, rDict io.Reader) *AvtLogger {
 	return l
 }
 
-func (l *AvtLogger) MessageArrived(idm *sim.IttoDbMessage) {
+func (l *AvtLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
 	l.TobLogger.MessageArrived(idm)
 }
 
-func (l *AvtLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
+func (l *AvtLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
 		l.genUpdate()
 	}

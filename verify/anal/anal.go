@@ -43,8 +43,8 @@ type observer struct {
 
 var _ sim.Observer = &observer{}
 
-func (*observer) MessageArrived(*sim.IttoDbMessage) {}
-func (o *observer) OperationAppliedToOrders(op sim.IttoOperation) {
+func (*observer) MessageArrived(*sim.SimMessage) {}
+func (o *observer) OperationAppliedToOrders(op sim.SimOperation) {
 	sess := op.GetMessage().Session.Index()
 	errs.Check(sess < 4, sess)
 	var key uint64
@@ -67,8 +67,8 @@ func (o *observer) OperationAppliedToOrders(op sim.IttoOperation) {
 		}
 	}
 }
-func (*observer) BeforeBookUpdate(sim.Book, sim.IttoOperation) {}
-func (o *observer) AfterBookUpdate(book sim.Book, op sim.IttoOperation) {
+func (*observer) BeforeBookUpdate(sim.Book, sim.SimOperation) {}
+func (o *observer) AfterBookUpdate(book sim.Book, op sim.SimOperation) {
 	oid := op.GetOptionId()
 	if oid.Invalid() {
 		return

@@ -4,18 +4,18 @@
 package sim
 
 type Observer interface {
-	MessageArrived(*IttoDbMessage)
-	OperationAppliedToOrders(IttoOperation)
-	BeforeBookUpdate(Book, IttoOperation)
-	AfterBookUpdate(Book, IttoOperation)
+	MessageArrived(*SimMessage)
+	OperationAppliedToOrders(SimOperation)
+	BeforeBookUpdate(Book, SimOperation)
+	AfterBookUpdate(Book, SimOperation)
 }
 
 type NilObserver struct{}
 
-func (*NilObserver) MessageArrived(*IttoDbMessage)          {}
-func (*NilObserver) OperationAppliedToOrders(IttoOperation) {}
-func (*NilObserver) BeforeBookUpdate(Book, IttoOperation)   {}
-func (*NilObserver) AfterBookUpdate(Book, IttoOperation)    {}
+func (*NilObserver) MessageArrived(*SimMessage)            {}
+func (*NilObserver) OperationAppliedToOrders(SimOperation) {}
+func (*NilObserver) BeforeBookUpdate(Book, SimOperation)   {}
+func (*NilObserver) AfterBookUpdate(Book, SimOperation)    {}
 
 type MuxObserver struct {
 	slaves []Observer
@@ -24,22 +24,22 @@ type MuxObserver struct {
 func (mo *MuxObserver) AppendSlave(slave Observer) {
 	mo.slaves = append(mo.slaves, slave)
 }
-func (mo *MuxObserver) MessageArrived(m *IttoDbMessage) {
+func (mo *MuxObserver) MessageArrived(m *SimMessage) {
 	for _, slave := range mo.slaves {
 		slave.MessageArrived(m)
 	}
 }
-func (mo *MuxObserver) OperationAppliedToOrders(o IttoOperation) {
+func (mo *MuxObserver) OperationAppliedToOrders(o SimOperation) {
 	for _, slave := range mo.slaves {
 		slave.OperationAppliedToOrders(o)
 	}
 }
-func (mo *MuxObserver) BeforeBookUpdate(b Book, o IttoOperation) {
+func (mo *MuxObserver) BeforeBookUpdate(b Book, o SimOperation) {
 	for _, slave := range mo.slaves {
 		slave.BeforeBookUpdate(b, o)
 	}
 }
-func (mo *MuxObserver) AfterBookUpdate(b Book, o IttoOperation) {
+func (mo *MuxObserver) AfterBookUpdate(b Book, o SimOperation) {
 	for _, slave := range mo.slaves {
 		slave.AfterBookUpdate(b, o)
 	}

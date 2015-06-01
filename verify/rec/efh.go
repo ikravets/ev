@@ -197,7 +197,7 @@ func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 	l.mode = mode
 }
 
-func (l *EfhLogger) MessageArrived(idm *sim.IttoDbMessage) {
+func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
 	l.TobLogger.MessageArrived(idm)
 	switch m := l.stream.getIttoMessage().(type) {
@@ -210,7 +210,7 @@ func (l *EfhLogger) MessageArrived(idm *sim.IttoDbMessage) {
 	}
 }
 
-func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
+func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if l.mode == EfhLoggerOutputOrders {
 		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNew) {
 			l.genUpdateOrders(l.bid)

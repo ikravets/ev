@@ -9,8 +9,8 @@ import (
 	"my/itto/verify/packet/itto"
 )
 
-type IttoOperation interface {
-	GetMessage() *IttoDbMessage
+type SimOperation interface {
+	GetMessage() *SimMessage
 	GetOptionId() itto.OptionId
 	GetOrigRef() itto.RefNumDelta
 	GetSide() itto.MarketSide
@@ -21,14 +21,14 @@ type IttoOperation interface {
 }
 
 type Operation struct {
-	m           *IttoDbMessage
-	d           *db
+	m           *SimMessage
+	sim         Sim
 	origRefNumD itto.RefNumDelta
 	origOrder   *order
-	sibling     IttoOperation
+	sibling     SimOperation
 }
 
-func (op *Operation) GetMessage() *IttoDbMessage {
+func (op *Operation) GetMessage() *SimMessage {
 	return op.m
 }
 func (op *Operation) GetOrigRef() itto.RefNumDelta {
@@ -42,13 +42,13 @@ func (op *Operation) populate() {
 		op.sibling.getOperation().populate()
 		op.origOrder = op.sibling.getOperation().origOrder
 	} else if op.origRefNumD != (itto.RefNumDelta{}) {
-		if ord, err := op.d.findOrder(op.m.Pam.Flow(), op.origRefNumD); err == nil {
+		if ord, err := op.sim.OrderDb().findOrder(op.m.Pam.Flow(), op.origRefNumD); err == nil {
 			op.origOrder = &ord
 		}
 	}
 }
 func (op *Operation) origOrderIndex() orderIndex {
-	return NewOrderIndex(op.d, op.m.Pam.Flow(), op.origRefNumD)
+	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.origRefNumD)
 }
 func (o *Operation) getOptionId() (oid itto.OptionId) {
 	o.populate()
@@ -102,7 +102,7 @@ func (o *OperationAdd) GetNewSize() int {
 	return o.Size
 }
 func (op *OperationAdd) orderIndex() orderIndex {
-	return NewOrderIndex(op.d, op.m.Pam.Flow(), op.RefNumD)
+	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.RefNumD)
 }
 
 type OperationRemove struct {

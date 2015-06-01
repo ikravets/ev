@@ -12,7 +12,7 @@ import (
 )
 
 type Book interface {
-	ApplyOperation(operation IttoOperation)
+	ApplyOperation(operation SimOperation)
 	GetTop(itto.OptionId, itto.MarketSide, int) []PriceLevel
 	NumOptions() int
 }
@@ -27,7 +27,7 @@ type book struct {
 	options map[itto.OptionId]*optionState
 }
 
-func (b *book) ApplyOperation(operation IttoOperation) {
+func (b *book) ApplyOperation(operation SimOperation) {
 	oid := operation.GetOptionId()
 	if oid.Invalid() {
 		return

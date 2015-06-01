@@ -14,7 +14,7 @@ import (
 )
 
 type Stream struct {
-	message     *sim.IttoDbMessage
+	message     *sim.SimMessage
 	ittoSeconds map[gopacket.Flow]uint32
 	seqNum      map[gopacket.Flow]uint64
 }
@@ -26,7 +26,7 @@ func NewStream() *Stream {
 	}
 	return l
 }
-func (l *Stream) MessageArrived(idm *sim.IttoDbMessage) {
+func (l *Stream) MessageArrived(idm *sim.SimMessage) {
 	l.message = idm
 
 	flow := l.message.Pam.Flow()

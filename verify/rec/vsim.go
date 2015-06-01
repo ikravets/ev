@@ -40,7 +40,7 @@ func (s *SimLogger) printfln(format string, vs ...interface{}) {
 	f := format + "\n"
 	s.printf(f, vs...)
 }
-func (s *SimLogger) MessageArrived(idm *sim.IttoDbMessage) {
+func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 	out := func(name string, typ itto.IttoMessageType, f string, vs ...interface{}) {
 		s.printf("NORM %s %c ", name, typ)
 		s.printfln(f, vs...)
@@ -82,7 +82,7 @@ func (s *SimLogger) MessageArrived(idm *sim.IttoDbMessage) {
 	}
 	s.efhLogger.MessageArrived(idm)
 }
-func (s *SimLogger) OperationAppliedToOrders(operation sim.IttoOperation) {
+func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 	type ordrespLogInfo struct {
 		notFound, addOp, refNum uint32
 		optionId                itto.OptionId
@@ -147,11 +147,11 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.IttoOperation) {
 		s.printfln("ORDU %08x %08x %d %08x %08x", ou.refNum, ou.optionId, ou.side, ou.price, ou.size)
 	}
 }
-func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.IttoOperation) {
+func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) {
 	s.tobOld = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
 	s.efhLogger.BeforeBookUpdate(book, operation)
 }
-func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.IttoOperation) {
+func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if operation.GetOptionId().Valid() {
 		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
 		empty := sim.PriceLevel{}
