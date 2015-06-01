@@ -21,6 +21,9 @@ type MuxObserver struct {
 	slaves []Observer
 }
 
+func NewMuxObserver() *MuxObserver {
+	return &MuxObserver{}
+}
 func (mo *MuxObserver) AppendSlave(slave Observer) {
 	mo.slaves = append(mo.slaves, slave)
 }

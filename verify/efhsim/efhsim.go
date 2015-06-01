@@ -25,7 +25,7 @@ type EfhSim struct {
 func NewEfhSim() *EfhSim {
 	s := &EfhSim{
 		simu:     sim.NewSim(),
-		observer: new(sim.MuxObserver),
+		observer: sim.NewMuxObserver(),
 	}
 	return s
 }
