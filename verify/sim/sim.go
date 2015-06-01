@@ -7,15 +7,6 @@ import (
 	"code.google.com/p/gopacket"
 )
 
-type Session struct {
-	flow  gopacket.Flow
-	index int
-}
-
-func (s *Session) Index() int {
-	return s.index
-}
-
 func (d *db) getSession(flow gopacket.Flow) Session {
 	for _, s := range d.sessions {
 		if s.flow == flow {
@@ -28,6 +19,15 @@ func (d *db) getSession(flow gopacket.Flow) Session {
 	}
 	d.sessions = append(d.sessions, s)
 	return s
+}
+
+type Session struct {
+	flow  gopacket.Flow
+	index int
+}
+
+func (s *Session) Index() int {
+	return s.index
 }
 
 func (d *db) SetSubscription(s *Subscr) {

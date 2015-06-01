@@ -13,12 +13,6 @@ import (
 	"my/itto/verify/packet/itto"
 )
 
-type IttoDbStats struct {
-	Orders     int
-	PeakOrders int
-	Sessions   int
-}
-
 type IttoDb interface {
 	Stats() IttoDbStats
 	NewMessage(packet.ApplicationMessage) *IttoDbMessage
@@ -27,20 +21,25 @@ type IttoDb interface {
 	SetSubscription(s *Subscr)
 }
 
-func NewIttoDb() IttoDb {
-	return &db{
-		orders: make(map[orderIndex]order),
-	}
-}
-
-type dbStatSupport struct {
-	maxOrders int
+type IttoDbStats struct {
+	Orders     int
+	PeakOrders int
+	Sessions   int
 }
 type db struct {
 	sessions []Session
 	orders   map[orderIndex]order
 	stat     dbStatSupport
 	subscr   *Subscr
+}
+type dbStatSupport struct {
+	maxOrders int
+}
+
+func NewIttoDb() IttoDb {
+	return &db{
+		orders: make(map[orderIndex]order),
+	}
 }
 
 type orderIndex uint64
@@ -63,15 +62,6 @@ func (d *db) findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order orde
 		err = orderNotFoundError
 	}
 	return
-}
-
-func (d *db) Stats() IttoDbStats {
-	s := IttoDbStats{
-		Orders:     len(d.orders),
-		PeakOrders: d.stat.maxOrders,
-		Sessions:   len(d.sessions),
-	}
-	return s
 }
 
 func (d *db) ApplyOperation(operation IttoOperation) {
@@ -112,4 +102,13 @@ func (d *db) ApplyOperation(operation IttoOperation) {
 			log.Fatalf("negative size after operation %#v origOrder=%#v\n", operation, o)
 		}
 	}
+}
+
+func (d *db) Stats() IttoDbStats {
+	s := IttoDbStats{
+		Orders:     len(d.orders),
+		PeakOrders: d.stat.maxOrders,
+		Sessions:   len(d.sessions),
+	}
+	return s
 }

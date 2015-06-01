@@ -14,6 +14,16 @@ type IttoDbMessage struct {
 	subscr  *Subscr
 }
 
+func (d *db) NewMessage(pam packet.ApplicationMessage) *IttoDbMessage {
+	s := d.getSession(pam.Flow())
+	m := &IttoDbMessage{
+		Pam:     pam,
+		Session: &s,
+		subscr:  d.subscr,
+	}
+	return m
+}
+
 func (m *IttoDbMessage) IgnoredBySubscriber() bool {
 	if m.subscr == nil {
 		return false
@@ -30,16 +40,6 @@ func (m *IttoDbMessage) IgnoredBySubscriber() bool {
 		oid = im.OId
 	}
 	return oid.Valid() && !m.subscr.Subscribed(oid)
-}
-
-func (d *db) NewMessage(pam packet.ApplicationMessage) *IttoDbMessage {
-	s := d.getSession(pam.Flow())
-	m := &IttoDbMessage{
-		Pam:     pam,
-		Session: &s,
-		subscr:  d.subscr,
-	}
-	return m
 }
 
 func (d *db) MessageOperations(m *IttoDbMessage) []IttoOperation {
