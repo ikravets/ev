@@ -45,12 +45,20 @@ func (p *reusingProcessor) LimitPacketNumber(limit int) {
 
 func (p *reusingProcessor) ProcessAll() (err error) {
 	errs.PassE(&err)
+	pd := NewEndpointPayloadDetector()
+	for port := 51000; port < 51100; port++ {
+		pd.addDstMap(layers.NewUDPPortEndpoint(layers.UDPPort(port)), miax.LayerTypeMachTop)
+	}
+	pmlf := &payloadMuxLayerFactory{}
+	pmlf.AddDetector(pd)
+
 	parser := packet.NewReusingLayerParser(layers.LayerTypeEthernet)
 	parser.AddDecodingLayerFactory(EthernetLayerFactory)
 	parser.AddDecodingLayerFactory(Dot1QLayerFactory)
 	parser.AddDecodingLayerFactory(IPv4LayerFactory)
 	parser.AddDecodingLayerFactory(UDPLayerFactory)
 	parser.AddDecodingLayerFactory(TcpIgnoreLayerFactory)
+	parser.AddDecodingLayerFactory(pmlf)
 	parser.AddDecodingLayerFactory(miax.MachTopLayerFactory)
 	parser.AddDecodingLayerFactory(miax.MachLayerFactory)
 	parser.AddDecodingLayerFactory(miax.TomLayerFactory)
@@ -60,6 +68,7 @@ func (p *reusingProcessor) ProcessAll() (err error) {
 		packetNumLimit = p.packetNumLimit
 	}
 	var decoded []gopacket.DecodingLayer
+	pmlf.SetDecodedLayers(&decoded)
 	for packetNum := 0; packetNum != packetNumLimit; packetNum++ {
 		//log.Printf("packetNum: %d\n", packetNum)
 		data, ci, err := p.obtainer.ZeroCopyReadPacketData()
@@ -172,8 +181,7 @@ var (
 	)
 	UDPLayerFactory = packet.NewSingleDecodingLayerFactory(
 		layers.LayerTypeUDP,
-		//func() gopacket.DecodingLayer { return &layers.UDP{} },
-		func() gopacket.DecodingLayer { return &MyUdp{} },
+		func() gopacket.DecodingLayer { return &layers.UDP{} },
 	)
 	TcpIgnoreLayerFactory = packet.NewSingleDecodingLayerFactory(
 		layers.LayerTypeTCP,
@@ -182,13 +190,4 @@ var (
 )
 
 /************************************************************************/
-type MyUdp struct {
-	layers.UDP
-}
-
-func (u *MyUdp) NextLayerType() gopacket.LayerType {
-	// FIXME
-	return miax.LayerTypeMachTop
-}
-
 var _ = log.Ldate
