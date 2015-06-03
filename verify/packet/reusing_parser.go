@@ -55,6 +55,9 @@ func (p *ReusingLayerParser) DecodeLayers(data []byte, decoded *[]gopacket.Decod
 	for len(tps) > 0 {
 		tp := tps[0]
 		tps = tps[1:]
+		if tp.Type == gopacket.LayerTypeZero {
+			continue
+		}
 		layer, err := p.getDecodingLayer(tp.Type)
 		errs.CheckE(err)
 		//errs.CheckE(layer.DecodeFromBytes(tp.Payload, p.df))
