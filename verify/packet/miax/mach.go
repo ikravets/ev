@@ -22,10 +22,20 @@ var EndpointMachSession = gopacket.RegisterEndpointType(10020, EndpointMachSessi
 
 // initialized in init() to avoid false detection of potential initialization loop
 var LayerTypeMachTop, LayerTypeMach gopacket.LayerType
+var MachTopLayerFactory, MachLayerFactory packet.DecodingLayerFactory
 
 func init() {
 	LayerTypeMachTop = gopacket.RegisterLayerType(11000, gopacket.LayerTypeMetadata{"MachTop", gopacket.DecodeFunc(decodeMach)})
 	LayerTypeMach = gopacket.RegisterLayerType(11001, gopacket.LayerTypeMetadata{"Mach", gopacket.DecodeFunc(decodeMach)})
+
+	MachTopLayerFactory = packet.NewSingleDecodingLayerFactory(
+		LayerTypeMachTop,
+		func() gopacket.DecodingLayer { return &MachTop{} },
+	)
+	MachLayerFactory = packet.NewSingleDecodingLayerFactory(
+		LayerTypeMach,
+		func() gopacket.DecodingLayer { return &Mach{} },
+	)
 }
 
 type MachTop struct {

@@ -51,9 +51,9 @@ func (p *reusingProcessor) ProcessAll() (err error) {
 	parser.AddDecodingLayerFactory(IPv4LayerFactory)
 	parser.AddDecodingLayerFactory(UDPLayerFactory)
 	parser.AddDecodingLayerFactory(TcpIgnoreLayerFactory)
-	parser.AddDecodingLayerFactory(MachTopLayerFactory)
-	parser.AddDecodingLayerFactory(MachLayerFactory)
-	parser.AddDecodingLayerFactory(&miax.TomLayerFactory{})
+	parser.AddDecodingLayerFactory(miax.MachTopLayerFactory)
+	parser.AddDecodingLayerFactory(miax.MachLayerFactory)
+	parser.AddDecodingLayerFactory(miax.TomLayerFactory)
 
 	packetNumLimit := -1
 	if p.packetNumLimit > 0 {
@@ -157,56 +157,27 @@ func (rp *reusingPacket) Timestamp() time.Time {
 }
 
 /************************************************************************/
-type SingleDecodingLayerFactory struct {
-	layerType gopacket.LayerType
-	create    func() gopacket.DecodingLayer
-}
-
-var _ packet.DecodingLayerFactory = &SingleDecodingLayerFactory{}
-
-func NewSingleDecodingLayerFactory(layerType gopacket.LayerType, create func() gopacket.DecodingLayer) *SingleDecodingLayerFactory {
-	return &SingleDecodingLayerFactory{
-		layerType: layerType,
-		create:    create,
-	}
-}
-func (f *SingleDecodingLayerFactory) Create(layerType gopacket.LayerType) gopacket.DecodingLayer {
-	errs.Check(layerType == f.layerType)
-	return f.create()
-}
-func (f *SingleDecodingLayerFactory) SupportedLayers() gopacket.LayerClass {
-	return f.layerType
-}
-
 var (
-	EthernetLayerFactory = NewSingleDecodingLayerFactory(
+	EthernetLayerFactory = packet.NewSingleDecodingLayerFactory(
 		layers.LayerTypeEthernet,
 		func() gopacket.DecodingLayer { return &layers.Ethernet{} },
 	)
-	Dot1QLayerFactory = NewSingleDecodingLayerFactory(
+	Dot1QLayerFactory = packet.NewSingleDecodingLayerFactory(
 		layers.LayerTypeDot1Q,
 		func() gopacket.DecodingLayer { return &layers.Dot1Q{} },
 	)
-	IPv4LayerFactory = NewSingleDecodingLayerFactory(
+	IPv4LayerFactory = packet.NewSingleDecodingLayerFactory(
 		layers.LayerTypeIPv4,
 		func() gopacket.DecodingLayer { return &layers.IPv4{} },
 	)
-	UDPLayerFactory = NewSingleDecodingLayerFactory(
+	UDPLayerFactory = packet.NewSingleDecodingLayerFactory(
 		layers.LayerTypeUDP,
 		//func() gopacket.DecodingLayer { return &layers.UDP{} },
 		func() gopacket.DecodingLayer { return &MyUdp{} },
 	)
-	TcpIgnoreLayerFactory = NewSingleDecodingLayerFactory(
+	TcpIgnoreLayerFactory = packet.NewSingleDecodingLayerFactory(
 		layers.LayerTypeTCP,
 		func() gopacket.DecodingLayer { return &gopacket.Payload{} },
-	)
-	MachTopLayerFactory = NewSingleDecodingLayerFactory(
-		miax.LayerTypeMachTop,
-		func() gopacket.DecodingLayer { return &miax.MachTop{} },
-	)
-	MachLayerFactory = NewSingleDecodingLayerFactory(
-		miax.LayerTypeMach,
-		func() gopacket.DecodingLayer { return &miax.Mach{} },
 	)
 )
 

@@ -432,11 +432,13 @@ func parseProductId(data []byte) packet.OptionId {
 
 /************************************************************************/
 
-type TomLayerFactory struct{}
+var TomLayerFactory = &tomLayerFactory{}
 
-var _ packet.DecodingLayerFactory = &TomLayerFactory{}
+type tomLayerFactory struct{}
 
-func (f *TomLayerFactory) Create(layerType gopacket.LayerType) gopacket.DecodingLayer {
+var _ packet.DecodingLayerFactory = &tomLayerFactory{}
+
+func (f *tomLayerFactory) Create(layerType gopacket.LayerType) gopacket.DecodingLayer {
 	d := int(layerType - gopacket.LayerType(TOM_LAYERS_BASE_NUM))
 	if d < 0 || d > 255 {
 		panic("FIXME")
@@ -446,6 +448,6 @@ func (f *TomLayerFactory) Create(layerType gopacket.LayerType) gopacket.Decoding
 	errs.Check(m.LayerType == layerType)
 	return m.CreateLayer()
 }
-func (f *TomLayerFactory) SupportedLayers() gopacket.LayerClass {
+func (f *tomLayerFactory) SupportedLayers() gopacket.LayerClass {
 	return LayerClassTom
 }

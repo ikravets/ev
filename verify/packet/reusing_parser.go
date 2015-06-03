@@ -96,4 +96,25 @@ func (p *ReusingLayerParser) SetTruncated() {
 	p.Truncated = true
 }
 
+type SingleDecodingLayerFactory struct {
+	layerType gopacket.LayerType
+	create    func() gopacket.DecodingLayer
+}
+
+var _ DecodingLayerFactory = &SingleDecodingLayerFactory{}
+
+func NewSingleDecodingLayerFactory(layerType gopacket.LayerType, create func() gopacket.DecodingLayer) *SingleDecodingLayerFactory {
+	return &SingleDecodingLayerFactory{
+		layerType: layerType,
+		create:    create,
+	}
+}
+func (f *SingleDecodingLayerFactory) Create(layerType gopacket.LayerType) gopacket.DecodingLayer {
+	errs.Check(layerType == f.layerType)
+	return f.create()
+}
+func (f *SingleDecodingLayerFactory) SupportedLayers() gopacket.LayerClass {
+	return f.layerType
+}
+
 var _ = log.Ldate
