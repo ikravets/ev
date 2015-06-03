@@ -3,7 +3,10 @@
 
 package packet
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 type MarketSide byte
 
@@ -63,6 +66,9 @@ func (oid OptionId) Valid() bool {
 }
 func (oid OptionId) Invalid() bool {
 	return !oid.Valid()
+}
+func (oid OptionId) String() string {
+	return fmt.Sprintf("%#x", oid.raw)
 }
 
 type Price int
