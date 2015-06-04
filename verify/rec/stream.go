@@ -9,20 +9,20 @@ import (
 
 	"code.google.com/p/gopacket"
 
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet"
 	"my/itto/verify/sim"
 )
 
 type Stream struct {
-	message     *sim.SimMessage
-	ittoSeconds map[gopacket.Flow]uint32
-	seqNum      map[gopacket.Flow]uint64
+	message *sim.SimMessage
+	seconds map[gopacket.Flow]int
+	seqNum  map[gopacket.Flow]uint64
 }
 
 func NewStream() *Stream {
 	l := &Stream{
-		ittoSeconds: make(map[gopacket.Flow]uint32),
-		seqNum:      make(map[gopacket.Flow]uint64),
+		seconds: make(map[gopacket.Flow]int),
+		seqNum:  make(map[gopacket.Flow]uint64),
 	}
 	return l
 }
@@ -36,32 +36,8 @@ func (l *Stream) MessageArrived(idm *sim.SimMessage) {
 	}
 	l.seqNum[flow] = seq
 
-	switch m := l.message.Pam.Layer().(type) {
-	case *itto.IttoMessageSeconds:
-		l.ittoSeconds[flow] = m.Second
-	case
-		*itto.IttoMessageAddOrder,
-		*itto.IttoMessageSingleSideExecuted,
-		*itto.IttoMessageSingleSideExecutedWithPrice,
-		*itto.IttoMessageOrderCancel,
-		*itto.IttoMessageSingleSideDelete,
-		*itto.IttoMessageBlockSingleSideDelete,
-		*itto.IttoMessageSingleSideReplace,
-		*itto.IttoMessageSingleSideUpdate,
-		*itto.IttoMessageAddQuote,
-		*itto.IttoMessageQuoteDelete,
-		*itto.IttoMessageQuoteReplace,
-		*itto.IttoMessageNoii,
-		*itto.IttoMessageOptionsTrade,
-		*itto.IttoMessageOptionsCrossTrade,
-		*itto.IttoMessageOptionDirectory,
-		*itto.IttoMessageOptionOpen,
-		*itto.IttoMessageOptionTradingAction:
-		// silently ignore
-		return
-	default:
-		log.Println("wrong message type ", idm.Pam.Layer())
-		return
+	if m, ok := l.message.Pam.Layer().(packet.SecondsMessage); ok {
+		l.seconds[flow] = m.Seconds()
 	}
 }
 func (l *Stream) getSeqNum() uint64 {
@@ -70,10 +46,10 @@ func (l *Stream) getSeqNum() uint64 {
 }
 func (l *Stream) getTimestamp() uint64 {
 	flow := l.message.Pam.Flow()
-	return uint64(l.ittoSeconds[flow])*1e9 + uint64(l.message.Pam.Layer().(itto.IttoMessage).Base().Timestamp)
+	return uint64(l.seconds[flow])*1e9 + uint64(l.message.Pam.Layer().(packet.ExchangeMessage).Nanoseconds())
 }
-func (l *Stream) getIttoMessage() itto.IttoMessage {
-	return l.message.Pam.Layer().(itto.IttoMessage)
+func (l *Stream) getExchangeMessage() packet.ExchangeMessage {
+	return l.message.Pam.Layer().(packet.ExchangeMessage)
 }
 func (l *Stream) getPacketTimestamp() time.Time {
 	return l.message.Pam.Timestamp()

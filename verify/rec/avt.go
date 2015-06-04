@@ -74,7 +74,7 @@ func (l *AvtLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 func (l *AvtLogger) genUpdate() {
 	var optName, underlying string
 	if l.oid2AvtName != nil {
-		optName = l.oid2AvtName[int(l.lastOptionId)]
+		optName = l.oid2AvtName[int(l.lastOptionId.ToUint32())]
 		bs := []byte(optName)
 		for i := range bs {
 			if bs[i] < 'A' || bs[i] > 'Z' {

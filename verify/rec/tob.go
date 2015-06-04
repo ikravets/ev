@@ -6,12 +6,13 @@ package rec
 import (
 	"log"
 
+	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
 
 type TobLogger struct {
-	lastOptionId itto.OptionId
+	lastOptionId packet.OptionId
 	consumeOps   int
 	curOps       int
 	hasOldTob    bool
@@ -20,15 +21,15 @@ type TobLogger struct {
 }
 type tob struct {
 	Check bool
-	Side  itto.MarketSide
+	Side  packet.MarketSide
 	Old   sim.PriceLevel
 	New   sim.PriceLevel
 }
 
 func NewTobLogger() *TobLogger {
 	l := &TobLogger{
-		bid: tob{Side: itto.MarketSideBid},
-		ask: tob{Side: itto.MarketSideAsk},
+		bid: tob{Side: packet.MarketSideBid},
+		ask: tob{Side: packet.MarketSideAsk},
 	}
 	return l
 }
@@ -79,9 +80,9 @@ func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) 
 		return
 	}
 	switch operation.GetSide() {
-	case itto.MarketSideBid:
+	case packet.MarketSideBid:
 		l.bid.Check = true
-	case itto.MarketSideAsk:
+	case packet.MarketSideAsk:
 		l.ask.Check = true
 	default:
 		log.Fatalln("wrong operation side")
@@ -118,7 +119,7 @@ const (
 	TobUpdateNewForce
 )
 
-func (tob *tob) update(book sim.Book, oid itto.OptionId, u TobUpdate) {
+func (tob *tob) update(book sim.Book, oid packet.OptionId, u TobUpdate) {
 	pl := &tob.New
 	if u == TobUpdateOld {
 		pl = &tob.Old

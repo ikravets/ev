@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet"
 	"my/itto/verify/sim"
 )
 
@@ -200,13 +200,10 @@ func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
 	l.TobLogger.MessageArrived(idm)
-	switch m := l.stream.getIttoMessage().(type) {
-	case *itto.IttoMessageOptionsTrade:
-		l.lastOptionId = m.OId
-		l.genUpdateTrades(m.Price, m.Size)
-	case *itto.IttoMessageOptionsCrossTrade:
-		l.lastOptionId = m.OId
-		l.genUpdateTrades(m.Price, m.Size)
+	if m, ok := l.stream.getExchangeMessage().(packet.TradeMessage); ok {
+		oid, price, size := m.TradeInfo()
+		l.lastOptionId = oid
+		l.genUpdateTrades(price, size)
 	}
 }
 
@@ -226,7 +223,7 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
 	return efhm_header{
 		Type:           messageType,
-		SecurityId:     uint32(l.lastOptionId),
+		SecurityId:     l.lastOptionId.ToUint32(),
 		SequenceNumber: uint32(l.stream.getSeqNum()), // FIXME MoldUDP64 seqNum is 64 bit
 		TimeStamp:      l.stream.getTimestamp(),
 	}
@@ -242,9 +239,9 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 		OrderType:   1,
 	}
 	switch tob.Side {
-	case itto.MarketSideBid:
+	case packet.MarketSideBid:
 		m.OrderSide = EFH_ORDER_BID
-	case itto.MarketSideAsk:
+	case packet.MarketSideAsk:
 		m.OrderSide = EFH_ORDER_ASK
 	}
 	l.printer.PrintOrder(m)
@@ -259,10 +256,10 @@ func (l *EfhLogger) genUpdateQuotes() {
 	}
 	l.printer.PrintQuote(m)
 }
-func (l *EfhLogger) genUpdateTrades(price, size int) {
+func (l *EfhLogger) genUpdateTrades(price packet.Price, size int) {
 	m := efhm_trade{
 		efhm_header: l.genUpdateHeader(EFHM_TRADE),
-		Price:       uint32(price),
+		Price:       uint32(packet.PriceTo4Dec(price)),
 		Size:        uint32(size),
 	}
 	l.printer.PrintTrade(m)

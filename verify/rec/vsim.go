@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 
+	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
@@ -45,39 +46,39 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 		s.printf("NORM %s %c ", name, typ)
 		s.printfln(f, vs...)
 	}
-	sideChar := func(s itto.MarketSide) byte {
-		if s == itto.MarketSideAsk {
+	sideChar := func(s packet.MarketSide) byte {
+		if s == packet.MarketSideAsk {
 			return 'S'
 		}
 		return byte(s)
 	}
 	switch im := idm.Pam.Layer().(type) {
 	case *itto.IttoMessageAddOrder:
-		out("ORDER", im.Type, "%c %08x %08x %08x %08x", sideChar(im.Side), im.OId, im.RefNumD.Delta(), im.Size, im.Price)
+		out("ORDER", im.Type, "%c %08x %08x %08x %08x", sideChar(im.Side), im.OId, im.RefNumD.ToUint32(), im.Size, im.Price)
 	case *itto.IttoMessageAddQuote:
-		out("QBID", im.Type, "%08x %08x %08x %08x", im.OId, im.Bid.RefNumD.Delta(), im.Bid.Size, im.Bid.Price)
-		out("QASK", im.Type, "%08x %08x %08x %08x", im.OId, im.Ask.RefNumD.Delta(), im.Ask.Size, im.Ask.Price)
+		out("QBID", im.Type, "%08x %08x %08x %08x", im.OId, im.Bid.RefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
+		out("QASK", im.Type, "%08x %08x %08x %08x", im.OId, im.Ask.RefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
 	case *itto.IttoMessageSingleSideExecuted:
-		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.Delta(), im.Size)
+		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *itto.IttoMessageSingleSideExecutedWithPrice:
-		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.Delta(), im.Size)
+		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *itto.IttoMessageOrderCancel:
-		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.Delta(), im.Size)
+		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *itto.IttoMessageSingleSideReplace:
-		out("ORDER", im.Type, "%08x %08x %08x %08x", im.RefNumD.Delta(), im.OrigRefNumD.Delta(), im.Size, im.Price)
+		out("ORDER", im.Type, "%08x %08x %08x %08x", im.RefNumD.ToUint32(), im.OrigRefNumD.ToUint32(), im.Size, im.Price)
 	case *itto.IttoMessageSingleSideDelete:
-		out("ORDER", im.Type, "%08x", im.OrigRefNumD.Delta())
+		out("ORDER", im.Type, "%08x", im.OrigRefNumD.ToUint32())
 	case *itto.IttoMessageSingleSideUpdate:
-		out("ORDER", im.Type, "%08x %08x %08x", im.RefNumD.Delta(), im.Size, im.Price)
+		out("ORDER", im.Type, "%08x %08x %08x", im.RefNumD.ToUint32(), im.Size, im.Price)
 	case *itto.IttoMessageQuoteReplace:
-		out("QBID", im.Type, "%08x %08x %08x %08x", im.Bid.RefNumD.Delta(), im.Bid.OrigRefNumD.Delta(), im.Bid.Size, im.Bid.Price)
-		out("QASK", im.Type, "%08x %08x %08x %08x", im.Ask.RefNumD.Delta(), im.Ask.OrigRefNumD.Delta(), im.Ask.Size, im.Ask.Price)
+		out("QBID", im.Type, "%08x %08x %08x %08x", im.Bid.RefNumD.ToUint32(), im.Bid.OrigRefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
+		out("QASK", im.Type, "%08x %08x %08x %08x", im.Ask.RefNumD.ToUint32(), im.Ask.OrigRefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
 	case *itto.IttoMessageQuoteDelete:
-		out("QBID", im.Type, "%08x", im.BidOrigRefNumD.Delta())
-		out("QASK", im.Type, "%08x", im.AskOrigRefNumD.Delta())
+		out("QBID", im.Type, "%08x", im.BidOrigRefNumD.ToUint32())
+		out("QASK", im.Type, "%08x", im.AskOrigRefNumD.ToUint32())
 	case *itto.IttoMessageBlockSingleSideDelete:
 		for _, r := range im.RefNumDs {
-			out("ORDER", im.Type, "%08x", r.Delta())
+			out("ORDER", im.Type, "%08x", r.ToUint32())
 		}
 	}
 	s.efhLogger.MessageArrived(idm)
@@ -85,26 +86,26 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 	type ordrespLogInfo struct {
 		notFound, addOp, refNum uint32
-		optionId                itto.OptionId
+		optionId                packet.OptionId
 		side, price, size       int
 		ordlSuffix              string
 	}
 	type orduLogInfo struct {
 		refNum            uint32
-		optionId          itto.OptionId
+		optionId          packet.OptionId
 		side, price, size int
 	}
 
 	var or ordrespLogInfo
 	var ou orduLogInfo
 	if op, ok := operation.(*sim.OperationAdd); ok {
-		var oid itto.OptionId
+		var oid packet.OptionId
 		if op.Independent() {
 			oid = op.GetOptionId()
 		}
 		or = ordrespLogInfo{
 			addOp:      1,
-			refNum:     op.RefNumD.Delta(),
+			refNum:     op.OrderId.ToUint32(),
 			optionId:   oid,
 			ordlSuffix: fmt.Sprintf(" %08x", oid),
 		}
@@ -114,7 +115,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 			price:    op.GetPrice(),
 			size:     op.GetNewSize(),
 		}
-		if op.GetSide() == itto.MarketSideAsk {
+		if op.GetSide() == packet.MarketSideAsk {
 			ou.side = 1
 		}
 	} else {
@@ -126,7 +127,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 				price:    operation.GetPrice(),
 				size:     operation.GetNewSize() - operation.GetSizeDelta(),
 			}
-			if operation.GetSide() == itto.MarketSideAsk {
+			if operation.GetSide() == packet.MarketSideAsk {
 				or.side = 1
 			}
 			if operation.GetNewSize() != 0 {
@@ -138,7 +139,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 				}
 			}
 		}
-		or.refNum = operation.GetOrigRef().Delta()
+		or.refNum = operation.GetOrigOrderId().ToUint32()
 		ou.refNum = or.refNum
 	}
 	s.printfln("ORDL %d %08x%s", or.addOp, or.refNum, or.ordlSuffix)
@@ -155,7 +156,7 @@ func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if operation.GetOptionId().Valid() {
 		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
 		empty := sim.PriceLevel{}
-		if operation.GetSide() == itto.MarketSideAsk {
+		if operation.GetSide() == packet.MarketSideAsk {
 			empty.Price = -1
 		}
 		for i := 0; i < SimLoggerSupernodeLevels; i++ {
