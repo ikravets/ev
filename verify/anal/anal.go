@@ -25,13 +25,13 @@ type orderHashStat struct {
 }
 type Analyzer struct {
 	observer      observer
-	bookStats     map[uint64]*bookStat
+	bookStats     map[OptionSide]*bookStat
 	orderHashStat []orderHashStat
 }
 
 func NewAnalyzer() *Analyzer {
 	a := &Analyzer{
-		bookStats: make(map[uint64]*bookStat),
+		bookStats: make(map[OptionSide]*bookStat),
 	}
 	a.observer.analyzer = a
 	return a
@@ -97,9 +97,10 @@ func (a *Analyzer) AddOrderHashFunction(f HashFunc) {
 
 func (a *Analyzer) book(oid packet.OptionId, side packet.MarketSide) (bs *bookStat) {
 	errs.Check(side == packet.MarketSideBid || side == packet.MarketSideAsk)
-	b, err := side.ToByte()
-	errs.CheckE(err)
-	key := uint64(oid.ToUint32()) | uint64(b)<<32
+	key := OptionSide{
+		Oid:  oid,
+		Side: side,
+	}
 	var ok bool
 	if bs, ok = a.bookStats[key]; !ok {
 		bs = &bookStat{}
@@ -127,8 +128,8 @@ func (a *Analyzer) BookSizeHist() BSHist {
 		v.OptionNumber++
 		if len(v.Sample) < 10 {
 			v.Sample = append(v.Sample, OptionSide{
-				Oid:  packet.OptionIdFromUint32(uint32(k)),
-				Side: packet.MarketSideFromByte(byte(k >> 32)),
+				Oid:  k.Oid,
+				Side: k.Side,
 			})
 		}
 		if v.OptionNumber == 1 {
