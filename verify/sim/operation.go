@@ -6,14 +6,14 @@ package sim
 import (
 	"log"
 
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet"
 )
 
 type SimOperation interface {
 	GetMessage() *SimMessage
-	GetOptionId() itto.OptionId
-	GetOrigRef() itto.RefNumDelta
-	GetSide() itto.MarketSide
+	GetOptionId() packet.OptionId
+	GetOrigOrderId() packet.OrderId
+	GetSide() packet.MarketSide
 	GetSizeDelta() int
 	GetNewSize() int
 	GetPrice() int
@@ -23,7 +23,7 @@ type SimOperation interface {
 type Operation struct {
 	m           *SimMessage
 	sim         Sim
-	origRefNumD itto.RefNumDelta
+	origOrderId packet.OrderId
 	origOrder   *order
 	sibling     SimOperation
 }
@@ -31,8 +31,8 @@ type Operation struct {
 func (op *Operation) GetMessage() *SimMessage {
 	return op.m
 }
-func (op *Operation) GetOrigRef() itto.RefNumDelta {
-	return op.origRefNumD
+func (op *Operation) GetOrigOrderId() packet.OrderId {
+	return op.origOrderId
 }
 func (op *Operation) populate() {
 	if op.origOrder != nil {
@@ -41,24 +41,24 @@ func (op *Operation) populate() {
 	if op.sibling != nil {
 		op.sibling.getOperation().populate()
 		op.origOrder = op.sibling.getOperation().origOrder
-	} else if op.origRefNumD != (itto.RefNumDelta{}) {
-		if ord, err := op.sim.OrderDb().findOrder(op.m.Pam.Flow(), op.origRefNumD); err == nil {
+	} else if op.origOrderId != packet.OrderIdUnknown {
+		if ord, err := op.sim.OrderDb().findOrder(op.m.Pam.Flow(), op.origOrderId); err == nil {
 			op.origOrder = &ord
 		}
 	}
 }
 func (op *Operation) origOrderIndex() orderIndex {
-	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.origRefNumD)
+	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.origOrderId)
 }
-func (o *Operation) getOptionId() (oid itto.OptionId) {
+func (o *Operation) getOptionId() (oid packet.OptionId) {
 	o.populate()
 	if o.origOrder != nil {
-		return o.origOrder.OId
+		return o.origOrder.OptionId
 	} else {
-		return itto.OptionId(0)
+		return packet.OptionIdUnknown
 	}
 }
-func (o *Operation) getSide() (side itto.MarketSide) {
+func (o *Operation) getSide() (side packet.MarketSide) {
 	o.populate()
 	if o.origOrder != nil {
 		side = o.origOrder.Side
@@ -68,32 +68,31 @@ func (o *Operation) getSide() (side itto.MarketSide) {
 
 type OperationAdd struct {
 	Operation
-	optionId itto.OptionId
-	itto.OrderSide
+	order
 }
 
 func (o *OperationAdd) getOperation() *Operation {
 	return &o.Operation
 }
 func (o *OperationAdd) Independent() bool {
-	return o.optionId.Valid()
+	return o.OptionId.Valid()
 }
-func (o *OperationAdd) GetOptionId() itto.OptionId {
-	if o.optionId.Valid() {
-		return o.optionId
+func (o *OperationAdd) GetOptionId() packet.OptionId {
+	if o.OptionId.Valid() {
+		return o.OptionId
 	} else {
 		return o.Operation.getOptionId()
 	}
 }
-func (o *OperationAdd) GetSide() (side itto.MarketSide) {
-	if o.Side != itto.MarketSideUnknown {
+func (o *OperationAdd) GetSide() (side packet.MarketSide) {
+	if o.Side != packet.MarketSideUnknown {
 		return o.Side
 	} else {
 		return o.Operation.getSide()
 	}
 }
 func (o *OperationAdd) GetPrice() int {
-	return o.Price
+	return packet.PriceTo4Dec(o.Price)
 }
 func (o *OperationAdd) GetSizeDelta() int {
 	return o.Size
@@ -102,7 +101,7 @@ func (o *OperationAdd) GetNewSize() int {
 	return o.Size
 }
 func (op *OperationAdd) orderIndex() orderIndex {
-	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.RefNumD)
+	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.OrderId)
 }
 
 type OperationRemove struct {
@@ -112,10 +111,10 @@ type OperationRemove struct {
 func (o *OperationRemove) getOperation() *Operation {
 	return &o.Operation
 }
-func (o *OperationRemove) GetOptionId() itto.OptionId {
+func (o *OperationRemove) GetOptionId() packet.OptionId {
 	return o.Operation.getOptionId()
 }
-func (o *OperationRemove) GetSide() (side itto.MarketSide) {
+func (o *OperationRemove) GetSide() (side packet.MarketSide) {
 	return o.Operation.getSide()
 }
 func (o *OperationRemove) GetSizeDelta() int {
@@ -133,7 +132,7 @@ func (o *OperationRemove) GetPrice() int {
 	if o.origOrder == nil {
 		log.Fatal("no origOrder")
 	}
-	return o.origOrder.Price
+	return packet.PriceTo4Dec(o.origOrder.Price)
 }
 
 type OperationUpdate struct {
@@ -144,10 +143,10 @@ type OperationUpdate struct {
 func (o *OperationUpdate) getOperation() *Operation {
 	return &o.Operation
 }
-func (o *OperationUpdate) GetOptionId() itto.OptionId {
+func (o *OperationUpdate) GetOptionId() packet.OptionId {
 	return o.Operation.getOptionId()
 }
-func (o *OperationUpdate) GetSide() (side itto.MarketSide) {
+func (o *OperationUpdate) GetSide() (side packet.MarketSide) {
 	return o.Operation.getSide()
 }
 func (o *OperationUpdate) GetSizeDelta() int {
@@ -165,5 +164,5 @@ func (o *OperationUpdate) GetPrice() int {
 	if o.origOrder == nil {
 		log.Fatal("no origOrder")
 	}
-	return o.origOrder.Price
+	return packet.PriceTo4Dec(o.origOrder.Price)
 }

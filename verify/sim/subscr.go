@@ -11,24 +11,24 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet"
 )
 
 type Subscr struct {
-	subscriptions map[itto.OptionId]struct{}
+	subscriptions map[packet.OptionId]struct{}
 	autoSubscribe bool
 }
 
 func NewSubscr() *Subscr {
 	return &Subscr{
-		subscriptions: make(map[itto.OptionId]struct{}),
+		subscriptions: make(map[packet.OptionId]struct{}),
 		autoSubscribe: true,
 	}
 }
 func (s *Subscr) AutoSubscribe(on bool) {
 	s.autoSubscribe = on
 }
-func (s *Subscr) Subscribe(oid itto.OptionId) {
+func (s *Subscr) Subscribe(oid packet.OptionId) {
 	if oid.Valid() {
 		s.subscriptions[oid] = struct{}{}
 	} else {
@@ -47,12 +47,12 @@ func (s *Subscr) SubscribeFromReader(rd io.Reader) (err error) {
 			_, err = fmt.Sscanf(text, "%v", &v)
 			errs.CheckE(err)
 		}
-		s.Subscribe(itto.OptionId(v))
+		s.Subscribe(packet.OptionIdFromUint32(uint32(v)))
 	}
 	errs.CheckE(sc.Err())
 	return
 }
-func (s *Subscr) Subscribed(oid itto.OptionId) bool {
+func (s *Subscr) Subscribed(oid packet.OptionId) bool {
 	if s.autoSubscribe {
 		return true
 	}

@@ -8,23 +8,23 @@ import (
 
 	"github.com/cznic/b"
 
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet"
 )
 
 type Book interface {
 	ApplyOperation(operation SimOperation)
-	GetTop(itto.OptionId, itto.MarketSide, int) []PriceLevel
+	GetTop(packet.OptionId, packet.MarketSide, int) []PriceLevel
 	NumOptions() int
 }
 
 func NewBook() Book {
 	return &book{
-		options: make(map[itto.OptionId]*optionState),
+		options: make(map[packet.OptionId]*optionState),
 	}
 }
 
 type book struct {
-	options map[itto.OptionId]*optionState
+	options map[packet.OptionId]*optionState
 }
 
 func (b *book) ApplyOperation(operation SimOperation) {
@@ -41,7 +41,7 @@ func (b *book) ApplyOperation(operation SimOperation) {
 		os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
 	}
 }
-func (b *book) GetTop(optionId itto.OptionId, side itto.MarketSide, levels int) []PriceLevel {
+func (b *book) GetTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel {
 	os, ok := b.options[optionId]
 	if !ok {
 		return nil
@@ -85,8 +85,8 @@ type optionState struct {
 
 func NewOptionState() *optionState {
 	return &optionState{
-		bid: NewOptionSideState(itto.MarketSideBid),
-		ask: NewOptionSideState(itto.MarketSideAsk),
+		bid: NewOptionSideState(packet.MarketSideBid),
+		ask: NewOptionSideState(packet.MarketSideAsk),
 	}
 }
 
@@ -94,11 +94,11 @@ type optionSideState struct {
 	levels *b.Tree
 }
 
-func (os *optionState) Side(side itto.MarketSide) *optionSideState {
+func (os *optionState) Side(side packet.MarketSide) *optionSideState {
 	switch side {
-	case itto.MarketSideBid:
+	case packet.MarketSideBid:
 		return &os.bid
-	case itto.MarketSideAsk:
+	case packet.MarketSideAsk:
 		return &os.ask
 	default:
 		log.Fatal("wrong side ", side)
@@ -106,7 +106,7 @@ func (os *optionState) Side(side itto.MarketSide) *optionSideState {
 	return nil
 }
 
-func NewOptionSideState(side itto.MarketSide) optionSideState {
+func NewOptionSideState(side packet.MarketSide) optionSideState {
 	ComparePrice := func(lhs, rhs interface{}) int {
 		l, r := lhs.(int), rhs.(int)
 		return l - r
@@ -118,9 +118,9 @@ func NewOptionSideState(side itto.MarketSide) optionSideState {
 
 	var cmp b.Cmp
 	switch side {
-	case itto.MarketSideBid:
+	case packet.MarketSideBid:
 		cmp = ComparePriceRev
-	case itto.MarketSideAsk:
+	case packet.MarketSideAsk:
 		cmp = ComparePrice
 	default:
 		log.Fatal("unexpected market side ", side)

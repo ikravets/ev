@@ -9,13 +9,13 @@ import (
 
 	"code.google.com/p/gopacket"
 
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet"
 )
 
 type OrderDb interface {
 	Stats() OrderDbStats
 	ApplyOperation(operation SimOperation)
-	findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order order, err error) // TODO refactor
+	findOrder(flow gopacket.Flow, orderId packet.OrderId) (order order, err error) // TODO refactor
 }
 type OrderDbStats struct {
 	Orders     int
@@ -40,20 +40,23 @@ func NewOrderDb(sim Sim) OrderDb {
 
 type orderIndex uint64
 
-func newOrderIndex(sim Sim, flow gopacket.Flow, refNumD itto.RefNumDelta) orderIndex {
+func newOrderIndex(sim Sim, flow gopacket.Flow, orderId packet.OrderId) orderIndex {
 	s := sim.Session(flow)
-	return orderIndex(uint64(s.index)<<32 + uint64(refNumD.Delta()))
+	return orderIndex(uint64(s.index)<<32 + uint64(orderId.ToUint32()))
 }
 
 type order struct {
-	OId itto.OptionId
-	itto.OrderSide
+	OptionId packet.OptionId
+	OrderId  packet.OrderId
+	Side     packet.MarketSide
+	Price    packet.Price
+	Size     int
 }
 
 var orderNotFoundError = errors.New("order not found")
 
-func (d *orderDb) findOrder(flow gopacket.Flow, refNumD itto.RefNumDelta) (order order, err error) {
-	order, ok := d.orders[newOrderIndex(d.sim, flow, refNumD)]
+func (d *orderDb) findOrder(flow gopacket.Flow, orderId packet.OrderId) (order order, err error) {
+	order, ok := d.orders[newOrderIndex(d.sim, flow, orderId)]
 	if !ok {
 		err = orderNotFoundError
 	}
@@ -69,15 +72,15 @@ func (d *orderDb) ApplyOperation(operation SimOperation) {
 	switch op := operation.(type) {
 	case *OperationAdd:
 		// intentionally allow adding zero price/size orders
-		o := order{OId: op.optionId, OrderSide: op.OrderSide}
+		o := op.order
 		if op.origOrder != nil {
-			if op.optionId.Valid() {
+			if op.OptionId.Valid() {
 				log.Fatalf("bad option id for add operation %#v origOrder=%#v\n", op, *op.origOrder)
 			}
-			if op.Side != itto.MarketSideUnknown && op.Side != op.origOrder.Side {
+			if op.Side != packet.MarketSideUnknown && op.Side != op.origOrder.Side {
 				log.Fatalf("bad side for add operation %#v origOrder=%#v\n", op, *op.origOrder)
 			}
-			o.OId = op.origOrder.OId
+			o.OptionId = op.origOrder.OptionId
 			o.Side = op.origOrder.Side
 		}
 		d.orders[op.orderIndex()] = o

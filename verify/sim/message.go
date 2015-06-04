@@ -28,7 +28,7 @@ func (m *SimMessage) IgnoredBySubscriber() bool {
 	if m.sim.Subscr() == nil {
 		return false
 	}
-	var oid itto.OptionId
+	var oid packet.OptionId
 	switch im := m.Pam.Layer().(type) {
 	case *itto.IttoMessageAddOrder:
 		oid = im.OId
@@ -44,37 +44,37 @@ func (m *SimMessage) IgnoredBySubscriber() bool {
 
 func (m *SimMessage) MessageOperations() []SimOperation {
 	var ops []SimOperation
-	addOperation := func(origRefNumD itto.RefNumDelta, operation SimOperation) {
+	addOperation := func(origOrderId packet.OrderId, operation SimOperation) {
 		opop := operation.getOperation()
 		opop.m = m
 		opop.sim = m.sim
-		opop.origRefNumD = origRefNumD
+		opop.origOrderId = origOrderId
 		ops = append(ops, operation)
 	}
-	addOperationReplace := func(origRefNumD itto.RefNumDelta, orderSide itto.OrderSide) {
+	addOperationReplace := func(origOrderId packet.OrderId, orderSide itto.OrderSide) {
 		opRemove := &OperationRemove{}
 		opAdd := &OperationAdd{
 			// unknown: optionId; maybe unknown: OrderSide.Side
-			OrderSide: orderSide,
+			order:     orderFromItto(packet.OptionIdUnknown, orderSide),
 			Operation: Operation{sibling: opRemove},
 		}
-		addOperation(origRefNumD, opRemove)
-		addOperation(itto.RefNumDelta{}, opAdd)
+		addOperation(origOrderId, opRemove)
+		addOperation(packet.OrderIdUnknown, opAdd)
 	}
 	switch im := m.Pam.Layer().(type) {
 	case *itto.IttoMessageAddOrder:
-		var oid itto.OptionId
+		var oid packet.OptionId
 		if !m.IgnoredBySubscriber() {
 			oid = im.OId
 		}
-		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: oid, OrderSide: im.OrderSide})
+		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.OrderSide)})
 	case *itto.IttoMessageAddQuote:
-		var oid itto.OptionId
+		var oid packet.OptionId
 		if !m.IgnoredBySubscriber() {
 			oid = im.OId
 		}
-		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: oid, OrderSide: im.Bid})
-		addOperation(itto.RefNumDelta{}, &OperationAdd{optionId: oid, OrderSide: im.Ask})
+		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Bid)})
+		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Ask)})
 	case *itto.IttoMessageSingleSideExecuted:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
 	case *itto.IttoMessageSingleSideExecutedWithPrice:
@@ -99,4 +99,14 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 		}
 	}
 	return ops
+}
+
+func orderFromItto(oid packet.OptionId, os itto.OrderSide) order {
+	return order{
+		OptionId: oid,
+		OrderId:  os.RefNumD,
+		Side:     os.Side,
+		Price:    os.Price,
+		Size:     os.Size,
+	}
 }
