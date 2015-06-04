@@ -38,11 +38,14 @@ func NewOrderDb(sim Sim) OrderDb {
 	}
 }
 
-type orderIndex uint64
+type orderIndex struct {
+	orderId      packet.OrderId
+	sessionIndex int
+}
 
 func newOrderIndex(sim Sim, flow gopacket.Flow, orderId packet.OrderId) orderIndex {
 	s := sim.Session(flow)
-	return orderIndex(uint64(s.index)<<32 + uint64(orderId.ToUint32()))
+	return orderIndex{orderId: orderId, sessionIndex: s.index}
 }
 
 type order struct {
