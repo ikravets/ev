@@ -8,7 +8,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet"
 	"my/itto/verify/sim"
 )
 
@@ -51,10 +51,10 @@ func (o *observer) OperationAppliedToOrders(op sim.SimOperation) {
 	var delta int
 	switch o := op.(type) {
 	case *sim.OperationAdd:
-		key = uint64(sess)<<32 | uint64(o.RefNumD.Delta())
+		key = uint64(sess)<<32 | uint64(o.OrderId.ToUint32())
 		delta = 1
 	case *sim.OperationRemove:
-		key = uint64(sess)<<32 | uint64(o.GetOrigRef().Delta())
+		key = uint64(sess)<<32 | uint64(o.GetOrigOrderId().ToUint32())
 		delta = -1
 	}
 	for _, ohs := range o.analyzer.orderHashStat {
@@ -95,9 +95,11 @@ func (a *Analyzer) AddOrderHashFunction(f HashFunc) {
 	a.orderHashStat = append(a.orderHashStat, ohs)
 }
 
-func (a *Analyzer) book(oid itto.OptionId, side itto.MarketSide) (bs *bookStat) {
-	errs.Check(side == itto.MarketSideBid || side == itto.MarketSideAsk)
-	key := uint64(oid) | uint64(side)<<32
+func (a *Analyzer) book(oid packet.OptionId, side packet.MarketSide) (bs *bookStat) {
+	errs.Check(side == packet.MarketSideBid || side == packet.MarketSideAsk)
+	b, err := side.ToByte()
+	errs.CheckE(err)
+	key := uint64(oid.ToUint32()) | uint64(b)<<32
 	var ok bool
 	if bs, ok = a.bookStats[key]; !ok {
 		bs = &bookStat{}
@@ -107,8 +109,8 @@ func (a *Analyzer) book(oid itto.OptionId, side itto.MarketSide) (bs *bookStat) 
 }
 
 type OptionSide struct {
-	Oid  itto.OptionId
-	Side itto.MarketSide
+	Oid  packet.OptionId
+	Side packet.MarketSide
 }
 type BSVal struct {
 	Levels       int
@@ -125,8 +127,8 @@ func (a *Analyzer) BookSizeHist() BSHist {
 		v.OptionNumber++
 		if len(v.Sample) < 10 {
 			v.Sample = append(v.Sample, OptionSide{
-				Oid:  itto.OptionId(k),
-				Side: itto.MarketSide(k >> 32),
+				Oid:  packet.OptionIdFromUint32(uint32(k)),
+				Side: packet.MarketSideFromByte(byte(k >> 32)),
 			})
 		}
 		if v.OptionNumber == 1 {

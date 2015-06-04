@@ -13,7 +13,6 @@ import (
 	"code.google.com/p/gopacket/pcapgo"
 
 	"my/itto/verify/packet"
-	"my/itto/verify/packet/itto"
 	"my/itto/verify/packet/processor"
 	"my/itto/verify/sim"
 )
@@ -22,9 +21,9 @@ type Splitter struct {
 	inputFileName    string
 	inputPacketLimit int
 	simu             sim.Sim
-	packetOids       []itto.OptionId
-	allPacketOids    [][]itto.OptionId
-	oidFilter        map[itto.OptionId]struct{}
+	packetOids       []packet.OptionId
+	allPacketOids    [][]packet.OptionId
+	oidFilter        map[packet.OptionId]struct{}
 	stats            SplitterStats
 }
 
@@ -60,7 +59,7 @@ type SplitByOptionsConfig struct {
 	AppendOnly    bool
 }
 
-func (s *Splitter) SplitByOptions(confs map[itto.OptionId]SplitByOptionsConfig) error {
+func (s *Splitter) SplitByOptions(confs map[packet.OptionId]SplitByOptionsConfig) error {
 	inHandle, err := pcap.OpenOffline(s.inputFileName)
 	if err != nil {
 		return err
@@ -72,7 +71,7 @@ func (s *Splitter) SplitByOptions(confs map[itto.OptionId]SplitByOptionsConfig) 
 		w             *pcapgo.Writer
 		lastPacketNum *int
 	}
-	states := make(map[itto.OptionId]*state)
+	states := make(map[packet.OptionId]*state)
 
 	for oid, conf := range confs {
 		state := state{
@@ -108,18 +107,18 @@ func (s *Splitter) SplitByOptions(confs map[itto.OptionId]SplitByOptionsConfig) 
 	return nil
 }
 
-func (s *Splitter) SplitByOption(oid itto.OptionId, fileName string) error {
+func (s *Splitter) SplitByOption(oid packet.OptionId, fileName string) error {
 	outFile, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
 	defer outFile.Close()
-	confs := make(map[itto.OptionId]SplitByOptionsConfig)
+	confs := make(map[packet.OptionId]SplitByOptionsConfig)
 	confs[oid] = SplitByOptionsConfig{Writer: outFile}
 	return s.SplitByOptions(confs)
 }
 
-func (s *Splitter) HandlePacket(packet packet.Packet) {
+func (s *Splitter) HandlePacket(_ packet.Packet) {
 	s.stats.Packets++
 	if s.stats.Packets%10000 == 0 {
 		log.Printf("stats: %#v %#v\n", s.stats, s.simu.OrderDb().Stats())
@@ -127,7 +126,7 @@ func (s *Splitter) HandlePacket(packet packet.Packet) {
 	// process *previous* packet info
 
 	// uniquefy packet oids
-	oidSet := make(map[itto.OptionId]struct{})
+	oidSet := make(map[packet.OptionId]struct{})
 	uniq := 0
 	for _, oid := range s.packetOids {
 		if _, ok := oidSet[oid]; !ok {
@@ -136,7 +135,7 @@ func (s *Splitter) HandlePacket(packet packet.Packet) {
 			uniq++
 		}
 	}
-	uniqOids := make([]itto.OptionId, uniq)
+	uniqOids := make([]packet.OptionId, uniq)
 	copy(uniqOids, s.packetOids)
 
 	s.allPacketOids = append(s.allPacketOids, uniqOids)
@@ -164,18 +163,18 @@ func (s *Splitter) HandleMessage(message packet.ApplicationMessage) {
 	}
 }
 
-func (s *Splitter) Filter(oids []itto.OptionId) {
+func (s *Splitter) Filter(oids []packet.OptionId) {
 	for _, oid := range oids {
 		s.FilterAdd(oid)
 	}
 }
-func (s *Splitter) FilterAdd(oid itto.OptionId) {
+func (s *Splitter) FilterAdd(oid packet.OptionId) {
 	if s.oidFilter == nil {
-		s.oidFilter = make(map[itto.OptionId]struct{})
+		s.oidFilter = make(map[packet.OptionId]struct{})
 	}
 	s.oidFilter[oid] = struct{}{}
 }
-func (s *Splitter) acceptOid(oid itto.OptionId) bool {
+func (s *Splitter) acceptOid(oid packet.OptionId) bool {
 	if s.oidFilter == nil {
 		return true
 	}
@@ -183,11 +182,11 @@ func (s *Splitter) acceptOid(oid itto.OptionId) bool {
 	return ok
 }
 
-func (s *Splitter) AllPacketOids() [][]itto.OptionId {
+func (s *Splitter) AllPacketOids() [][]packet.OptionId {
 	return s.allPacketOids
 }
 
-func (s *Splitter) PacketByOption(oid itto.OptionId) []int {
+func (s *Splitter) PacketByOption(oid packet.OptionId) []int {
 	var pnums []int
 	for i, poids := range s.allPacketOids {
 		for _, poid := range poids {
@@ -199,8 +198,8 @@ func (s *Splitter) PacketByOption(oid itto.OptionId) []int {
 	return pnums
 }
 
-func (s *Splitter) PacketByOptionAll() map[itto.OptionId][]int {
-	m := make(map[itto.OptionId][]int)
+func (s *Splitter) PacketByOptionAll() map[packet.OptionId][]int {
+	m := make(map[packet.OptionId][]int)
 	for i, poids := range s.allPacketOids {
 		for _, poid := range poids {
 			m[poid] = append(m[poid], i)
