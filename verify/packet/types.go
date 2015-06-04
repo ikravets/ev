@@ -115,3 +115,13 @@ func PriceTo2Dec(price Price) int {
 func PriceTo4Dec(price Price) int {
 	return int(price)
 }
+
+type SecondsMessage interface {
+	Seconds() int
+}
+type ExchangeMessage interface {
+	Nanoseconds() int
+}
+type TradeMessage interface {
+	TradeInfo() (OptionId, Price, int)
+}

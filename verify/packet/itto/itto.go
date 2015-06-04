@@ -201,6 +201,7 @@ func init() {
 
 /************************************************************************/
 type IttoMessage interface {
+	packet.ExchangeMessage
 	gopacket.DecodingLayer
 	//embed gopacket.Layer by "inlining"
 	//workaround for https://github.com/golang/go/issues/6977
@@ -233,6 +234,9 @@ func (m *IttoMessageCommon) LayerType() gopacket.LayerType {
 
 func (m *IttoMessageCommon) Base() *IttoMessageCommon {
 	return m
+}
+func (m *IttoMessageCommon) Nanoseconds() int {
+	return int(m.Timestamp)
 }
 
 func decodeIttoMessage(data []byte) IttoMessageCommon {
@@ -278,6 +282,8 @@ type IttoMessageSeconds struct {
 	Second uint32
 }
 
+var _ packet.SecondsMessage = &IttoMessageSeconds{}
+
 func (m *IttoMessageSeconds) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSeconds{
 		IttoMessageCommon: decodeIttoMessage(data),
@@ -292,6 +298,9 @@ func (m *IttoMessageSeconds) SerializeTo(b gopacket.SerializeBuffer, opts gopack
 	errs.CheckE(err)
 	binary.BigEndian.PutUint32(buf, m.Second)
 	return
+}
+func (m *IttoMessageSeconds) Seconds() int {
+	return int(m.Second)
 }
 
 /************************************************************************/
@@ -693,6 +702,12 @@ func (m *IttoMessageOptionsTrade) DecodeFromBytes(data []byte, df gopacket.Decod
 		Size:              int(binary.BigEndian.Uint32(data[22:26])),
 	}
 	return nil
+}
+
+var _ packet.TradeMessage = &IttoMessageOptionsTrade{}
+
+func (m *IttoMessageOptionsTrade) TradeInfo() (packet.OptionId, packet.Price, int) {
+	return m.OId, m.Price, m.Size
 }
 
 /************************************************************************/
