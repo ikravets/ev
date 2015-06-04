@@ -6,13 +6,14 @@ package itto
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"my/errs"
-	"strconv"
 	"time"
 
 	"code.google.com/p/gopacket"
+
+	"my/errs"
+
+	"my/itto/verify/packet"
 )
 
 var LayerTypeItto = gopacket.RegisterLayerType(10002, gopacket.LayerTypeMetadata{"Itto", gopacket.DecodeFunc(decodeItto)})
@@ -23,95 +24,15 @@ func decodeItto(data []byte, p gopacket.PacketBuilder) error {
 }
 
 /************************************************************************/
-const (
-	PriceScale      = 10000
-	PriceScaleShort = 100
-)
-
-func PriceShortToLong(shortPrice int) int {
-	return shortPrice * PriceScale / PriceScaleShort
-}
-func PriceLongToShort(longPrice int) int {
-	return longPrice * PriceScaleShort / PriceScale
-}
-
-type MarketSide byte
-
-const (
-	MarketSideUnknown MarketSide = 0
-	MarketSideBid     MarketSide = 'B'
-	MarketSideAsk     MarketSide = 'A'
-)
-
-func (ms MarketSide) String() string {
-	switch ms {
-	case MarketSideBid:
-		return "B"
-	case MarketSideAsk:
-		return "A"
-	default:
-		return "?"
-	}
-}
-func (ms MarketSide) ToByte() (byte, error) {
-	switch ms {
-	case MarketSideBid:
-		return 'B', nil
-	case MarketSideAsk:
-		return 'S', nil
-	default:
-		return 0, MarketSideUnknownError
-	}
-}
-
-var MarketSideUnknownError = errors.New("MarketSide unknown")
-
-func MarketSideParse(b byte) MarketSide {
-	switch b {
-	case 'B':
-		return MarketSideBid
-	case 'A', 'S':
-		return MarketSideAsk
-	default:
-		return MarketSideUnknown
-	}
-}
-
-type RefNumDelta struct {
-	delta uint32
-	isNew bool
-}
-
-func NewRefNumDelta(delta uint32) RefNumDelta {
-	return RefNumDelta{delta: delta, isNew: true}
-}
-func OrigRefNumDelta(delta uint32) RefNumDelta {
-	return RefNumDelta{delta: delta}
-}
-func (r RefNumDelta) String() string {
-	return strconv.FormatUint(uint64(r.delta), 10)
-}
-func (r RefNumDelta) Delta() uint32 {
-	return r.delta
-}
-
-type OptionId uint32
-
-func (oid OptionId) Valid() bool {
-	return oid != 0
-}
-func (oid OptionId) Invalid() bool {
-	return oid == 0
-}
 
 type OrderSide struct {
-	Side    MarketSide
-	RefNumD RefNumDelta
-	Price   int
+	Side    packet.MarketSide
+	RefNumD packet.OrderId
+	Price   packet.Price
 	Size    int
 }
 type ReplaceOrderSide struct {
-	OrigRefNumD RefNumDelta
+	OrigRefNumD packet.OrderId
 	OrderSide
 }
 
@@ -412,7 +333,7 @@ func (m *IttoMessageBaseReference) SerializeTo(b gopacket.SerializeBuffer, opts 
 /************************************************************************/
 type IttoMessageOptionDirectory struct {
 	IttoMessageCommon
-	OId              OptionId
+	OId              packet.OptionId
 	Symbol           string
 	Expiration       time.Time
 	StrikePrice      int
@@ -427,7 +348,7 @@ type IttoMessageOptionDirectory struct {
 func (m *IttoMessageOptionDirectory) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOptionDirectory{
 		IttoMessageCommon: decodeIttoMessage(data),
-		OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+		OId:               packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 		Symbol:            string(data[9:15]),
 		Expiration:        time.Date(2000+int(data[15]), time.Month(data[16]), int(data[17]), 0, 0, 0, 0, time.Local),
 		StrikePrice:       int(binary.BigEndian.Uint32(data[18:22])),
@@ -444,14 +365,14 @@ func (m *IttoMessageOptionDirectory) DecodeFromBytes(data []byte, df gopacket.De
 /************************************************************************/
 type IttoMessageOptionTradingAction struct {
 	IttoMessageCommon
-	OId   OptionId
+	OId   packet.OptionId
 	State byte
 }
 
 func (m *IttoMessageOptionTradingAction) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOptionTradingAction{
 		IttoMessageCommon: decodeIttoMessage(data),
-		OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+		OId:               packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 		State:             data[9],
 	}
 	return nil
@@ -460,14 +381,14 @@ func (m *IttoMessageOptionTradingAction) DecodeFromBytes(data []byte, df gopacke
 /************************************************************************/
 type IttoMessageOptionOpen struct {
 	IttoMessageCommon
-	OId       OptionId
+	OId       packet.OptionId
 	OpenState byte
 }
 
 func (m *IttoMessageOptionOpen) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOptionOpen{
 		IttoMessageCommon: decodeIttoMessage(data),
-		OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+		OId:               packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 		OpenState:         data[9],
 	}
 	return nil
@@ -476,7 +397,7 @@ func (m *IttoMessageOptionOpen) DecodeFromBytes(data []byte, df gopacket.DecodeF
 /************************************************************************/
 type IttoMessageAddOrder struct {
 	IttoMessageCommon
-	OId OptionId
+	OId packet.OptionId
 	OrderSide
 }
 
@@ -484,16 +405,16 @@ func (m *IttoMessageAddOrder) DecodeFromBytes(data []byte, df gopacket.DecodeFee
 	*m = IttoMessageAddOrder{
 		IttoMessageCommon: decodeIttoMessage(data),
 		OrderSide: OrderSide{
-			RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-			Side:    MarketSideParse(data[9]),
+			RefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
+			Side:    packet.MarketSideFromByte(data[9]),
 		},
-		OId: OptionId(binary.BigEndian.Uint32(data[10:14])),
+		OId: packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[10:14])),
 	}
 	if m.Type.IsShort() {
-		m.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[14:16])))
+		m.Price = packet.PriceFrom2Dec(int(binary.BigEndian.Uint16(data[14:16])))
 		m.Size = int(binary.BigEndian.Uint16(data[16:18]))
 	} else {
-		m.Price = int(binary.BigEndian.Uint32(data[14:18]))
+		m.Price = packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[14:18])))
 		m.Size = int(binary.BigEndian.Uint32(data[18:22]))
 	}
 	return nil
@@ -503,19 +424,19 @@ func (m *IttoMessageAddOrder) SerializeTo(b gopacket.SerializeBuffer, opts gopac
 	errs.CheckE(m.IttoMessageCommon.SerializeTo(b, opts))
 	buf, err := b.AppendBytes(9)
 	errs.CheckE(err)
-	binary.BigEndian.PutUint32(buf, m.RefNumD.Delta())
+	binary.BigEndian.PutUint32(buf, m.RefNumD.ToUint32())
 	buf[4], err = m.Side.ToByte()
 	errs.CheckE(err)
-	binary.BigEndian.PutUint32(buf[5:9], uint32(m.OId))
+	binary.BigEndian.PutUint32(buf[5:9], m.OId.ToUint32())
 	if m.Type.IsShort() {
 		buf, err := b.AppendBytes(4)
 		errs.CheckE(err)
-		binary.BigEndian.PutUint16(buf, uint16(PriceLongToShort(m.Price)))
+		binary.BigEndian.PutUint16(buf, uint16(packet.PriceTo2Dec(m.Price)))
 		binary.BigEndian.PutUint16(buf[2:], uint16(m.Size))
 	} else {
 		buf, err := b.AppendBytes(8)
 		errs.CheckE(err)
-		binary.BigEndian.PutUint32(buf, uint32(m.Price))
+		binary.BigEndian.PutUint32(buf, uint32(packet.PriceTo4Dec(m.Price)))
 		binary.BigEndian.PutUint32(buf[4:], uint32(m.Size))
 	}
 	return
@@ -524,7 +445,7 @@ func (m *IttoMessageAddOrder) SerializeTo(b gopacket.SerializeBuffer, opts gopac
 /************************************************************************/
 type IttoMessageAddQuote struct {
 	IttoMessageCommon
-	OId OptionId
+	OId packet.OptionId
 	Bid OrderSide
 	Ask OrderSide
 }
@@ -532,19 +453,19 @@ type IttoMessageAddQuote struct {
 func (m *IttoMessageAddQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageAddQuote{
 		IttoMessageCommon: decodeIttoMessage(data),
-		Bid:               OrderSide{Side: MarketSideBid, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[5:9]))},
-		Ask:               OrderSide{Side: MarketSideAsk, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
-		OId:               OptionId(binary.BigEndian.Uint32(data[13:17])),
+		Bid:               OrderSide{Side: packet.MarketSideBid, RefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9]))},
+		Ask:               OrderSide{Side: packet.MarketSideAsk, RefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[9:13]))},
+		OId:               packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[13:17])),
 	}
 	if m.Type.IsShort() {
-		m.Bid.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[17:19])))
+		m.Bid.Price = packet.PriceFrom2Dec(int(binary.BigEndian.Uint16(data[17:19])))
 		m.Bid.Size = int(binary.BigEndian.Uint16(data[19:21]))
-		m.Ask.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[21:23])))
+		m.Ask.Price = packet.PriceFrom2Dec(int(binary.BigEndian.Uint16(data[21:23])))
 		m.Ask.Size = int(binary.BigEndian.Uint16(data[23:25]))
 	} else {
-		m.Bid.Price = int(binary.BigEndian.Uint32(data[17:21]))
+		m.Bid.Price = packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[17:21])))
 		m.Bid.Size = int(binary.BigEndian.Uint32(data[21:25]))
-		m.Ask.Price = int(binary.BigEndian.Uint32(data[25:29]))
+		m.Ask.Price = packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[25:29])))
 		m.Ask.Size = int(binary.BigEndian.Uint32(data[29:33]))
 	}
 	return nil
@@ -553,7 +474,7 @@ func (m *IttoMessageAddQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFee
 /************************************************************************/
 type IttoMessageSingleSideExecuted struct {
 	IttoMessageCommon
-	OrigRefNumD RefNumDelta
+	OrigRefNumD packet.OrderId
 	Size        int
 	Cross       uint32
 	Match       uint32
@@ -562,7 +483,7 @@ type IttoMessageSingleSideExecuted struct {
 func (m *IttoMessageSingleSideExecuted) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideExecuted{
 		IttoMessageCommon: decodeIttoMessage(data),
-		OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+		OrigRefNumD:       packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 		Size:              int(binary.BigEndian.Uint32(data[9:13])),
 		Cross:             binary.BigEndian.Uint32(data[13:17]),
 		Match:             binary.BigEndian.Uint32(data[17:21]),
@@ -574,20 +495,20 @@ func (m *IttoMessageSingleSideExecuted) DecodeFromBytes(data []byte, df gopacket
 type IttoMessageSingleSideExecutedWithPrice struct {
 	IttoMessageSingleSideExecuted
 	Printable byte
-	Price     int
+	Price     packet.Price
 }
 
 func (m *IttoMessageSingleSideExecutedWithPrice) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideExecutedWithPrice{
 		IttoMessageSingleSideExecuted: IttoMessageSingleSideExecuted{
 			IttoMessageCommon: decodeIttoMessage(data),
-			OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+			OrigRefNumD:       packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 			Cross:             binary.BigEndian.Uint32(data[9:13]),
 			Match:             binary.BigEndian.Uint32(data[13:17]),
 			Size:              int(binary.BigEndian.Uint32(data[22:26])),
 		},
 		Printable: data[17],
-		Price:     int(binary.BigEndian.Uint32(data[18:22])),
+		Price:     packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[18:22]))),
 	}
 	return nil
 }
@@ -595,14 +516,14 @@ func (m *IttoMessageSingleSideExecutedWithPrice) DecodeFromBytes(data []byte, df
 /************************************************************************/
 type IttoMessageOrderCancel struct {
 	IttoMessageCommon
-	OrigRefNumD RefNumDelta
+	OrigRefNumD packet.OrderId
 	Size        int
 }
 
 func (m *IttoMessageOrderCancel) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOrderCancel{
 		IttoMessageCommon: decodeIttoMessage(data),
-		OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+		OrigRefNumD:       packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 		Size:              int(binary.BigEndian.Uint32(data[9:13])),
 	}
 	return nil
@@ -618,15 +539,15 @@ func (m *IttoMessageSingleSideReplace) DecodeFromBytes(data []byte, df gopacket.
 	*m = IttoMessageSingleSideReplace{
 		IttoMessageCommon: decodeIttoMessage(data),
 		ReplaceOrderSide: ReplaceOrderSide{
-			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-			OrderSide:   OrderSide{RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
+			OrigRefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
+			OrderSide:   OrderSide{RefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[9:13]))},
 		},
 	}
 	if m.Type.IsShort() {
-		m.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[13:15])))
+		m.Price = packet.PriceFrom2Dec(int(binary.BigEndian.Uint16(data[13:15])))
 		m.Size = int(binary.BigEndian.Uint16(data[15:17]))
 	} else {
-		m.Price = int(binary.BigEndian.Uint32(data[13:17]))
+		m.Price = packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[13:17])))
 		m.Size = int(binary.BigEndian.Uint32(data[17:21]))
 	}
 	return nil
@@ -635,13 +556,13 @@ func (m *IttoMessageSingleSideReplace) DecodeFromBytes(data []byte, df gopacket.
 /************************************************************************/
 type IttoMessageSingleSideDelete struct {
 	IttoMessageCommon
-	OrigRefNumD RefNumDelta
+	OrigRefNumD packet.OrderId
 }
 
 func (m *IttoMessageSingleSideDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageSingleSideDelete{
 		IttoMessageCommon: decodeIttoMessage(data),
-		OrigRefNumD:       OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
+		OrigRefNumD:       packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 	}
 	return nil
 }
@@ -657,8 +578,8 @@ func (m *IttoMessageSingleSideUpdate) DecodeFromBytes(data []byte, df gopacket.D
 	*m = IttoMessageSingleSideUpdate{
 		IttoMessageCommon: decodeIttoMessage(data),
 		OrderSide: OrderSide{
-			RefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-			Price:   int(binary.BigEndian.Uint32(data[10:14])),
+			RefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
+			Price:   packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[10:14]))),
 			Size:    int(binary.BigEndian.Uint32(data[14:18])),
 		},
 		Reason: data[9],
@@ -677,23 +598,23 @@ func (m *IttoMessageQuoteReplace) DecodeFromBytes(data []byte, df gopacket.Decod
 	*m = IttoMessageQuoteReplace{
 		IttoMessageCommon: decodeIttoMessage(data),
 		Bid: ReplaceOrderSide{
-			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-			OrderSide:   OrderSide{Side: MarketSideBid, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[9:13]))},
+			OrigRefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
+			OrderSide:   OrderSide{Side: packet.MarketSideBid, RefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[9:13]))},
 		},
 		Ask: ReplaceOrderSide{
-			OrigRefNumD: OrigRefNumDelta(binary.BigEndian.Uint32(data[13:17])),
-			OrderSide:   OrderSide{Side: MarketSideAsk, RefNumD: NewRefNumDelta(binary.BigEndian.Uint32(data[17:21]))},
+			OrigRefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[13:17])),
+			OrderSide:   OrderSide{Side: packet.MarketSideAsk, RefNumD: packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[17:21]))},
 		},
 	}
 	if m.Type.IsShort() {
-		m.Bid.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[21:23])))
+		m.Bid.Price = packet.PriceFrom2Dec(int(binary.BigEndian.Uint16(data[21:23])))
 		m.Bid.Size = int(binary.BigEndian.Uint16(data[23:25]))
-		m.Ask.Price = PriceShortToLong(int(binary.BigEndian.Uint16(data[25:27])))
+		m.Ask.Price = packet.PriceFrom2Dec(int(binary.BigEndian.Uint16(data[25:27])))
 		m.Ask.Size = int(binary.BigEndian.Uint16(data[27:29]))
 	} else {
-		m.Bid.Price = int(binary.BigEndian.Uint32(data[21:25]))
+		m.Bid.Price = packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[21:25])))
 		m.Bid.Size = int(binary.BigEndian.Uint32(data[25:29]))
-		m.Ask.Price = int(binary.BigEndian.Uint32(data[29:33]))
+		m.Ask.Price = packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[29:33])))
 		m.Ask.Size = int(binary.BigEndian.Uint32(data[33:37]))
 	}
 	return nil
@@ -702,15 +623,15 @@ func (m *IttoMessageQuoteReplace) DecodeFromBytes(data []byte, df gopacket.Decod
 /************************************************************************/
 type IttoMessageQuoteDelete struct {
 	IttoMessageCommon
-	BidOrigRefNumD RefNumDelta
-	AskOrigRefNumD RefNumDelta
+	BidOrigRefNumD packet.OrderId
+	AskOrigRefNumD packet.OrderId
 }
 
 func (m *IttoMessageQuoteDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageQuoteDelete{
 		IttoMessageCommon: decodeIttoMessage(data),
-		BidOrigRefNumD:    OrigRefNumDelta(binary.BigEndian.Uint32(data[5:9])),
-		AskOrigRefNumD:    OrigRefNumDelta(binary.BigEndian.Uint32(data[9:13])),
+		BidOrigRefNumD:    packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
+		AskOrigRefNumD:    packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[9:13])),
 	}
 	return nil
 }
@@ -719,7 +640,7 @@ func (m *IttoMessageQuoteDelete) DecodeFromBytes(data []byte, df gopacket.Decode
 type IttoMessageBlockSingleSideDelete struct {
 	IttoMessageCommon
 	Number   int
-	RefNumDs []RefNumDelta
+	RefNumDs []packet.OrderId
 }
 
 func (m *IttoMessageBlockSingleSideDelete) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
@@ -727,10 +648,10 @@ func (m *IttoMessageBlockSingleSideDelete) DecodeFromBytes(data []byte, df gopac
 		IttoMessageCommon: decodeIttoMessage(data),
 		Number:            int(binary.BigEndian.Uint16(data[5:9])),
 	}
-	m.RefNumDs = make([]RefNumDelta, m.Number)
+	m.RefNumDs = make([]packet.OrderId, m.Number)
 	for i := 0; i < m.Number; i++ {
 		off := 7 + 4*i
-		m.RefNumDs[i] = OrigRefNumDelta(binary.BigEndian.Uint32(data[off : off+4]))
+		m.RefNumDs[i] = packet.OrderIdFromUint32(binary.BigEndian.Uint32(data[off : off+4]))
 	}
 	return nil
 }
@@ -753,22 +674,22 @@ func (m *IttoMessageBlockSingleSideDelete) String() string {
 /************************************************************************/
 type IttoMessageOptionsTrade struct {
 	IttoMessageCommon
-	Side  MarketSide
-	OId   OptionId
+	Side  packet.MarketSide
+	OId   packet.OptionId
 	Cross uint32
 	Match uint32
-	Price int
+	Price packet.Price
 	Size  int
 }
 
 func (m *IttoMessageOptionsTrade) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = IttoMessageOptionsTrade{
 		IttoMessageCommon: decodeIttoMessage(data),
-		Side:              MarketSideParse(data[5]),
-		OId:               OptionId(binary.BigEndian.Uint32(data[6:10])),
+		Side:              packet.MarketSideFromByte(data[5]),
+		OId:               packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[6:10])),
 		Cross:             binary.BigEndian.Uint32(data[10:14]),
 		Match:             binary.BigEndian.Uint32(data[14:18]),
-		Price:             int(binary.BigEndian.Uint32(data[18:22])),
+		Price:             packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[18:22]))),
 		Size:              int(binary.BigEndian.Uint32(data[22:26])),
 	}
 	return nil
@@ -784,10 +705,10 @@ func (m *IttoMessageOptionsCrossTrade) DecodeFromBytes(data []byte, df gopacket.
 	*m = IttoMessageOptionsCrossTrade{
 		IttoMessageOptionsTrade: IttoMessageOptionsTrade{
 			IttoMessageCommon: decodeIttoMessage(data),
-			OId:               OptionId(binary.BigEndian.Uint32(data[5:9])),
+			OId:               packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[5:9])),
 			Cross:             binary.BigEndian.Uint32(data[9:13]),
 			Match:             binary.BigEndian.Uint32(data[13:17]),
-			Price:             int(binary.BigEndian.Uint32(data[18:22])),
+			Price:             packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[18:22]))),
 			Size:              int(binary.BigEndian.Uint32(data[22:26])),
 		},
 		CrossType: data[17],
@@ -817,7 +738,7 @@ type IttoMessageNoii struct {
 	AuctionId   uint32
 	AuctionType byte
 	Size        uint32
-	OId         OptionId
+	OId         packet.OptionId
 	Imbalance   OrderSide
 }
 
@@ -828,11 +749,11 @@ func (m *IttoMessageNoii) DecodeFromBytes(data []byte, df gopacket.DecodeFeedbac
 		AuctionType:       data[9],
 		Size:              binary.BigEndian.Uint32(data[10:14]),
 		Imbalance: OrderSide{
-			Side:  MarketSideParse(data[14]),
-			Price: int(binary.BigEndian.Uint32(data[19:23])),
+			Side:  packet.MarketSideFromByte(data[14]),
+			Price: packet.PriceFrom4Dec(int(binary.BigEndian.Uint32(data[19:23]))),
 			Size:  int(binary.BigEndian.Uint32(data[23:27])),
 		},
-		OId: OptionId(binary.BigEndian.Uint32(data[15:19])),
+		OId: packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[15:19])),
 	}
 	return nil
 }

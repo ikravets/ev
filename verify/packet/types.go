@@ -70,6 +70,31 @@ func (oid OptionId) Invalid() bool {
 func (oid OptionId) String() string {
 	return fmt.Sprintf("%#x", oid.raw)
 }
+func (oid OptionId) ToUint32() uint32 {
+	return uint32(oid.raw)
+}
+
+type OrderId struct {
+	raw uint64
+}
+
+var OrderIdUnknown = OrderId{}
+
+func OrderIdFromUint32(v uint32) OrderId {
+	return OrderId{raw: uint64(v)}
+}
+func OrderIdFromUint64(v uint64) OrderId {
+	return OrderId{raw: v}
+}
+func (oid OrderId) String() string {
+	return fmt.Sprintf("%#x", oid.raw)
+}
+func (oid OrderId) ToUint32() uint32 {
+	return uint32(oid.raw)
+}
+func (oid OrderId) ToUint64() uint64 {
+	return oid.raw
+}
 
 type Price int
 
