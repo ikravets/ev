@@ -41,13 +41,13 @@ func (s *Subscr) SubscribeFromReader(rd io.Reader) (err error) {
 	sc := bufio.NewScanner(rd)
 	for sc.Scan() {
 		text := sc.Text()
-		var v int
+		var v uint64
 		var b byte
 		if _, err := fmt.Sscanf(text, "%c%v", &b, &v); err != nil {
 			_, err = fmt.Sscanf(text, "%v", &v)
 			errs.CheckE(err)
 		}
-		s.Subscribe(packet.OptionIdFromUint32(uint32(v)))
+		s.Subscribe(packet.OptionIdFromUint64(v))
 	}
 	errs.CheckE(sc.Err())
 	return
