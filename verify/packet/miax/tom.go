@@ -133,6 +133,7 @@ func init() {
 
 /************************************************************************/
 type TomMessage interface {
+	packet.ExchangeMessage
 	gopacket.DecodingLayer
 	//embed gopacket.Layer by "inlining"
 	//workaround for https://github.com/golang/go/issues/6977
@@ -165,6 +166,9 @@ func (m *TomMessageCommon) LayerType() gopacket.LayerType {
 
 func (m *TomMessageCommon) Base() *TomMessageCommon {
 	return m
+}
+func (m *TomMessageCommon) Nanoseconds() int {
+	return int(m.Timestamp)
 }
 
 func decodeTomMessage(data []byte) TomMessageCommon {
@@ -210,6 +214,8 @@ type TomMessageSystemTime struct {
 	Second uint32
 }
 
+var _ packet.SecondsMessage = &TomMessageSystemTime{}
+
 func (m *TomMessageSystemTime) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = TomMessageSystemTime{
 		TomMessageCommon: decodeTomMessage(data),
@@ -224,6 +230,9 @@ func (m *TomMessageSystemTime) SerializeTo(b gopacket.SerializeBuffer, opts gopa
 	errs.CheckE(err)
 	binary.LittleEndian.PutUint32(buf, m.Second)
 	return
+}
+func (m *TomMessageSystemTime) Seconds() int {
+	return int(m.Second)
 }
 
 /************************************************************************/
