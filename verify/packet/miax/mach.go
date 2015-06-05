@@ -133,6 +133,7 @@ func (m *Mach) Flow() gopacket.Flow {
 	return gopacket.NewFlow(EndpointMachSession, session, session)
 }
 func decodeMach(data []byte, p gopacket.PacketBuilder) (err error) {
+	panic("FIXME")
 	errs.PassE(&err)
 	m := &Mach{}
 	errs.CheckE(m.DecodeFromBytes(data, p))
