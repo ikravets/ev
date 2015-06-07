@@ -46,11 +46,11 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 		opop.origOrderId = origOrderId
 		ops = append(ops, operation)
 	}
-	addOperationReplace := func(origOrderId packet.OrderId, orderSide itto.OrderSide) {
+	addOperationReplace := func(origOrderId packet.OrderId, ord order) {
 		opRemove := &OperationRemove{}
 		opAdd := &OperationAdd{
 			// unknown: optionId; maybe unknown: OrderSide.Side
-			order:     orderFromItto(packet.OptionIdUnknown, orderSide),
+			order:     ord,
 			Operation: Operation{sibling: opRemove},
 		}
 		addOperation(origOrderId, opRemove)
@@ -77,14 +77,14 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 	case *itto.IttoMessageOrderCancel:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
 	case *itto.IttoMessageSingleSideReplace:
-		addOperationReplace(im.OrigRefNumD, im.OrderSide)
+		addOperationReplace(im.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.OrderSide))
 	case *itto.IttoMessageSingleSideDelete:
 		addOperation(im.OrigRefNumD, &OperationRemove{})
 	case *itto.IttoMessageSingleSideUpdate:
-		addOperationReplace(im.RefNumD, im.OrderSide)
+		addOperationReplace(im.RefNumD, orderFromItto(packet.OptionIdUnknown, im.OrderSide))
 	case *itto.IttoMessageQuoteReplace:
-		addOperationReplace(im.Bid.OrigRefNumD, im.Bid.OrderSide)
-		addOperationReplace(im.Ask.OrigRefNumD, im.Ask.OrderSide)
+		addOperationReplace(im.Bid.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.Bid.OrderSide))
+		addOperationReplace(im.Ask.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.Ask.OrderSide))
 	case *itto.IttoMessageQuoteDelete:
 		addOperation(im.BidOrigRefNumD, &OperationRemove{})
 		addOperation(im.AskOrigRefNumD, &OperationRemove{})
