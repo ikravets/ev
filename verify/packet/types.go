@@ -73,6 +73,9 @@ func (oid OptionId) String() string {
 func (oid OptionId) ToUint32() uint32 {
 	return uint32(oid.raw)
 }
+func (oid OptionId) ToUint64() uint64 {
+	return oid.raw
+}
 
 type OrderId struct {
 	raw uint64
