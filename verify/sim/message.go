@@ -27,17 +27,6 @@ func NewSimMessage(sim Sim, pam packet.ApplicationMessage) *SimMessage {
 	return m
 }
 
-func (m *SimMessage) IgnoredBySubscriber() bool {
-	if m.sim.Subscr() == nil {
-		return false
-	}
-	var oid packet.OptionId
-	if m, ok := m.Pam.Layer().(packet.TradeMessage); ok {
-		oid, _, _ = m.TradeInfo()
-	}
-	return oid.Valid() && !m.sim.Subscr().Subscribed(oid)
-}
-
 func (m *SimMessage) MessageOperations() []SimOperation {
 	var ops []SimOperation
 	addOperation := func(origOrderId packet.OrderId, operation SimOperation) {
@@ -135,6 +124,16 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 		log.Println("unexpected message ", m.Pam.Layer())
 	}
 	return ops
+}
+func (m *SimMessage) IgnoredBySubscriber() bool {
+	if m.sim.Subscr() == nil {
+		return false
+	}
+	var oid packet.OptionId
+	if m, ok := m.Pam.Layer().(packet.TradeMessage); ok {
+		oid, _, _ = m.TradeInfo()
+	}
+	return oid.Valid() && !m.sim.Subscr().Subscribed(oid)
 }
 
 func orderFromItto(oid packet.OptionId, os itto.OrderSide) order {
