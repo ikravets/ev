@@ -11,6 +11,7 @@ import (
 	"log"
 
 	"my/itto/verify/packet"
+	"my/itto/verify/packet/bats"
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
@@ -42,8 +43,12 @@ func (s *SimLogger) printfln(format string, vs ...interface{}) {
 	s.printf(f, vs...)
 }
 func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
-	out := func(name string, typ itto.IttoMessageType, f string, vs ...interface{}) {
+	outItto := func(name string, typ itto.IttoMessageType, f string, vs ...interface{}) {
 		s.printf("NORM %s %c ", name, typ)
+		s.printfln(f, vs...)
+	}
+	outBats := func(f string, vs ...interface{}) {
+		s.printf("NORM ORDER %c ", idm.Pam.Layer().(bats.PitchMessage).Base().Type)
 		s.printfln(f, vs...)
 	}
 	sideChar := func(s packet.MarketSide) byte {
@@ -54,32 +59,45 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 	}
 	switch im := idm.Pam.Layer().(type) {
 	case *itto.IttoMessageAddOrder:
-		out("ORDER", im.Type, "%c %08x %08x %08x %08x", sideChar(im.Side), im.OId, im.RefNumD.ToUint32(), im.Size, im.Price)
+		outItto("ORDER", im.Type, "%c %08x %08x %08x %08x", sideChar(im.Side), im.OId, im.RefNumD.ToUint32(), im.Size, im.Price)
 	case *itto.IttoMessageAddQuote:
-		out("QBID", im.Type, "%08x %08x %08x %08x", im.OId, im.Bid.RefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
-		out("QASK", im.Type, "%08x %08x %08x %08x", im.OId, im.Ask.RefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
+		outItto("QBID", im.Type, "%08x %08x %08x %08x", im.OId, im.Bid.RefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
+		outItto("QASK", im.Type, "%08x %08x %08x %08x", im.OId, im.Ask.RefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
 	case *itto.IttoMessageSingleSideExecuted:
-		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
+		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *itto.IttoMessageSingleSideExecutedWithPrice:
-		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
+		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *itto.IttoMessageOrderCancel:
-		out("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
+		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *itto.IttoMessageSingleSideReplace:
-		out("ORDER", im.Type, "%08x %08x %08x %08x", im.RefNumD.ToUint32(), im.OrigRefNumD.ToUint32(), im.Size, im.Price)
+		outItto("ORDER", im.Type, "%08x %08x %08x %08x", im.RefNumD.ToUint32(), im.OrigRefNumD.ToUint32(), im.Size, im.Price)
 	case *itto.IttoMessageSingleSideDelete:
-		out("ORDER", im.Type, "%08x", im.OrigRefNumD.ToUint32())
+		outItto("ORDER", im.Type, "%08x", im.OrigRefNumD.ToUint32())
 	case *itto.IttoMessageSingleSideUpdate:
-		out("ORDER", im.Type, "%08x %08x %08x", im.RefNumD.ToUint32(), im.Size, im.Price)
+		outItto("ORDER", im.Type, "%08x %08x %08x", im.RefNumD.ToUint32(), im.Size, im.Price)
 	case *itto.IttoMessageQuoteReplace:
-		out("QBID", im.Type, "%08x %08x %08x %08x", im.Bid.RefNumD.ToUint32(), im.Bid.OrigRefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
-		out("QASK", im.Type, "%08x %08x %08x %08x", im.Ask.RefNumD.ToUint32(), im.Ask.OrigRefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
+		outItto("QBID", im.Type, "%08x %08x %08x %08x", im.Bid.RefNumD.ToUint32(), im.Bid.OrigRefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
+		outItto("QASK", im.Type, "%08x %08x %08x %08x", im.Ask.RefNumD.ToUint32(), im.Ask.OrigRefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
 	case *itto.IttoMessageQuoteDelete:
-		out("QBID", im.Type, "%08x", im.BidOrigRefNumD.ToUint32())
-		out("QASK", im.Type, "%08x", im.AskOrigRefNumD.ToUint32())
+		outItto("QBID", im.Type, "%08x", im.BidOrigRefNumD.ToUint32())
+		outItto("QASK", im.Type, "%08x", im.AskOrigRefNumD.ToUint32())
 	case *itto.IttoMessageBlockSingleSideDelete:
 		for _, r := range im.RefNumDs {
-			out("ORDER", im.Type, "%08x", r.ToUint32())
+			outItto("ORDER", im.Type, "%08x", r.ToUint32())
 		}
+
+	case *bats.PitchMessageAddOrder:
+		outBats("%c %012x %016x %08x %08x", sideChar(im.Side), im.Symbol.ToUint64(), im.OrderId.ToUint64(), im.Size, packet.PriceTo4Dec(im.Price))
+	case *bats.PitchMessageDeleteOrder:
+		outBats("%016x", im.OrderId.ToUint64())
+	case *bats.PitchMessageOrderExecuted:
+		outBats("%016x %08x", im.OrderId.ToUint64(), im.Size)
+	case *bats.PitchMessageOrderExecutedAtPriceSize:
+		outBats("%016x %08x", im.OrderId.ToUint64(), im.Size)
+	case *bats.PitchMessageReduceSize:
+		outBats("%016x %08x", im.OrderId.ToUint64(), im.Size)
+	case *bats.PitchMessageModifyOrder:
+		outBats("%016x %08x %08x", im.OrderId.ToUint64(), im.Size, packet.PriceTo4Dec(im.Price))
 	}
 	s.efhLogger.MessageArrived(idm)
 }
