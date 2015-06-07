@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"my/itto/verify/packet"
+	"my/itto/verify/packet/bats"
 	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
@@ -43,11 +44,17 @@ func (l *TobLogger) MessageArrived(idm *sim.SimMessage) {
 		*itto.IttoMessageSingleSideExecutedWithPrice,
 		*itto.IttoMessageOrderCancel,
 		*itto.IttoMessageSingleSideDelete,
-		*itto.IttoMessageBlockSingleSideDelete:
+		*itto.IttoMessageBlockSingleSideDelete,
+		*bats.PitchMessageAddOrder,
+		*bats.PitchMessageDeleteOrder,
+		*bats.PitchMessageOrderExecuted,
+		*bats.PitchMessageOrderExecutedAtPriceSize,
+		*bats.PitchMessageReduceSize:
 		l.consumeOps = 1
 	case
 		*itto.IttoMessageSingleSideReplace,
-		*itto.IttoMessageSingleSideUpdate:
+		*itto.IttoMessageSingleSideUpdate,
+		*bats.PitchMessageModifyOrder:
 		l.consumeOps = 2
 	case
 		*itto.IttoMessageAddQuote,
