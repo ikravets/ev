@@ -76,12 +76,7 @@ func (p *reusingProcessor) ProcessAll() (err error) {
 			break
 		}
 		errs.CheckE(err)
-		//log.Printf("decoding\n")
-		//errs.CheckE(parser.DecodeLayers(data, &decoded))
-		if err = parser.DecodeLayers(data, &decoded); err != nil {
-			log.Printf("decoding error at packet %d: %s\n", packetNum, err)
-		}
-		//log.Printf("decoded: %#v\n", decoded)
+		errs.CheckE(parser.DecodeLayers(data, &decoded))
 		errs.CheckE(p.ProcessPacket(data, ci, decoded))
 	}
 	return
@@ -97,8 +92,7 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 	var flow gopacket.Flow
 	var seqNum uint64
 	for _, layer := range decoded {
-		//log.Printf("%v", layer)
-		continue
+		//log.Printf("%#v", layer)
 		switch l := layer.(type) {
 		case gopacket.NetworkLayer:
 			p.flowBufSrc.Write(l.NetworkFlow().Src().Raw())
