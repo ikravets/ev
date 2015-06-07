@@ -4,6 +4,8 @@
 package sim
 
 import (
+	"log"
+
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
 )
@@ -97,6 +99,16 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 		for _, r := range im.RefNumDs {
 			addOperation(r, &OperationRemove{})
 		}
+	case
+		*itto.IttoMessageNoii,
+		*itto.IttoMessageOptionsTrade,
+		*itto.IttoMessageOptionsCrossTrade,
+		*itto.IttoMessageOptionDirectory,
+		*itto.IttoMessageOptionOpen,
+		*itto.IttoMessageOptionTradingAction:
+		// silently ignore
+	default:
+		log.Println("unexpected message ", m.Pam.Layer())
 	}
 	return ops
 }
