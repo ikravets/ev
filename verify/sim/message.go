@@ -12,9 +12,12 @@ import (
 )
 
 type SimMessage struct {
-	Pam     packet.ApplicationMessage
-	Session *Session
-	sim     Sim
+	Pam        packet.ApplicationMessage
+	Session    *Session
+	sim        Sim
+	opsPerBook int
+	sides      int
+	ops        []SimOperation
 }
 
 func NewSimMessage(sim Sim, pam packet.ApplicationMessage) *SimMessage {
@@ -24,17 +27,27 @@ func NewSimMessage(sim Sim, pam packet.ApplicationMessage) *SimMessage {
 		Session: &s,
 		sim:     sim,
 	}
+	m.populateOps()
 	return m
 }
 
+func (m *SimMessage) BookUpdates() int {
+	return m.opsPerBook
+}
+func (m *SimMessage) BookSides() int {
+	// XXX why do we need this?
+	return m.sides
+}
 func (m *SimMessage) MessageOperations() []SimOperation {
-	var ops []SimOperation
+	return m.ops
+}
+func (m *SimMessage) populateOps() {
 	addOperation := func(origOrderId packet.OrderId, operation SimOperation) {
 		opop := operation.getOperation()
 		opop.m = m
 		opop.sim = m.sim
 		opop.origOrderId = origOrderId
-		ops = append(ops, operation)
+		m.ops = append(m.ops, operation)
 	}
 	addOperationReplace := func(origOrderId packet.OrderId, ord order) {
 		opRemove := &OperationRemove{}
@@ -49,17 +62,18 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 	switch im := m.Pam.Layer().(type) {
 	case *itto.IttoMessageAddOrder:
 		var oid packet.OptionId
-		if !m.IgnoredBySubscriber() {
+		if !m.ignoredBySubscriber() {
 			oid = im.OId
 		}
 		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.OrderSide)})
 	case *itto.IttoMessageAddQuote:
 		var oid packet.OptionId
-		if !m.IgnoredBySubscriber() {
+		if !m.ignoredBySubscriber() {
 			oid = im.OId
 		}
 		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Bid)})
 		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Ask)})
+		m.sides = 2
 	case *itto.IttoMessageSingleSideExecuted:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
 	case *itto.IttoMessageSingleSideExecutedWithPrice:
@@ -75,16 +89,19 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 	case *itto.IttoMessageQuoteReplace:
 		addOperationReplace(im.Bid.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.Bid.OrderSide))
 		addOperationReplace(im.Ask.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.Ask.OrderSide))
+		m.sides = 2
 	case *itto.IttoMessageQuoteDelete:
 		addOperation(im.BidOrigRefNumD, &OperationRemove{})
 		addOperation(im.AskOrigRefNumD, &OperationRemove{})
+		m.sides = 2
 	case *itto.IttoMessageBlockSingleSideDelete:
+		m.opsPerBook = 1
 		for _, r := range im.RefNumDs {
 			addOperation(r, &OperationRemove{})
 		}
 	case *bats.PitchMessageAddOrder:
 		var oid packet.OptionId
-		if !m.IgnoredBySubscriber() {
+		if !m.ignoredBySubscriber() {
 			oid = im.Symbol
 		}
 		ord := order{
@@ -123,9 +140,14 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 	default:
 		log.Println("unexpected message ", m.Pam.Layer())
 	}
-	return ops
+	if m.opsPerBook == 0 {
+		m.opsPerBook = len(m.ops)
+	}
+	if m.sides == 0 && len(m.ops) > 0 {
+		m.sides = 1
+	}
 }
-func (m *SimMessage) IgnoredBySubscriber() bool {
+func (m *SimMessage) ignoredBySubscriber() bool {
 	if m.sim.Subscr() == nil {
 		return false
 	}
