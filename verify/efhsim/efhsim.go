@@ -49,7 +49,7 @@ func (s *EfhSim) AnalyzeInput() error {
 		return err
 	}
 	defer handle.Close()
-	pp := processor.NewCopyingProcessor()
+	pp := processor.NewProcessor()
 	pp.LimitPacketNumber(s.inputPacketLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(s)

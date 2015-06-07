@@ -47,7 +47,7 @@ func (c *cmdPcap2txt) ParsingFinished() {
 	defer outFile.Close()
 
 	printer := &packetPrinter{w: outFile}
-	pp := processor.NewCopyingProcessor()
+	pp := processor.NewProcessor()
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)
 	pp.ProcessAll()

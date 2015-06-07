@@ -46,7 +46,7 @@ func (c *cmdPcap2memh) ParsingFinished() {
 	defer printer.Close()
 	printer.AddDummy()
 
-	pp := processor.NewCopyingProcessor()
+	pp := processor.NewProcessor()
 	pp.LimitPacketNumber(c.PacketNumLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)
