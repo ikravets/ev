@@ -31,15 +31,8 @@ func (m *SimMessage) IgnoredBySubscriber() bool {
 		return false
 	}
 	var oid packet.OptionId
-	switch im := m.Pam.Layer().(type) {
-	case *itto.IttoMessageAddOrder:
-		oid = im.OId
-	case *itto.IttoMessageAddQuote:
-		oid = im.OId
-	case *itto.IttoMessageOptionsTrade:
-		oid = im.OId
-	case *itto.IttoMessageOptionsCrossTrade:
-		oid = im.OId
+	if m, ok := m.Pam.Layer().(packet.TradeMessage); ok {
+		oid, _, _ = m.TradeInfo()
 	}
 	return oid.Valid() && !m.sim.Subscr().Subscribed(oid)
 }
