@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"my/itto/verify/packet"
+	"my/itto/verify/packet/bats"
 	"my/itto/verify/packet/itto"
 )
 
@@ -92,13 +93,43 @@ func (m *SimMessage) MessageOperations() []SimOperation {
 		for _, r := range im.RefNumDs {
 			addOperation(r, &OperationRemove{})
 		}
+	case *bats.PitchMessageAddOrder:
+		var oid packet.OptionId
+		if !m.IgnoredBySubscriber() {
+			oid = im.Symbol
+		}
+		ord := order{
+			OptionId: oid,
+			OrderId:  im.OrderId,
+			Side:     im.Side,
+			Price:    im.Price,
+			Size:     int(im.Size),
+		}
+		addOperation(packet.OrderIdUnknown, &OperationAdd{order: ord})
+	case *bats.PitchMessageDeleteOrder:
+		addOperation(im.OrderId, &OperationRemove{})
+	case *bats.PitchMessageOrderExecuted:
+		addOperation(im.OrderId, &OperationUpdate{sizeChange: int(im.Size)})
+	case *bats.PitchMessageOrderExecutedAtPriceSize:
+		addOperation(im.OrderId, &OperationUpdate{sizeChange: int(im.Size)})
+	case *bats.PitchMessageReduceSize:
+		addOperation(im.OrderId, &OperationUpdate{sizeChange: int(im.Size)})
+	case *bats.PitchMessageModifyOrder:
+		ord := order{
+			OrderId: im.OrderId,
+			Price:   im.Price,
+			Size:    int(im.Size),
+		}
+		addOperationReplace(im.OrderId, ord)
 	case
 		*itto.IttoMessageNoii,
 		*itto.IttoMessageOptionsTrade,
 		*itto.IttoMessageOptionsCrossTrade,
 		*itto.IttoMessageOptionDirectory,
 		*itto.IttoMessageOptionOpen,
-		*itto.IttoMessageOptionTradingAction:
+		*itto.IttoMessageOptionTradingAction,
+		*bats.PitchMessageTime,
+		*bats.PitchMessageSymbolMapping:
 		// silently ignore
 	default:
 		log.Println("unexpected message ", m.Pam.Layer())
