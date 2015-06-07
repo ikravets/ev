@@ -28,6 +28,12 @@ type reusingProcessor struct {
 	flowBufDst     bytes.Buffer
 }
 
+// default processor is reusing processor
+func NewProcessor() packet.Processor {
+	// FIXME unsupported by itto
+	return NewReusingProcessor()
+}
+
 func NewReusingProcessor() packet.Processor {
 	return &reusingProcessor{}
 }
