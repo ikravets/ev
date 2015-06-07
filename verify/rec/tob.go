@@ -7,8 +7,6 @@ import (
 	"log"
 
 	"my/itto/verify/packet"
-	"my/itto/verify/packet/bats"
-	"my/itto/verify/packet/itto"
 	"my/itto/verify/sim"
 )
 
@@ -36,38 +34,12 @@ func NewTobLogger() *TobLogger {
 }
 
 func (l *TobLogger) MessageArrived(idm *sim.SimMessage) {
-	l.bid.Check, l.ask.Check = false, false
-	switch idm.Pam.Layer().(type) {
-	case
-		*itto.IttoMessageAddOrder,
-		*itto.IttoMessageSingleSideExecuted,
-		*itto.IttoMessageSingleSideExecutedWithPrice,
-		*itto.IttoMessageOrderCancel,
-		*itto.IttoMessageSingleSideDelete,
-		*itto.IttoMessageBlockSingleSideDelete,
-		*bats.PitchMessageAddOrder,
-		*bats.PitchMessageDeleteOrder,
-		*bats.PitchMessageOrderExecuted,
-		*bats.PitchMessageOrderExecutedAtPriceSize,
-		*bats.PitchMessageReduceSize:
-		l.consumeOps = 1
-	case
-		*itto.IttoMessageSingleSideReplace,
-		*itto.IttoMessageSingleSideUpdate,
-		*bats.PitchMessageModifyOrder:
-		l.consumeOps = 2
-	case
-		*itto.IttoMessageAddQuote,
-		*itto.IttoMessageQuoteDelete:
-		l.consumeOps = 2
+	l.consumeOps = idm.BookUpdates()
+	if idm.BookSides() == 2 {
+		// XXX why do we need this?
 		l.bid.Check, l.ask.Check = true, true
-	case
-		*itto.IttoMessageQuoteReplace:
-		l.consumeOps = 4
-		l.bid.Check, l.ask.Check = true, true
-	default:
-		// expect no book operations
-		l.consumeOps = 0
+	} else {
+		l.bid.Check, l.ask.Check = false, false
 	}
 	l.curOps = 0
 	l.hasOldTob = false
