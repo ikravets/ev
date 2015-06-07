@@ -181,6 +181,7 @@ type PitchMessage interface {
 }
 
 type PitchMessageCommon struct {
+	Contents   []byte
 	Length     uint8
 	Type       PitchMessageType
 	TimeOffset uint32
@@ -193,7 +194,7 @@ func (m *PitchMessageCommon) NextLayerType() gopacket.LayerType {
 	return gopacket.LayerTypeZero
 }
 func (m *PitchMessageCommon) LayerContents() []byte {
-	return nil
+	return m.Contents
 }
 func (m *PitchMessageCommon) LayerPayload() []byte {
 	return nil
@@ -214,8 +215,9 @@ func decodePitchMessage(data []byte) PitchMessageCommon {
 		panic("message to short")
 	}
 	m := PitchMessageCommon{
-		Length: data[0],
-		Type:   PitchMessageType(data[1]),
+		Contents: data,
+		Length:   data[0],
+		Type:     PitchMessageType(data[1]),
 	}
 	if m.Type != PitchMessageTypeTime && m.Type != PitchMessageTypeSymbolMapping && len(data) >= 6 {
 		m.TimeOffset = binary.LittleEndian.Uint32(data[2:6])
