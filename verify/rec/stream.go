@@ -31,10 +31,12 @@ func (l *Stream) MessageArrived(idm *sim.SimMessage) {
 
 	flow := l.message.Pam.Flow()
 	seq := l.message.Pam.SequenceNumber()
-	if prevSeq, ok := l.seqNum[flow]; ok && prevSeq+1 != seq {
-		log.Printf("seqNum gap; expected %d actual %d\n", prevSeq+1, seq)
+	if seq != 0 {
+		if prevSeq, ok := l.seqNum[flow]; ok && prevSeq+1 != seq {
+			log.Printf("seqNum gap; expected %d actual %d\n", prevSeq+1, seq)
+		}
+		l.seqNum[flow] = seq
 	}
-	l.seqNum[flow] = seq
 
 	if m, ok := l.message.Pam.Layer().(packet.SecondsMessage); ok {
 		l.seconds[flow] = m.Seconds()
