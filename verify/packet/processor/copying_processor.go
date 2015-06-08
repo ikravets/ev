@@ -12,8 +12,7 @@ import (
 	"code.google.com/p/gopacket/layers"
 
 	"my/itto/verify/packet"
-	"my/itto/verify/packet/itto"
-	"my/itto/verify/packet/moldudp64"
+	"my/itto/verify/packet/nasdaq"
 )
 
 type applicationMessage struct {
@@ -87,7 +86,7 @@ func (p *processor) ProcessAll() error {
 		seqNum := mu.SequenceNumber
 		flow := p.getFlow(pkt)
 		for _, l := range pkt.Layers() {
-			if itto.LayerClassItto.Contains(l.LayerType()) {
+			if nasdaq.LayerClassItto.Contains(l.LayerType()) {
 				m = applicationMessage{
 					layer:     l,
 					flow:      flow,
@@ -116,8 +115,8 @@ func (p *processor) getFlow(pkt gopacket.Packet) gopacket.Flow {
 }
 
 func (p *processor) decodeAppLayer(pkt gopacket.Packet) error {
-	var moldUdp64Decoder gopacket.Decoder = moldudp64.LayerTypeMoldUDP64
-	var ittoDecoder gopacket.Decoder = itto.LayerTypeItto
+	var moldUdp64Decoder gopacket.Decoder = nasdaq.LayerTypeMoldUDP64
+	var ittoDecoder gopacket.Decoder = nasdaq.LayerTypeItto
 	//log.Println("decodeAppLayer", pkt)
 	transpLayer := pkt.TransportLayer()
 	appLayer := pkt.ApplicationLayer()
@@ -137,16 +136,16 @@ func (p *processor) decodeAppLayer(pkt gopacket.Packet) error {
 		return err
 	}
 	for _, l := range pkt.Layers() {
-		if mb, ok := l.(*moldudp64.MoldUDP64MessageBlockChained); ok {
+		if mb, ok := l.(*nasdaq.MoldUDP64MessageBlockChained); ok {
 			ittoDecoder.Decode(mb.Payload, packetBuilder)
 		}
 	}
 	return nil
 }
 
-func moldudp64Layer(pkt gopacket.Packet) *moldudp64.MoldUDP64 {
-	if l := pkt.Layer(moldudp64.LayerTypeMoldUDP64); l != nil {
-		return l.(*moldudp64.MoldUDP64)
+func moldudp64Layer(pkt gopacket.Packet) *nasdaq.MoldUDP64 {
+	if l := pkt.Layer(nasdaq.LayerTypeMoldUDP64); l != nil {
+		return l.(*nasdaq.MoldUDP64)
 	}
 	return nil
 }

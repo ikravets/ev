@@ -8,7 +8,7 @@ import (
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/bats"
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet/nasdaq"
 )
 
 type SimMessage struct {
@@ -60,13 +60,13 @@ func (m *SimMessage) populateOps() {
 		addOperation(packet.OrderIdUnknown, opAdd)
 	}
 	switch im := m.Pam.Layer().(type) {
-	case *itto.IttoMessageAddOrder:
+	case *nasdaq.IttoMessageAddOrder:
 		var oid packet.OptionId
 		if !m.ignoredBySubscriber() {
 			oid = im.OId
 		}
 		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.OrderSide)})
-	case *itto.IttoMessageAddQuote:
+	case *nasdaq.IttoMessageAddQuote:
 		var oid packet.OptionId
 		if !m.ignoredBySubscriber() {
 			oid = im.OId
@@ -74,27 +74,27 @@ func (m *SimMessage) populateOps() {
 		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Bid)})
 		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Ask)})
 		m.sides = 2
-	case *itto.IttoMessageSingleSideExecuted:
+	case *nasdaq.IttoMessageSingleSideExecuted:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
-	case *itto.IttoMessageSingleSideExecutedWithPrice:
+	case *nasdaq.IttoMessageSingleSideExecutedWithPrice:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
-	case *itto.IttoMessageOrderCancel:
+	case *nasdaq.IttoMessageOrderCancel:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
-	case *itto.IttoMessageSingleSideReplace:
+	case *nasdaq.IttoMessageSingleSideReplace:
 		addOperationReplace(im.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.OrderSide))
-	case *itto.IttoMessageSingleSideDelete:
+	case *nasdaq.IttoMessageSingleSideDelete:
 		addOperation(im.OrigRefNumD, &OperationRemove{})
-	case *itto.IttoMessageSingleSideUpdate:
+	case *nasdaq.IttoMessageSingleSideUpdate:
 		addOperationReplace(im.RefNumD, orderFromItto(packet.OptionIdUnknown, im.OrderSide))
-	case *itto.IttoMessageQuoteReplace:
+	case *nasdaq.IttoMessageQuoteReplace:
 		addOperationReplace(im.Bid.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.Bid.OrderSide))
 		addOperationReplace(im.Ask.OrigRefNumD, orderFromItto(packet.OptionIdUnknown, im.Ask.OrderSide))
 		m.sides = 2
-	case *itto.IttoMessageQuoteDelete:
+	case *nasdaq.IttoMessageQuoteDelete:
 		addOperation(im.BidOrigRefNumD, &OperationRemove{})
 		addOperation(im.AskOrigRefNumD, &OperationRemove{})
 		m.sides = 2
-	case *itto.IttoMessageBlockSingleSideDelete:
+	case *nasdaq.IttoMessageBlockSingleSideDelete:
 		m.opsPerBook = 1
 		for _, r := range im.RefNumDs {
 			addOperation(r, &OperationRemove{})
@@ -128,12 +128,12 @@ func (m *SimMessage) populateOps() {
 		}
 		addOperationReplace(im.OrderId, ord)
 	case
-		*itto.IttoMessageNoii,
-		*itto.IttoMessageOptionsTrade,
-		*itto.IttoMessageOptionsCrossTrade,
-		*itto.IttoMessageOptionDirectory,
-		*itto.IttoMessageOptionOpen,
-		*itto.IttoMessageOptionTradingAction,
+		*nasdaq.IttoMessageNoii,
+		*nasdaq.IttoMessageOptionsTrade,
+		*nasdaq.IttoMessageOptionsCrossTrade,
+		*nasdaq.IttoMessageOptionDirectory,
+		*nasdaq.IttoMessageOptionOpen,
+		*nasdaq.IttoMessageOptionTradingAction,
 		*bats.PitchMessageTime,
 		*bats.PitchMessageSymbolMapping:
 		// silently ignore
@@ -158,7 +158,7 @@ func (m *SimMessage) ignoredBySubscriber() bool {
 	return oid.Valid() && !m.sim.Subscr().Subscribed(oid)
 }
 
-func orderFromItto(oid packet.OptionId, os itto.OrderSide) order {
+func orderFromItto(oid packet.OptionId, os nasdaq.OrderSide) order {
 	return order{
 		OptionId: oid,
 		OrderId:  os.RefNumD,

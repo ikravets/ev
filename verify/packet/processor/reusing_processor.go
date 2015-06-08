@@ -17,9 +17,8 @@ import (
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/bats"
-	"my/itto/verify/packet/itto"
 	"my/itto/verify/packet/miax"
-	"my/itto/verify/packet/moldudp64"
+	"my/itto/verify/packet/nasdaq"
 )
 
 type reusingProcessor struct {
@@ -61,7 +60,7 @@ func (p *reusingProcessor) ProcessAll() (err error) {
 		pd.addDstMap(layers.NewUDPPortEndpoint(layers.UDPPort(port)), miax.LayerTypeMachTop)
 	}
 	for port := 18000; port < 18010; port++ {
-		pd.addDstMap(layers.NewUDPPortEndpoint(layers.UDPPort(port)), moldudp64.LayerTypeMoldUDP64)
+		pd.addDstMap(layers.NewUDPPortEndpoint(layers.UDPPort(port)), nasdaq.LayerTypeMoldUDP64)
 	}
 	pmlf := &payloadMuxLayerFactory{}
 	pmlf.AddDetector(pd)
@@ -78,9 +77,9 @@ func (p *reusingProcessor) ProcessAll() (err error) {
 	parser.AddDecodingLayerFactory(miax.TomLayerFactory)
 	parser.AddDecodingLayerFactory(bats.BSULayerFactory)
 	parser.AddDecodingLayerFactory(bats.PitchLayerFactory)
-	parser.AddDecodingLayerFactory(moldudp64.MoldUDP64LayerFactory)
-	parser.AddDecodingLayerFactory(moldudp64.MoldUDP64MessageBlockLayerFactory)
-	parser.AddDecodingLayerFactory(itto.IttoLayerFactory)
+	parser.AddDecodingLayerFactory(nasdaq.MoldUDP64LayerFactory)
+	parser.AddDecodingLayerFactory(nasdaq.MoldUDP64MessageBlockLayerFactory)
+	parser.AddDecodingLayerFactory(nasdaq.IttoLayerFactory)
 
 	packetNumLimit := -1
 	if p.packetNumLimit > 0 {
@@ -142,10 +141,10 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 			}
 			p.handler.HandleMessage(&m)
 			seqNum++
-		case *moldudp64.MoldUDP64:
+		case *nasdaq.MoldUDP64:
 			flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
 			seqNum = l.SequenceNumber
-		case itto.IttoMessage:
+		case nasdaq.IttoMessage:
 			m := applicationMessage{
 				layer:     l,
 				flow:      flow,

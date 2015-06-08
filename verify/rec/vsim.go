@@ -12,7 +12,7 @@ import (
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/bats"
-	"my/itto/verify/packet/itto"
+	"my/itto/verify/packet/nasdaq"
 	"my/itto/verify/sim"
 )
 
@@ -43,7 +43,7 @@ func (s *SimLogger) printfln(format string, vs ...interface{}) {
 	s.printf(f, vs...)
 }
 func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
-	outItto := func(name string, typ itto.IttoMessageType, f string, vs ...interface{}) {
+	outItto := func(name string, typ nasdaq.IttoMessageType, f string, vs ...interface{}) {
 		s.printf("NORM %s %c ", name, typ)
 		s.printfln(f, vs...)
 	}
@@ -58,30 +58,30 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 		return byte(s)
 	}
 	switch im := idm.Pam.Layer().(type) {
-	case *itto.IttoMessageAddOrder:
+	case *nasdaq.IttoMessageAddOrder:
 		outItto("ORDER", im.Type, "%c %08x %08x %08x %08x", sideChar(im.Side), im.OId, im.RefNumD.ToUint32(), im.Size, im.Price)
-	case *itto.IttoMessageAddQuote:
+	case *nasdaq.IttoMessageAddQuote:
 		outItto("QBID", im.Type, "%08x %08x %08x %08x", im.OId, im.Bid.RefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
 		outItto("QASK", im.Type, "%08x %08x %08x %08x", im.OId, im.Ask.RefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
-	case *itto.IttoMessageSingleSideExecuted:
+	case *nasdaq.IttoMessageSingleSideExecuted:
 		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
-	case *itto.IttoMessageSingleSideExecutedWithPrice:
+	case *nasdaq.IttoMessageSingleSideExecutedWithPrice:
 		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
-	case *itto.IttoMessageOrderCancel:
+	case *nasdaq.IttoMessageOrderCancel:
 		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
-	case *itto.IttoMessageSingleSideReplace:
+	case *nasdaq.IttoMessageSingleSideReplace:
 		outItto("ORDER", im.Type, "%08x %08x %08x %08x", im.RefNumD.ToUint32(), im.OrigRefNumD.ToUint32(), im.Size, im.Price)
-	case *itto.IttoMessageSingleSideDelete:
+	case *nasdaq.IttoMessageSingleSideDelete:
 		outItto("ORDER", im.Type, "%08x", im.OrigRefNumD.ToUint32())
-	case *itto.IttoMessageSingleSideUpdate:
+	case *nasdaq.IttoMessageSingleSideUpdate:
 		outItto("ORDER", im.Type, "%08x %08x %08x", im.RefNumD.ToUint32(), im.Size, im.Price)
-	case *itto.IttoMessageQuoteReplace:
+	case *nasdaq.IttoMessageQuoteReplace:
 		outItto("QBID", im.Type, "%08x %08x %08x %08x", im.Bid.RefNumD.ToUint32(), im.Bid.OrigRefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
 		outItto("QASK", im.Type, "%08x %08x %08x %08x", im.Ask.RefNumD.ToUint32(), im.Ask.OrigRefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
-	case *itto.IttoMessageQuoteDelete:
+	case *nasdaq.IttoMessageQuoteDelete:
 		outItto("QBID", im.Type, "%08x", im.BidOrigRefNumD.ToUint32())
 		outItto("QASK", im.Type, "%08x", im.AskOrigRefNumD.ToUint32())
-	case *itto.IttoMessageBlockSingleSideDelete:
+	case *nasdaq.IttoMessageBlockSingleSideDelete:
 		for _, r := range im.RefNumDs {
 			outItto("ORDER", im.Type, "%08x", r.ToUint32())
 		}

@@ -26,7 +26,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet/moldudp64"
+	"my/itto/verify/packet/nasdaq"
 )
 
 func init() {
@@ -104,7 +104,7 @@ type memh2pcap struct {
 	so     gopacket.SerializeOptions
 	sb     gopacket.SerializeBuffer
 	num    int
-	mold   *moldudp64.MoldUDP64
+	mold   *nasdaq.MoldUDP64
 	data   bytes.Buffer
 	layers []gopacket.SerializableLayer
 }
@@ -131,12 +131,12 @@ func (m *memh2pcap) Open(w io.Writer) (err error) {
 		DstPort: 18001,
 	}
 	errs.CheckE(udp.SetNetworkLayerForChecksum(ip))
-	mold := &moldudp64.MoldUDP64{
+	mold := &nasdaq.MoldUDP64{
 		Session:        "TestSess00",
 		SequenceNumber: 0,
 		MessageCount:   1,
 	}
-	moldMb := &moldudp64.MoldUDP64MessageBlockChained{}
+	moldMb := &nasdaq.MoldUDP64MessageBlockChained{}
 
 	m.mold = mold
 	m.layers = append([]gopacket.SerializableLayer{}, moldMb, mold, udp, ip, eth)

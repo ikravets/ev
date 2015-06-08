@@ -1,7 +1,7 @@
 // Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
-package moldudp64
+package nasdaq
 
 import (
 	"encoding/binary"
@@ -13,7 +13,6 @@ import (
 	"my/errs"
 
 	"my/itto/verify/packet"
-	"my/itto/verify/packet/itto"
 )
 
 var EndpointMoldUDP64SessionMetadata = gopacket.EndpointTypeMetadata{"MoldUDP64", func(b []byte) string {
@@ -153,7 +152,7 @@ func (m *MoldUDP64MessageBlock) CanDecode() gopacket.LayerClass {
 }
 
 func (m *MoldUDP64MessageBlock) NextLayerType() gopacket.LayerType {
-	return itto.IttoMessageType(m.Payload[0]).LayerType()
+	return IttoMessageType(m.Payload[0]).LayerType()
 }
 
 func decodeMoldUDP64MessageBlock(data []byte, p gopacket.PacketBuilder) error {
