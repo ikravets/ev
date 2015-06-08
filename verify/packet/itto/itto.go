@@ -162,9 +162,9 @@ type EnumMessageTypeMetadata struct {
 var IttoMessageTypeMetadata [256]EnumMessageTypeMetadata
 var LayerClassItto gopacket.LayerClass
 
-func init() {
-	const ITTO_LAYERS_BASE_NUM = 10100
+const ITTO_LAYERS_BASE_NUM = 10100
 
+func init() {
 	layerTypes := make([]gopacket.LayerType, 0, 256)
 	for i := 0; i < 256; i++ {
 		if IttoMessageTypeNames[i] == "" {
@@ -771,4 +771,25 @@ func (m *IttoMessageNoii) DecodeFromBytes(data []byte, df gopacket.DecodeFeedbac
 		OId: packet.OptionIdFromUint32(binary.BigEndian.Uint32(data[15:19])),
 	}
 	return nil
+}
+
+/************************************************************************/
+var IttoLayerFactory = &ittoLayerFactory{}
+
+type ittoLayerFactory struct{}
+
+var _ packet.DecodingLayerFactory = &ittoLayerFactory{}
+
+func (f *ittoLayerFactory) Create(layerType gopacket.LayerType) gopacket.DecodingLayer {
+	d := int(layerType - gopacket.LayerType(ITTO_LAYERS_BASE_NUM))
+	if d < 0 || d > 255 {
+		panic("FIXME")
+		//return gopacket.LayerTypeZero // FIXME
+	}
+	m := IttoMessageTypeMetadata[d]
+	errs.Check(m.LayerType == layerType)
+	return m.CreateLayer()
+}
+func (f *ittoLayerFactory) SupportedLayers() gopacket.LayerClass {
+	return LayerClassItto
 }
