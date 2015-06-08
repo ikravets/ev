@@ -34,6 +34,7 @@ func NewReusingLayerParser(first gopacket.LayerType, factories ...DecodingLayerF
 	for _, f := range factories {
 		p.AddDecodingLayerFactory(f)
 	}
+	p.AddDecodingLayerFactory(UnknownDecodingLayerFactory)
 	return p
 }
 
@@ -58,10 +59,13 @@ func (p *ReusingLayerParser) DecodeLayers(data []byte, decoded *[]gopacket.Decod
 		if tp.Type == gopacket.LayerTypeZero {
 			continue
 		}
-		layer, err := p.getDecodingLayer(tp.Type)
-		errs.CheckE(err)
-		//errs.CheckE(layer.DecodeFromBytes(tp.Payload, p.df))
-		layer.DecodeFromBytes(tp.Payload, p.df) // FIXME check returned error
+		layer, err := p.tryDecode(tp)
+		if err != nil {
+			log.Printf("error: %s\n", err)
+			tp.Type = gopacket.LayerTypeDecodeFailure
+			layer, err = p.tryDecode(tp)
+			errs.CheckE(err)
+		}
 		*decoded = append(*decoded, layer)
 
 		if dml, ok := layer.(DecodingMultiLayer); ok {
@@ -71,6 +75,17 @@ func (p *ReusingLayerParser) DecodeLayers(data []byte, decoded *[]gopacket.Decod
 		}
 	}
 	return nil
+}
+
+func (p *ReusingLayerParser) tryDecode(tp TypedPayload) (layer gopacket.DecodingLayer, err error) {
+	if layer, err = p.getDecodingLayer(tp.Type); err != nil {
+		return
+	}
+	if err = layer.DecodeFromBytes(tp.Payload, p.df); err != nil {
+		p.recycle([]gopacket.DecodingLayer{layer})
+		layer = nil
+	}
+	return
 }
 
 func (p *ReusingLayerParser) recycle(layers []gopacket.DecodingLayer) {
@@ -119,5 +134,29 @@ func (f *SingleDecodingLayerFactory) Create(layerType gopacket.LayerType) gopack
 func (f *SingleDecodingLayerFactory) SupportedLayers() gopacket.LayerClass {
 	return f.layerType
 }
+
+type UnknownDecodingLayer struct {
+	Data []byte
+}
+
+var (
+	_ gopacket.Layer         = &UnknownDecodingLayer{}
+	_ gopacket.DecodingLayer = &UnknownDecodingLayer{}
+)
+
+func (d *UnknownDecodingLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	d.Data = data
+	return nil
+}
+func (d *UnknownDecodingLayer) CanDecode() gopacket.LayerClass    { return d.LayerType() }
+func (d *UnknownDecodingLayer) NextLayerType() gopacket.LayerType { return gopacket.LayerTypeZero }
+func (d *UnknownDecodingLayer) LayerType() gopacket.LayerType     { return gopacket.LayerTypeDecodeFailure }
+func (d *UnknownDecodingLayer) LayerContents() []byte             { return d.Data }
+func (d *UnknownDecodingLayer) LayerPayload() []byte              { return nil }
+
+var UnknownDecodingLayerFactory = NewSingleDecodingLayerFactory(
+	gopacket.LayerTypeDecodeFailure,
+	func() gopacket.DecodingLayer { return &UnknownDecodingLayer{} },
+)
 
 var _ = log.Ldate
