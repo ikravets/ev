@@ -22,6 +22,17 @@ var EndpointMoldUDP64Session = gopacket.RegisterEndpointType(10000, EndpointMold
 
 var LayerTypeMoldUDP64 = gopacket.RegisterLayerType(10000, gopacket.LayerTypeMetadata{"MoldUDP64", gopacket.DecodeFunc(decodeMoldUDP64)})
 
+// must initialize in init() to avoid false detection of potential initialization loop
+var LayerTypeMoldUDP64MessageBlock gopacket.LayerType
+var LayerTypeMoldUDP64MessageBlockChained gopacket.LayerType
+
+func init() {
+	LayerTypeMoldUDP64MessageBlock = gopacket.RegisterLayerType(10001, gopacket.LayerTypeMetadata{"MoldUDP64MessageBlock", gopacket.DecodeFunc(decodeMoldUDP64MessageBlock)})
+
+	LayerTypeMoldUDP64MessageBlockChained = gopacket.RegisterLayerType(10003, gopacket.LayerTypeMetadata{"MoldUDP64MessageBlockChained", gopacket.DecodeFunc(decodeMoldUDP64MessageBlockChained)})
+}
+
+/************************************************************************/
 type MoldUDP64 struct {
 	layers.BaseLayer
 	Session        string
@@ -37,7 +48,6 @@ var (
 func (m *MoldUDP64) LayerType() gopacket.LayerType {
 	return LayerTypeMoldUDP64
 }
-
 func (m *MoldUDP64) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	if len(data) < 20 {
 		return errors.New("moldUDP64 packet is too short")
@@ -50,11 +60,9 @@ func (m *MoldUDP64) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) err
 	}
 	return nil
 }
-
 func (m *MoldUDP64) CanDecode() gopacket.LayerClass {
 	return LayerTypeMoldUDP64
 }
-
 func (m *MoldUDP64) NextLayerType() gopacket.LayerType {
 	return LayerTypeMoldUDP64MessageBlockChained
 }
@@ -84,13 +92,6 @@ func (m *MoldUDP64) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Serial
 }
 
 /************************************************************************/
-// initialized in init() to avoid false detection of potential initialization loop
-var LayerTypeMoldUDP64MessageBlock gopacket.LayerType
-
-func init() {
-	LayerTypeMoldUDP64MessageBlock = gopacket.RegisterLayerType(10001, gopacket.LayerTypeMetadata{"MoldUDP64MessageBlock", gopacket.DecodeFunc(decodeMoldUDP64MessageBlock)})
-}
-
 type MoldUDP64MessageBlock struct {
 	layers.BaseLayer
 	MessageLength uint16
@@ -136,13 +137,6 @@ func decodeMoldUDP64MessageBlock(data []byte, p gopacket.PacketBuilder) error {
 }
 
 /************************************************************************/
-// initialized in init() to avoid false detection of potential initialization loop
-var LayerTypeMoldUDP64MessageBlockChained gopacket.LayerType
-
-func init() {
-	LayerTypeMoldUDP64MessageBlockChained = gopacket.RegisterLayerType(10003, gopacket.LayerTypeMetadata{"MoldUDP64MessageBlockChained", gopacket.DecodeFunc(decodeMoldUDP64MessageBlockChained)})
-}
-
 type MoldUDP64MessageBlockChained struct {
 	MessageLength uint16
 	//seqNumber int TODO
