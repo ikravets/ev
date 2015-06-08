@@ -57,7 +57,6 @@ func processArgs() {
 }
 
 func main() {
-	os.Setenv("PATH", os.ExpandEnv("$HOME/my/proj/ekaline/esniff/wireshark/build/run:$HOME/wireshark/build/run:$PATH"))
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	processArgs()
 }
