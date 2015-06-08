@@ -29,6 +29,7 @@ type cmdEfhsim struct {
 	InputFileNameAvtDict    string `long:"avt-dict" value-name:"DICT" description:"read dictionary for AVT CSV output"`
 	OutputDirStats          string `long:"output-stats" value-name:"DIR" description:"output dir for stats"`
 	PacketNumLimit          int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
+	NoHwLim                 bool   `long:"no-hw-lim" description:"do not enforce HW limits"`
 	shouldExecute           bool
 	outFiles                []io.Closer
 }
@@ -62,7 +63,9 @@ func (c *cmdEfhsim) ParsingFinished() {
 		errs.CheckE(efh.SubscribeFromReader(file))
 		file.Close()
 	}
-	efh.AddLogger(rec.NewHwLimChecker())
+	if !c.NoHwLim {
+		efh.AddLogger(rec.NewHwLimChecker())
+	}
 	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
 		logger := rec.NewSimLogger(w)
 		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
