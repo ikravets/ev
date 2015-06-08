@@ -12,6 +12,7 @@ import (
 
 	"my/errs"
 
+	"my/itto/verify/packet"
 	"my/itto/verify/packet/itto"
 )
 
@@ -26,10 +27,22 @@ var LayerTypeMoldUDP64 = gopacket.RegisterLayerType(10000, gopacket.LayerTypeMet
 var LayerTypeMoldUDP64MessageBlock gopacket.LayerType
 var LayerTypeMoldUDP64MessageBlockChained gopacket.LayerType
 
+var MoldUDP64LayerFactory, MoldUDP64MessageBlockLayerFactory packet.DecodingLayerFactory
+
 func init() {
 	LayerTypeMoldUDP64MessageBlock = gopacket.RegisterLayerType(10001, gopacket.LayerTypeMetadata{"MoldUDP64MessageBlock", gopacket.DecodeFunc(decodeMoldUDP64MessageBlock)})
 
 	LayerTypeMoldUDP64MessageBlockChained = gopacket.RegisterLayerType(10003, gopacket.LayerTypeMetadata{"MoldUDP64MessageBlockChained", gopacket.DecodeFunc(decodeMoldUDP64MessageBlockChained)})
+
+	MoldUDP64LayerFactory = packet.NewSingleDecodingLayerFactory(
+		LayerTypeMoldUDP64,
+		func() gopacket.DecodingLayer { return &MoldUDP64{} },
+	)
+
+	MoldUDP64MessageBlockLayerFactory = packet.NewSingleDecodingLayerFactory(
+		LayerTypeMoldUDP64MessageBlock,
+		func() gopacket.DecodingLayer { return &MoldUDP64MessageBlock{} },
+	)
 }
 
 /************************************************************************/
@@ -38,6 +51,7 @@ type MoldUDP64 struct {
 	Session        string
 	SequenceNumber uint64
 	MessageCount   uint16
+	messages       [][]byte
 }
 
 var (
@@ -58,10 +72,26 @@ func (m *MoldUDP64) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) err
 		MessageCount:   binary.BigEndian.Uint16(data[18:20]),
 		BaseLayer:      layers.BaseLayer{data[:20], data[20:]},
 	}
+	data = m.Payload
+	for i := 0; i < int(m.MessageCount); i++ {
+		length := binary.BigEndian.Uint16(data[0:2]) + 2
+		m.messages = append(m.messages, data[:length])
+		data = data[length:]
+	}
 	return nil
 }
 func (m *MoldUDP64) CanDecode() gopacket.LayerClass {
 	return LayerTypeMoldUDP64
+}
+func (m *MoldUDP64) NextLayers() []packet.TypedPayload {
+	tps := make([]packet.TypedPayload, len(m.messages))
+	for i, p := range m.messages {
+		tps[i] = packet.TypedPayload{
+			Type:    LayerTypeMoldUDP64MessageBlock,
+			Payload: p,
+		}
+	}
+	return tps
 }
 func (m *MoldUDP64) NextLayerType() gopacket.LayerType {
 	return LayerTypeMoldUDP64MessageBlockChained
@@ -95,7 +125,6 @@ func (m *MoldUDP64) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Serial
 type MoldUDP64MessageBlock struct {
 	layers.BaseLayer
 	MessageLength uint16
-	Payload       []byte
 }
 
 var (
@@ -124,7 +153,7 @@ func (m *MoldUDP64MessageBlock) CanDecode() gopacket.LayerClass {
 }
 
 func (m *MoldUDP64MessageBlock) NextLayerType() gopacket.LayerType {
-	return itto.LayerTypeItto
+	return itto.IttoMessageType(m.Payload[0]).LayerType()
 }
 
 func decodeMoldUDP64MessageBlock(data []byte, p gopacket.PacketBuilder) error {
