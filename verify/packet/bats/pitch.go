@@ -43,6 +43,9 @@ func (a PitchMessageType) String() string {
 func (a PitchMessageType) LayerType() gopacket.LayerType {
 	return PitchMessageTypeMetadata[a].LayerType
 }
+func (a PitchMessageType) ToInt() int {
+	return int(a)
+}
 
 /************************************************************************/
 const (
