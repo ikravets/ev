@@ -48,7 +48,7 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 		s.printfln(f, vs...)
 	}
 	outBats := func(f string, vs ...interface{}) {
-		s.printf("NORM ORDER %c ", idm.Pam.Layer().(bats.PitchMessage).Base().Type)
+		s.printf("NORM ORDER %02x ", idm.Pam.Layer().(bats.PitchMessage).Base().Type.ToInt())
 		s.printfln(f, vs...)
 	}
 	sideChar := func(s packet.MarketSide) byte {
@@ -103,13 +103,14 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 }
 func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 	type ordrespLogInfo struct {
-		notFound, addOp, refNum uint32
-		optionId                packet.OptionId
-		side, price, size       int
-		ordlSuffix              string
+		notFound, addOp   int
+		orderId           packet.OrderId
+		optionId          packet.OptionId
+		side, price, size int
+		ordlSuffix        string
 	}
 	type orduLogInfo struct {
-		refNum            uint32
+		orderId           packet.OrderId
 		optionId          packet.OptionId
 		side, price, size int
 	}
@@ -123,12 +124,12 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 		}
 		or = ordrespLogInfo{
 			addOp:      1,
-			refNum:     op.OrderId.ToUint32(),
+			orderId:    op.OrderId,
 			optionId:   oid,
-			ordlSuffix: fmt.Sprintf(" %08x", oid),
+			ordlSuffix: fmt.Sprintf(" %012x", oid.ToUint64()),
 		}
 		ou = orduLogInfo{
-			refNum:   or.refNum,
+			orderId:  or.orderId,
 			optionId: op.GetOptionId(),
 			price:    op.GetPrice(),
 			size:     op.GetNewSize(),
@@ -157,13 +158,13 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 				}
 			}
 		}
-		or.refNum = operation.GetOrigOrderId().ToUint32()
-		ou.refNum = or.refNum
+		or.orderId = operation.GetOrigOrderId()
+		ou.orderId = or.orderId
 	}
-	s.printfln("ORDL %d %08x%s", or.addOp, or.refNum, or.ordlSuffix)
-	s.printfln("ORDRESP %d %d %d %08x %08x %08x %08x", or.notFound, or.addOp, or.side, or.size, or.price, or.optionId, or.refNum)
+	s.printfln("ORDL %d %016x%s", or.addOp, or.orderId.ToUint64(), or.ordlSuffix)
+	s.printfln("ORDRESP %d %d %d %08x %08x %012x %016x", or.notFound, or.addOp, or.side, or.size, or.price, or.optionId.ToUint64(), or.orderId.ToUint64())
 	if operation.GetOptionId().Valid() {
-		s.printfln("ORDU %08x %08x %d %08x %08x", ou.refNum, ou.optionId, ou.side, ou.price, ou.size)
+		s.printfln("ORDU %016x %012x %d %08x %08x", ou.orderId.ToUint64(), ou.optionId.ToUint64(), ou.side, ou.price, ou.size)
 	}
 }
 func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) {
