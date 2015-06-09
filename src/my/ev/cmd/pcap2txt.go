@@ -12,8 +12,8 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/jessevdk/go-flags"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/packet/processor"
+	"my/ev/packet"
+	"my/ev/packet/processor"
 )
 
 type cmdPcap2txt struct {

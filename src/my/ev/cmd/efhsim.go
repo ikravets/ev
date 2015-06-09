@@ -13,9 +13,9 @@ import (
 	"github.com/jessevdk/go-flags"
 	"my/errs"
 
-	"my/itto/verify/anal"
-	"my/itto/verify/efhsim"
-	"my/itto/verify/rec"
+	"my/ev/anal"
+	"my/ev/efhsim"
+	"my/ev/rec"
 )
 
 type cmdEfhsim struct {

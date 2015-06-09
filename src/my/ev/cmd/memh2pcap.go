@@ -26,7 +26,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet/nasdaq"
+	"my/ev/packet/nasdaq"
 )
 
 func init() {

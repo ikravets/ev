@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/sim"
+	"my/ev/packet"
+	"my/ev/sim"
 )
 
 const (

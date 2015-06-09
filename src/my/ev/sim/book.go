@@ -8,7 +8,7 @@ import (
 
 	"github.com/cznic/b"
 
-	"my/itto/verify/packet"
+	"my/ev/packet"
 )
 
 type Book interface {

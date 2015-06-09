@@ -12,7 +12,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet"
+	"my/ev/packet"
 )
 
 var EndpointMoldUDP64SessionMetadata = gopacket.EndpointTypeMetadata{"MoldUDP64", func(b []byte) string {

@@ -15,7 +15,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/exch/sbtcp"
+	"my/ev/exch/sbtcp"
 )
 
 type ExchangeSimulator interface {

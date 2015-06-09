@@ -11,7 +11,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet"
+	"my/ev/packet"
 )
 
 var LayerTypeBSU = gopacket.RegisterLayerType(12000, gopacket.LayerTypeMetadata{"BatsSequencedUnit", nil /*FIXME*/})

@@ -11,7 +11,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet"
+	"my/ev/packet"
 )
 
 var LayerTypeTom = gopacket.RegisterLayerType(11002, gopacket.LayerTypeMetadata{"Tom", gopacket.DecodeFunc(decodeTom)})

@@ -12,7 +12,7 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet"
+	"my/ev/packet"
 )
 
 var EndpointMachSessionMetadata = gopacket.EndpointTypeMetadata{"Mach", func(b []byte) string {

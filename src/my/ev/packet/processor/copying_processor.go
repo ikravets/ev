@@ -11,8 +11,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/packet/nasdaq"
+	"my/ev/packet"
+	"my/ev/packet/nasdaq"
 )
 
 type applicationMessage struct {

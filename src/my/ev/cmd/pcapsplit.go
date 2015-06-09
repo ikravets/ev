@@ -11,8 +11,8 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/pcapsplit"
+	"my/ev/packet"
+	"my/ev/pcapsplit"
 )
 
 type cmdPcapsplit struct {

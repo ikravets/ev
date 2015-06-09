@@ -12,7 +12,7 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"my/errs"
-	"my/itto/verify/rec"
+	"my/ev/rec"
 )
 
 type cmdSoupbin2memh struct {

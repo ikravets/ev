@@ -9,8 +9,8 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/jessevdk/go-flags"
 
-	"my/itto/verify/packet/processor"
-	"my/itto/verify/rec"
+	"my/ev/packet/processor"
+	"my/ev/rec"
 )
 
 type cmdPcap2memh struct {

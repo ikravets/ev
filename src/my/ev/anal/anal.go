@@ -8,8 +8,8 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/sim"
+	"my/ev/packet"
+	"my/ev/sim"
 )
 
 type bookStat struct {

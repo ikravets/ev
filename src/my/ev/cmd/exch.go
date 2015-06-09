@@ -6,7 +6,7 @@ package cmd
 import (
 	"github.com/jessevdk/go-flags"
 
-	"my/itto/verify/exch"
+	"my/ev/exch"
 )
 
 type cmdExch struct {

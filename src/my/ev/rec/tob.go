@@ -6,8 +6,8 @@ package rec
 import (
 	"log"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/sim"
+	"my/ev/packet"
+	"my/ev/sim"
 )
 
 type TobLogger struct {

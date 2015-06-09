@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/gopacket/pcap"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/packet/processor"
-	"my/itto/verify/sim"
+	"my/ev/packet"
+	"my/ev/packet/processor"
+	"my/ev/sim"
 )
 
 type EfhSim struct {

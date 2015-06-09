@@ -6,7 +6,7 @@ package sim
 import (
 	"log"
 
-	"my/itto/verify/packet"
+	"my/ev/packet"
 )
 
 type SimOperation interface {

@@ -15,10 +15,10 @@ import (
 
 	"my/errs"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/packet/bats"
-	"my/itto/verify/packet/miax"
-	"my/itto/verify/packet/nasdaq"
+	"my/ev/packet"
+	"my/ev/packet/bats"
+	"my/ev/packet/miax"
+	"my/ev/packet/nasdaq"
 )
 
 type reusingProcessor struct {

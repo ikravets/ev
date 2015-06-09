@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/gopacket"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/sim"
+	"my/ev/packet"
+	"my/ev/sim"
 )
 
 type Stream struct {

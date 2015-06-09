@@ -6,9 +6,9 @@ package sim
 import (
 	"log"
 
-	"my/itto/verify/packet"
-	"my/itto/verify/packet/bats"
-	"my/itto/verify/packet/nasdaq"
+	"my/ev/packet"
+	"my/ev/packet/bats"
+	"my/ev/packet/nasdaq"
 )
 
 type SimMessage struct {
