@@ -6,7 +6,7 @@ package packet
 import (
 	"log"
 
-	"code.google.com/p/gopacket"
+	"github.com/google/gopacket"
 
 	"my/errs"
 )

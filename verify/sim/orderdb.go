@@ -7,7 +7,7 @@ import (
 	"errors"
 	"log"
 
-	"code.google.com/p/gopacket"
+	"github.com/google/gopacket"
 
 	"my/itto/verify/packet"
 )

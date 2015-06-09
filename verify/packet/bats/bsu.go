@@ -6,8 +6,8 @@ package bats
 import (
 	"encoding/binary"
 
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 
 	"my/errs"
 

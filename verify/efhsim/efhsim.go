@@ -7,7 +7,7 @@ import (
 	"io"
 	"log"
 
-	"code.google.com/p/gopacket/pcap"
+	"github.com/google/gopacket/pcap"
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/processor"

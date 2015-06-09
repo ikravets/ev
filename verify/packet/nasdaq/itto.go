@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"code.google.com/p/gopacket"
+	"github.com/google/gopacket"
 
 	"my/errs"
 

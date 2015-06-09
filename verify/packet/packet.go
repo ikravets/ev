@@ -6,7 +6,7 @@ package packet
 import (
 	"time"
 
-	"code.google.com/p/gopacket"
+	"github.com/google/gopacket"
 )
 
 // small subset of gopacket.Packet functionality

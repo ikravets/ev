@@ -6,7 +6,7 @@ package cmd
 import (
 	"log"
 
-	"code.google.com/p/gopacket/pcap"
+	"github.com/google/gopacket/pcap"
 	"github.com/jessevdk/go-flags"
 
 	"my/itto/verify/packet/processor"

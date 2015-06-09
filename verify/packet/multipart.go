@@ -3,7 +3,7 @@
 
 package packet
 
-import "code.google.com/p/gopacket"
+import "github.com/google/gopacket"
 
 type DecodingMultiLayer interface {
 	//similarly to gopacket.DecodingLayer

@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"code.google.com/p/gopacket"
+	"github.com/google/gopacket"
 
 	"my/errs"
 

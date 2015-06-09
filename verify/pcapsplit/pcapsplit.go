@@ -8,9 +8,9 @@ import (
 	"log"
 	"os"
 
-	"code.google.com/p/gopacket/layers"
-	"code.google.com/p/gopacket/pcap"
-	"code.google.com/p/gopacket/pcapgo"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/pcapgo"
 
 	"my/itto/verify/packet"
 	"my/itto/verify/packet/processor"

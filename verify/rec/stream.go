@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"code.google.com/p/gopacket"
+	"github.com/google/gopacket"
 
 	"my/itto/verify/packet"
 	"my/itto/verify/sim"

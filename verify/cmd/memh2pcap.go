@@ -19,9 +19,9 @@ import (
 	"time"
 	"unicode"
 
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
-	"code.google.com/p/gopacket/pcapgo"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
 	"github.com/jessevdk/go-flags"
 
 	"my/errs"

@@ -4,7 +4,7 @@
 package sim
 
 import (
-	"code.google.com/p/gopacket"
+	"github.com/google/gopacket"
 
 	"my/itto/verify/packet"
 )
