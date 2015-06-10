@@ -6,16 +6,21 @@ package main
 import (
 	"fmt"
 	"log"
-	"my/ev/cmd"
 	"os"
 	"runtime/pprof"
 
 	"github.com/jessevdk/go-flags"
+
+	"my/errs"
+
+	"my/ev/cmd"
 )
 
-func processArgs() {
+func main() {
+	var err error
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+
 	var opts struct {
-		Verbose     []bool `short:"v" long:"verbose" description:"show verbose debug information"`
 		LogFileName string `short:"l" long:"log" value-name:"FILE" default:"/dev/stderr" default-mask:"stderr" description:"log file"`
 		ProfileCpu  string `long:"profile-cpu" value-name:"FILE"`
 		ProfileMem  string `long:"profile-mem" value-name:"FILE"`
@@ -23,23 +28,25 @@ func processArgs() {
 
 	parser := flags.NewParser(&opts, flags.PassDoubleDash|flags.HelpFlag)
 	cmd.Registry.ConfigParser(parser)
-	if _, err := parser.Parse(); err != nil {
-		fmt.Println(err.(*flags.Error).Message)
-		os.Exit(1)
+	_, err = parser.Parse()
+	if e, ok := err.(*flags.Error); ok && e.Type != flags.ErrUnknown {
+		fmt.Printf("%s\n", e.Message)
+		if e.Type == flags.ErrHelp {
+			os.Exit(0)
+		} else {
+			os.Exit(1)
+		}
 	}
+	errs.CheckE(err)
 
 	logFile, err := os.OpenFile(opts.LogFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
+	errs.CheckE(err)
 	log.SetOutput(logFile)
 	defer logFile.Close()
 
 	if opts.ProfileCpu != "" {
 		profFile, err := os.Create(opts.ProfileCpu)
-		if err != nil {
-			log.Fatal(err)
-		}
+		errs.CheckE(err)
 		pprof.StartCPUProfile(profFile)
 		defer pprof.StopCPUProfile()
 	}
@@ -48,15 +55,8 @@ func processArgs() {
 
 	if opts.ProfileMem != "" {
 		profFile, err := os.Create(opts.ProfileMem)
-		if err != nil {
-			log.Fatal(err)
-		}
+		errs.CheckE(err)
 		pprof.WriteHeapProfile(profFile)
 		profFile.Close()
 	}
-}
-
-func main() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	processArgs()
 }
