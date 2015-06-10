@@ -119,11 +119,11 @@ var PitchMessageCreators = [256]func() PitchMessage{
 	PitchMessageTypeSymbolMapping:            func() PitchMessage { return &PitchMessageSymbolMapping{} },
 	PitchMessageTypeAddOrderExpanded:         func() PitchMessage { return &PitchMessageAddOrder{} },
 	PitchMessageTypeTradeExpanded:            func() PitchMessage { return &PitchMessageTrade{} },
-	//PitchMessageTypeTradingStatus:          func() PitchMessage { return &PitchMessageTradingStatus{} },
-	//PitchMessageTypeAuctionUpdate:          func() PitchMessage { return &PitchMessageAuctionUpdate{} },
-	//PitchMessageTypeAuctionSummary:         func() PitchMessage { return &PitchMessageAuctionSummary{} },
-	PitchMessageTypeUnitClear: func() PitchMessage { return &PitchMessageUnitClear{} },
-	//PitchMessageTypeRetailPriceImprovement: func() PitchMessage { return &PitchMessageRetailPriceImprovement{} },
+	PitchMessageTypeTradingStatus:            func() PitchMessage { return &PitchMessageTradingStatus{} },
+	PitchMessageTypeAuctionUpdate:            func() PitchMessage { return &PitchMessageAuctionUpdate{} },
+	PitchMessageTypeAuctionSummary:           func() PitchMessage { return &PitchMessageAuctionSummary{} },
+	PitchMessageTypeUnitClear:                func() PitchMessage { return &PitchMessageUnitClear{} },
+	PitchMessageTypeRetailPriceImprovement:   func() PitchMessage { return &PitchMessageRetailPriceImprovement{} },
 }
 
 type EnumMessageTypeMetadata struct {
@@ -521,6 +521,88 @@ func (m *PitchMessageSymbolMapping) DecodeFromBytes(data []byte, df gopacket.Dec
 		Symbol:             parseSymbol(data[2:8]),
 		OsiSymbol:          string(data[8:29]),
 		SymbolCondition:    data[29],
+	}
+	return nil
+}
+
+/************************************************************************/
+type PitchMessageTradingStatus struct {
+	PitchMessageCommon
+	Symbol        packet.OptionId
+	TradingStatus byte
+	RegShoAction  byte
+	Reserved      [2]byte
+}
+
+func (m *PitchMessageTradingStatus) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = PitchMessageTradingStatus{
+		PitchMessageCommon: decodePitchMessage(data),
+		Symbol:             parseSymbol(data[6:14]),
+		TradingStatus:      data[14],
+		RegShoAction:       data[15],
+		Reserved:           [2]byte{data[16], data[17]},
+	}
+	return nil
+}
+
+/************************************************************************/
+type PitchMessageAuctionUpdate struct {
+	PitchMessageCommon
+	Symbol           packet.OptionId
+	AuctionType      byte
+	ReferencePrice   packet.Price
+	BuySize          uint32
+	SellSize         uint32
+	IndicativePrice  packet.Price
+	AuctionOnlyPrice packet.Price
+}
+
+func (m *PitchMessageAuctionUpdate) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = PitchMessageAuctionUpdate{
+		PitchMessageCommon: decodePitchMessage(data),
+		Symbol:             parseSymbol(data[6:14]),
+		AuctionType:        data[14],
+		ReferencePrice:     packet.PriceFrom4Dec(int(binary.LittleEndian.Uint64(data[15:23]))),
+		BuySize:            binary.LittleEndian.Uint32(data[23:27]),
+		SellSize:           binary.LittleEndian.Uint32(data[27:31]),
+		IndicativePrice:    packet.PriceFrom4Dec(int(binary.LittleEndian.Uint64(data[31:39]))),
+		AuctionOnlyPrice:   packet.PriceFrom4Dec(int(binary.LittleEndian.Uint64(data[39:47]))),
+	}
+	return nil
+}
+
+/************************************************************************/
+type PitchMessageAuctionSummary struct {
+	PitchMessageCommon
+	Symbol      packet.OptionId
+	AuctionType byte
+	Price       packet.Price
+	Size        uint32
+}
+
+func (m *PitchMessageAuctionSummary) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = PitchMessageAuctionSummary{
+		PitchMessageCommon: decodePitchMessage(data),
+		Symbol:             parseSymbol(data[6:14]),
+		AuctionType:        data[14],
+		Price:              packet.PriceFrom4Dec(int(binary.LittleEndian.Uint64(data[15:23]))),
+		Size:               binary.LittleEndian.Uint32(data[23:27]),
+	}
+	return nil
+}
+
+/************************************************************************/
+type PitchMessageRetailPriceImprovement struct {
+	PitchMessageCommon
+	Symbol                 packet.OptionId
+	RetailPriceImprovement byte
+}
+
+func (m *PitchMessageRetailPriceImprovement) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = PitchMessageRetailPriceImprovement{
+		PitchMessageCommon:     decodePitchMessage(data),
+		Symbol:                 parseSymbol(data[6:14]),
+		RetailPriceImprovement: data[14],
 	}
 	return nil
 }
