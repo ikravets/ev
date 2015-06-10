@@ -457,7 +457,7 @@ func (m *PitchMessageTrade) DecodeFromBytes(data []byte, df gopacket.DecodeFeedb
 	}
 	switch m.Type {
 	case PitchMessageTypeTradeShort:
-		m.Size = uint32(binary.LittleEndian.Uint16(data[15:16]))
+		m.Size = uint32(binary.LittleEndian.Uint16(data[15:17]))
 		m.Symbol = parseSymbol(data[17:23])
 		m.Price = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[23:25])))
 		m.ExecutionId = binary.LittleEndian.Uint64(data[25:33])
