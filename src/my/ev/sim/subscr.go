@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 
 	"my/errs"
 
@@ -16,12 +15,14 @@ import (
 
 type Subscr struct {
 	subscriptions map[packet.OptionId]struct{}
+	stoplist      map[packet.OptionId]struct{}
 	autoSubscribe bool
 }
 
 func NewSubscr() *Subscr {
 	return &Subscr{
 		subscriptions: make(map[packet.OptionId]struct{}),
+		stoplist:      make(map[packet.OptionId]struct{}),
 		autoSubscribe: true,
 	}
 }
@@ -29,12 +30,13 @@ func (s *Subscr) AutoSubscribe(on bool) {
 	s.autoSubscribe = on
 }
 func (s *Subscr) Subscribe(oid packet.OptionId) {
-	if oid.Valid() {
-		s.subscriptions[oid] = struct{}{}
-	} else {
-		log.Fatal("subscribing to invalid option", oid)
-	}
+	errs.Check(oid.Valid(), "subscribing to invalid option", oid)
+	s.subscriptions[oid] = struct{}{}
 	s.autoSubscribe = false
+}
+func (s *Subscr) Unsubscribe(oid packet.OptionId) {
+	errs.Check(oid.Valid(), "unsubscribing from invalid option", oid)
+	delete(s.subscriptions, oid)
 }
 func (s *Subscr) SubscribeFromReader(rd io.Reader) (err error) {
 	errs.PassE(&err)
@@ -47,14 +49,24 @@ func (s *Subscr) SubscribeFromReader(rd io.Reader) (err error) {
 			_, err = fmt.Sscanf(text, "%v", &v)
 			errs.CheckE(err)
 		}
-		s.Subscribe(packet.OptionIdFromUint64(v))
+		oid := packet.OptionIdFromUint64(v)
+		if b == 'U' || b == 'u' || b == '!' {
+			if s.autoSubscribe {
+				s.stoplist[oid] = struct{}{}
+			} else {
+				s.Unsubscribe(oid)
+			}
+		} else {
+			s.Subscribe(oid)
+		}
 	}
 	errs.CheckE(sc.Err())
 	return
 }
 func (s *Subscr) Subscribed(oid packet.OptionId) bool {
 	if s.autoSubscribe {
-		return true
+		_, ok := s.stoplist[oid]
+		return !ok
 	}
 	_, ok := s.subscriptions[oid]
 	return ok
