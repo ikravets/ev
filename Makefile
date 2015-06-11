@@ -8,6 +8,8 @@ endef
 
 VENDOR_DIR := vendor
 VENDOR_LOCAL_DIR := $(VENDOR_DIR).local
+BUILD_DIR=$(CURDIR)/build
+BUILD_DIR_centos=$(CURDIR)/build.centos
 GOPATH_ORIG := $(GOPATH)
 GOPATH = $(BUILD_DIR)/$(VENDOR_DIR):$(BUILD_DIR)
 export GOPATH
@@ -15,30 +17,26 @@ export GOPATH
 .PHONY: build build-centos shell edit get
 
 
-build: BUILD_DIR=$(CURDIR)/build
 build:
 	mkdir -p "$(BUILD_DIR)/$(VENDOR_DIR)"
 	$(foreach d,src $(VENDOR_DIR)/src,\
 	    [[ -e "$(BUILD_DIR)/$(d)" ]] || ln -s "$(CURDIR)/$(d)" "$(BUILD_DIR)/$(d)" $(NL))
 	go install -v my/ev/...
 
-build-centos: LOCAL_BUILD_DIR=$(CURDIR)/build.centos
 build-centos: BUILD_DIR=/home/devuser/go
 build-centos:
-	mkdir -p $(foreach v,. $(VENDOR_DIR) $(VENDOR_LOCAL_DIR),$(LOCAL_BUILD_DIR)/$(v)/src)
+	mkdir -p $(foreach v,. $(VENDOR_DIR) $(VENDOR_LOCAL_DIR),$(BUILD_DIR_centos)/$(v)/src)
 	docker run --tty --interactive --user 1000 --env GOPATH \
-	    --volume "$(LOCAL_BUILD_DIR):$(BUILD_DIR)" \
+	    --volume "$(BUILD_DIR_centos):$(BUILD_DIR)" \
 	    $(foreach d,src $(VENDOR_DIR)/src $(VENDOR_LOCAL_DIR)/src,\
 		--volume "$(CURDIR)/$(d):$(BUILD_DIR)/$(d)") \
 	    ekagobuild \
 	    go install -v my/ev/...
 
-shell: BUILD_DIR=$(CURDIR)/build
 shell:
 	@echo GOPATH=$$GOPATH
 	bash
 
-edit: BUILD_DIR=$(CURDIR)/build
 edit: GOPATH:=$(GOPATH):$(GOPATH_ORIG)
 edit:
 	@echo GOPATH=$$GOPATH
