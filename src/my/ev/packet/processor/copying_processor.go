@@ -44,7 +44,9 @@ type processor struct {
 }
 
 func NewCopyingProcessor() packet.Processor {
-	return &processor{}
+	return &processor{
+		handler: &packet.NopHandler{},
+	}
 }
 
 func (p *processor) SetObtainer(o packet.Obtainer) {

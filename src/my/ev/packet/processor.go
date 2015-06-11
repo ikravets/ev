@@ -40,3 +40,10 @@ var EndpointCombinedSessionMetadata = gopacket.EndpointTypeMetadata{"Combined", 
 	return fmt.Sprintf("combined %v", b)
 }}
 var EndpointCombinedSession = gopacket.RegisterEndpointType(9999, EndpointCombinedSessionMetadata)
+
+type NopHandler struct{}
+
+var _ Handler = &NopHandler{}
+
+func (_ *NopHandler) HandlePacket(_ Packet)              {}
+func (_ *NopHandler) HandleMessage(_ ApplicationMessage) {}

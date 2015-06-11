@@ -35,7 +35,9 @@ func NewProcessor() packet.Processor {
 }
 
 func NewReusingProcessor() packet.Processor {
-	return &reusingProcessor{}
+	return &reusingProcessor{
+		handler: &packet.NopHandler{},
+	}
 }
 
 func (p *reusingProcessor) SetObtainer(o packet.Obtainer) {
