@@ -124,6 +124,7 @@ type SecondsMessage interface {
 }
 type ExchangeMessage interface {
 	Nanoseconds() int
+	OptionId() OptionId
 }
 type TradeMessage interface {
 	TradeInfo() (OptionId, Price, int)

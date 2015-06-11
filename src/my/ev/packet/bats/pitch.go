@@ -212,6 +212,9 @@ func (m *PitchMessageCommon) Base() *PitchMessageCommon {
 func (m *PitchMessageCommon) Nanoseconds() int {
 	return int(m.TimeOffset)
 }
+func (m *PitchMessageCommon) OptionId() packet.OptionId {
+	return packet.OptionIdUnknown
+}
 
 func decodePitchMessage(data []byte) PitchMessageCommon {
 	if len(data) < 2 {
@@ -335,6 +338,9 @@ func (m *PitchMessageAddOrder) DecodeFromBytes(data []byte, df gopacket.DecodeFe
 		copy(m.ParticipantId[:], data[36:40])
 	}
 	return nil
+}
+func (m *PitchMessageAddOrder) OptionId() packet.OptionId {
+	return m.Symbol
 }
 
 /************************************************************************/
@@ -474,6 +480,9 @@ func (m *PitchMessageTrade) DecodeFromBytes(data []byte, df gopacket.DecodeFeedb
 	}
 	return nil
 }
+func (m *PitchMessageTrade) OptionId() packet.OptionId {
+	return m.Symbol
+}
 
 var _ packet.TradeMessage = &PitchMessageTrade{}
 
@@ -524,6 +533,9 @@ func (m *PitchMessageSymbolMapping) DecodeFromBytes(data []byte, df gopacket.Dec
 	}
 	return nil
 }
+func (m *PitchMessageSymbolMapping) OptionId() packet.OptionId {
+	return m.Symbol
+}
 
 /************************************************************************/
 type PitchMessageTradingStatus struct {
@@ -543,6 +555,9 @@ func (m *PitchMessageTradingStatus) DecodeFromBytes(data []byte, df gopacket.Dec
 		Reserved:           [2]byte{data[16], data[17]},
 	}
 	return nil
+}
+func (m *PitchMessageTradingStatus) OptionId() packet.OptionId {
+	return m.Symbol
 }
 
 /************************************************************************/

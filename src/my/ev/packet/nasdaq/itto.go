@@ -238,6 +238,9 @@ func (m *IttoMessageCommon) Base() *IttoMessageCommon {
 func (m *IttoMessageCommon) Nanoseconds() int {
 	return int(m.Timestamp)
 }
+func (m *IttoMessageCommon) OptionId() packet.OptionId {
+	return packet.OptionIdUnknown
+}
 
 func decodeIttoMessage(data []byte) IttoMessageCommon {
 	m := IttoMessageCommon{
@@ -370,6 +373,9 @@ func (m *IttoMessageOptionDirectory) DecodeFromBytes(data []byte, df gopacket.De
 	}
 	return nil
 }
+func (m *IttoMessageOptionDirectory) OptionId() packet.OptionId {
+	return m.OId
+}
 
 /************************************************************************/
 type IttoMessageOptionTradingAction struct {
@@ -386,6 +392,9 @@ func (m *IttoMessageOptionTradingAction) DecodeFromBytes(data []byte, df gopacke
 	}
 	return nil
 }
+func (m *IttoMessageOptionTradingAction) OptionId() packet.OptionId {
+	return m.OId
+}
 
 /************************************************************************/
 type IttoMessageOptionOpen struct {
@@ -401,6 +410,9 @@ func (m *IttoMessageOptionOpen) DecodeFromBytes(data []byte, df gopacket.DecodeF
 		OpenState:         data[9],
 	}
 	return nil
+}
+func (m *IttoMessageOptionOpen) OptionId() packet.OptionId {
+	return m.OId
 }
 
 /************************************************************************/
@@ -450,6 +462,9 @@ func (m *IttoMessageAddOrder) SerializeTo(b gopacket.SerializeBuffer, opts gopac
 	}
 	return
 }
+func (m *IttoMessageAddOrder) OptionId() packet.OptionId {
+	return m.OId
+}
 
 /************************************************************************/
 type IttoMessageAddQuote struct {
@@ -478,6 +493,9 @@ func (m *IttoMessageAddQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFee
 		m.Ask.Size = int(binary.BigEndian.Uint32(data[29:33]))
 	}
 	return nil
+}
+func (m *IttoMessageAddQuote) OptionId() packet.OptionId {
+	return m.OId
 }
 
 /************************************************************************/
@@ -702,6 +720,9 @@ func (m *IttoMessageOptionsTrade) DecodeFromBytes(data []byte, df gopacket.Decod
 		Size:              int(binary.BigEndian.Uint32(data[22:26])),
 	}
 	return nil
+}
+func (m *IttoMessageOptionsTrade) OptionId() packet.OptionId {
+	return m.OId
 }
 
 var _ packet.TradeMessage = &IttoMessageOptionsTrade{}

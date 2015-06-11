@@ -170,6 +170,9 @@ func (m *TomMessageCommon) Base() *TomMessageCommon {
 func (m *TomMessageCommon) Nanoseconds() int {
 	return int(m.Timestamp)
 }
+func (m *TomMessageCommon) OptionId() packet.OptionId {
+	return packet.OptionIdUnknown
+}
 
 func decodeTomMessage(data []byte) TomMessageCommon {
 	m := TomMessageCommon{
@@ -278,6 +281,9 @@ func (m *TomMessageSeriesUpdate) DecodeFromBytes(data []byte, df gopacket.Decode
 	}
 	return nil
 }
+func (m *TomMessageSeriesUpdate) OptionId() packet.OptionId {
+	return m.ProductId
+}
 
 /************************************************************************/
 type TomMessageSystemState struct {
@@ -333,6 +339,9 @@ func (m *TomMessageTom) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 	}
 	return nil
 }
+func (m *TomMessageTom) OptionId() packet.OptionId {
+	return m.ProductId
+}
 
 /************************************************************************/
 type TomMessageTrade struct {
@@ -360,6 +369,9 @@ func (m *TomMessageTrade) DecodeFromBytes(data []byte, df gopacket.DecodeFeedbac
 		TradeCondition:      data[27],
 	}
 	return nil
+}
+func (m *TomMessageTrade) OptionId() packet.OptionId {
+	return m.ProductId
 }
 
 /************************************************************************/
