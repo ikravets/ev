@@ -122,11 +122,14 @@ func (m *SimMessage) populateOps() {
 		*nasdaq.IttoMessageOptionDirectory,
 		*nasdaq.IttoMessageOptionOpen,
 		*nasdaq.IttoMessageOptionTradingAction,
+		*nasdaq.IttoMessageSeconds,
 		*bats.PitchMessageTime,
-		*bats.PitchMessageSymbolMapping:
+		*bats.PitchMessageSymbolMapping,
+		*bats.PitchMessageTrade,
+		*bats.PitchMessageTradingStatus:
 		// silently ignore
 	default:
-		log.Println("unexpected message ", m.Pam.Layer())
+		log.Printf("unexpected message %#v\n", m.Pam.Layer())
 	}
 	if m.opsPerBook == 0 {
 		m.opsPerBook = len(m.ops)
