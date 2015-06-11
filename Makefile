@@ -33,6 +33,9 @@ build-centos:
 	    ekagobuild \
 	    go install -v my/ev/...
 
+deploy: build-centos
+	rsync -aP $(BUILD_DIR_centos)/bin/ev xn02:bin/ev
+
 shell:
 	@echo GOPATH=$$GOPATH
 	bash
