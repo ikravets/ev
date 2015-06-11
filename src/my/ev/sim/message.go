@@ -61,18 +61,10 @@ func (m *SimMessage) populateOps() {
 	}
 	switch im := m.Pam.Layer().(type) {
 	case *nasdaq.IttoMessageAddOrder:
-		var oid packet.OptionId
-		if !m.ignoredBySubscriber() {
-			oid = im.OId
-		}
-		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.OrderSide)})
+		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(m.subscribedOptionId(), im.OrderSide)})
 	case *nasdaq.IttoMessageAddQuote:
-		var oid packet.OptionId
-		if !m.ignoredBySubscriber() {
-			oid = im.OId
-		}
-		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Bid)})
-		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(oid, im.Ask)})
+		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(m.subscribedOptionId(), im.Bid)})
+		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(m.subscribedOptionId(), im.Ask)})
 		m.sides = 2
 	case *nasdaq.IttoMessageSingleSideExecuted:
 		addOperation(im.OrigRefNumD, &OperationUpdate{sizeChange: im.Size})
@@ -100,12 +92,8 @@ func (m *SimMessage) populateOps() {
 			addOperation(r, &OperationRemove{})
 		}
 	case *bats.PitchMessageAddOrder:
-		var oid packet.OptionId
-		if !m.ignoredBySubscriber() {
-			oid = im.Symbol
-		}
 		ord := order{
-			OptionId: oid,
+			OptionId: m.subscribedOptionId(),
 			OrderId:  im.OrderId,
 			Side:     im.Side,
 			Price:    im.Price,
@@ -147,15 +135,12 @@ func (m *SimMessage) populateOps() {
 		m.sides = 1
 	}
 }
-func (m *SimMessage) ignoredBySubscriber() bool {
-	if m.sim.Subscr() == nil {
-		return false
+func (m *SimMessage) subscribedOptionId() packet.OptionId {
+	em := m.Pam.Layer().(packet.ExchangeMessage)
+	if m.sim.Subscr() == nil || m.sim.Subscr().Subscribed(em.OptionId()) {
+		return em.OptionId()
 	}
-	var oid packet.OptionId
-	if m, ok := m.Pam.Layer().(packet.TradeMessage); ok {
-		oid, _, _ = m.TradeInfo()
-	}
-	return oid.Valid() && !m.sim.Subscr().Subscribed(oid)
+	return packet.OptionIdUnknown
 }
 
 func orderFromItto(oid packet.OptionId, os nasdaq.OrderSide) order {
