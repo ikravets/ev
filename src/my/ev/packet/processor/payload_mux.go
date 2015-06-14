@@ -132,22 +132,20 @@ func (d *EndpointPayloadDetector) addDstMap(dst gopacket.Endpoint, lt gopacket.L
 
 /************************************************************************/
 type UdpDstPortPayloadDetector struct {
-	portMap map[layers.UDPPort]gopacket.LayerType
+	portMap [65536]gopacket.LayerType
 }
 
 var _ PayloadDetector = &UdpDstPortPayloadDetector{}
 var UdpDstPortPayloadDetectorFailedError = errors.New("payload detection by UdpDstPort failed")
 
 func NewUdpDstPortPayloadDetector() *UdpDstPortPayloadDetector {
-	return &UdpDstPortPayloadDetector{
-		portMap: make(map[layers.UDPPort]gopacket.LayerType),
-	}
+	return &UdpDstPortPayloadDetector{}
 }
 func (d *UdpDstPortPayloadDetector) Detect(payload []byte, decodedLayers *[]gopacket.DecodingLayer) (layer gopacket.LayerType, err error) {
 	err = UdpDstPortPayloadDetectorFailedError
 	for _, dl := range *decodedLayers {
 		if u, ok := dl.(*layers.UDP); ok {
-			if layer, ok = d.portMap[u.DstPort]; ok {
+			if layer = d.portMap[u.DstPort]; layer != gopacket.LayerTypeZero {
 				err = nil
 			}
 			break
