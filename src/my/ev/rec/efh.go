@@ -29,8 +29,8 @@ type efhm_header struct {
 	TickCondition  uint8
 	QueuePosition  uint16
 	UnderlyingId   uint32
-	SecurityId     uint32
-	SequenceNumber uint32
+	SecurityId     uint64
+	SequenceNumber uint64
 	TimeStamp      uint64
 }
 
@@ -223,8 +223,8 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
 	return efhm_header{
 		Type:           messageType,
-		SecurityId:     l.lastOptionId.ToUint32(),
-		SequenceNumber: uint32(l.stream.getSeqNum()), // FIXME MoldUDP64 seqNum is 64 bit
+		SecurityId:     l.lastOptionId.ToUint64(),
+		SequenceNumber: l.stream.getSeqNum(),
 		TimeStamp:      l.stream.getTimestamp(),
 	}
 }
