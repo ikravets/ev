@@ -56,15 +56,15 @@ func (p *reusingProcessor) LimitPacketNumber(limit int) {
 
 func (p *reusingProcessor) ProcessAll() (err error) {
 	errs.PassE(&err)
-	pd := NewEndpointPayloadDetector()
+	pd := NewUdpDstPortPayloadDetector()
 	for port := 30100; port < 30200; port++ {
-		pd.addDstMap(layers.NewUDPPortEndpoint(layers.UDPPort(port)), bats.LayerTypeBSU)
+		pd.addPortMap(layers.UDPPort(port), bats.LayerTypeBSU)
 	}
 	for port := 51000; port < 51100; port++ {
-		pd.addDstMap(layers.NewUDPPortEndpoint(layers.UDPPort(port)), miax.LayerTypeMachTop)
+		pd.addPortMap(layers.UDPPort(port), miax.LayerTypeMachTop)
 	}
 	for port := 18000; port < 18010; port++ {
-		pd.addDstMap(layers.NewUDPPortEndpoint(layers.UDPPort(port)), nasdaq.LayerTypeMoldUDP64)
+		pd.addPortMap(layers.UDPPort(port), nasdaq.LayerTypeMoldUDP64)
 	}
 	pmlf := &payloadMuxLayerFactory{}
 	pmlf.AddDetector(pd)
