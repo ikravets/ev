@@ -19,16 +19,18 @@ type DecodingLayerFactory interface {
 type ReusingLayerParser struct {
 	first      gopacket.LayerType
 	factories  map[gopacket.LayerType]DecodingLayerFactory
-	layerCache map[gopacket.LayerType][]gopacket.DecodingLayer
+	layerCache map[gopacket.LayerType]*[]gopacket.DecodingLayer
 	df         gopacket.DecodeFeedback
 	Truncated  bool
+	tps        []TypedPayload
 }
 
 func NewReusingLayerParser(first gopacket.LayerType, factories ...DecodingLayerFactory) *ReusingLayerParser {
 	p := &ReusingLayerParser{
 		factories:  make(map[gopacket.LayerType]DecodingLayerFactory),
-		layerCache: make(map[gopacket.LayerType][]gopacket.DecodingLayer),
+		layerCache: make(map[gopacket.LayerType]*[]gopacket.DecodingLayer),
 		first:      first,
+		tps:        make([]TypedPayload, 100),
 	}
 	p.df = p // cast this once to the interface
 	for _, f := range factories {
@@ -48,41 +50,66 @@ func (p *ReusingLayerParser) AddDecodingLayerFactory(f DecodingLayerFactory) {
 
 func (p *ReusingLayerParser) DecodeLayers(data []byte, decoded *[]gopacket.DecodingLayer) (err error) {
 	errs.PassE(&err)
-	p.recycle(*decoded)
-	*decoded = (*decoded)[:0]
 	p.Truncated = false
 
-	tps := []TypedPayload{TypedPayload{Type: p.first, Payload: data}}
-	for len(tps) > 0 {
-		tp := tps[0]
-		tps = tps[1:]
+	dlEnd := 0
+	p.tps[0] = TypedPayload{Type: p.first, Payload: data}
+	for tpsStart, tpsEnd := 0, 1; tpsStart < tpsEnd; tpsStart++ {
+		tp := &p.tps[tpsStart]
 		if tp.Type == gopacket.LayerTypeZero {
 			continue
 		}
-		layer, err := p.tryDecode(tp)
+		if dlEnd == len(*decoded) {
+			*decoded = append(*decoded, nil)
+		}
+		layer := (*decoded)[dlEnd]
+		layer, err := p.tryDecode(tp, layer)
 		if err != nil {
 			log.Printf("error: %s\n", err)
 			tp.Type = gopacket.LayerTypeDecodeFailure
-			layer, err = p.tryDecode(tp)
+			layer, err = p.tryDecode(tp, layer)
 			errs.CheckE(err)
 		}
-		*decoded = append(*decoded, layer)
+		(*decoded)[dlEnd] = layer
+		dlEnd++
 
 		if dml, ok := layer.(DecodingMultiLayer); ok {
-			tps = append(tps, dml.NextLayers()...)
+			nls := dml.NextLayers()
+			p.checkTpsSize(tpsEnd, len(nls))
+			copy(p.tps[tpsEnd:], nls)
+			tpsEnd += len(nls)
 		} else if len(layer.LayerPayload()) > 0 {
-			tps = append(tps, TypedPayload{Type: layer.NextLayerType(), Payload: layer.LayerPayload()})
+			p.checkTpsSize(tpsEnd, 1)
+			p.tps[tpsEnd] = TypedPayload{Type: layer.NextLayerType(), Payload: layer.LayerPayload()}
+			tpsEnd++
 		}
 	}
+	p.recycle((*decoded)[dlEnd:])
+	*decoded = (*decoded)[:dlEnd]
 	return nil
 }
 
-func (p *ReusingLayerParser) tryDecode(tp TypedPayload) (layer gopacket.DecodingLayer, err error) {
-	if layer, err = p.getDecodingLayer(tp.Type); err != nil {
-		return
+func (p *ReusingLayerParser) checkTpsSize(tpsEnd int, add int) {
+	if len(p.tps) < tpsEnd+add {
+		oldTps := p.tps[:tpsEnd]
+		p.tps = make([]TypedPayload, len(p.tps)*2+add)
+		copy(p.tps, oldTps)
+	}
+}
+
+func (p *ReusingLayerParser) tryDecode(tp *TypedPayload, oldLayer gopacket.DecodingLayer) (layer gopacket.DecodingLayer, err error) {
+	if oldLayer != nil && oldLayer.CanDecode().Contains(tp.Type) {
+		layer = oldLayer
+	} else {
+		if oldLayer != nil {
+			p.recycleOne(oldLayer)
+		}
+		if layer, err = p.getDecodingLayer(tp.Type); err != nil {
+			return
+		}
 	}
 	if err = layer.DecodeFromBytes(tp.Payload, p.df); err != nil {
-		p.recycle([]gopacket.DecodingLayer{layer})
+		p.recycleOne(layer)
 		layer = nil
 	}
 	return
@@ -90,16 +117,22 @@ func (p *ReusingLayerParser) tryDecode(tp TypedPayload) (layer gopacket.Decoding
 
 func (p *ReusingLayerParser) recycle(layers []gopacket.DecodingLayer) {
 	for _, layer := range layers {
-		typ := layer.CanDecode().LayerTypes()[0]
-		p.layerCache[typ] = append(p.layerCache[typ], layer)
+		p.recycleOne(layer)
 	}
 }
-
+func (p *ReusingLayerParser) recycleOne(layer gopacket.DecodingLayer) {
+	typ := layer.CanDecode().LayerTypes()[0]
+	lc := p.layerCache[typ]
+	if lc == nil {
+		lc = &[]gopacket.DecodingLayer{}
+		p.layerCache[typ] = lc
+	}
+	*lc = append(*lc, layer)
+}
 func (p *ReusingLayerParser) getDecodingLayer(typ gopacket.LayerType) (layer gopacket.DecodingLayer, err error) {
-	if layers, ok := p.layerCache[typ]; ok && len(layers) > 0 {
-		layer = layers[len(layers)-1]
-		layers = layers[:len(layers)-1]
-		p.layerCache[typ] = layers
+	if layers, ok := p.layerCache[typ]; ok && len(*layers) > 0 {
+		layer = (*layers)[len(*layers)-1]
+		*layers = (*layers)[:len(*layers)-1]
 		return
 	}
 	if factory, ok := p.factories[typ]; ok {
