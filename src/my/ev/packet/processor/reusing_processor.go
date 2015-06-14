@@ -27,6 +27,8 @@ type reusingProcessor struct {
 	packetNumLimit int
 	flowBufSrc     bytes.Buffer
 	flowBufDst     bytes.Buffer
+	pkt            reusingPacket
+	m              applicationMessage
 }
 
 // default processor is reusing processor
@@ -104,13 +106,17 @@ func (p *reusingProcessor) ProcessAll() (err error) {
 
 func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, decoded []gopacket.DecodingLayer) (err error) {
 	errs.PassE(&err)
-	pkt, err := p.CreatePacket(data, ci, decoded)
-	errs.CheckE(err)
-	p.handler.HandlePacket(pkt)
+	p.pkt = reusingPacket{
+		data:   data,
+		ci:     ci,
+		layers: decoded,
+	}
+	p.m = applicationMessage{
+		timestamp: p.pkt.Timestamp(),
+	}
+	p.handler.HandlePacket(&p.pkt)
 	p.flowBufSrc.Reset()
 	p.flowBufDst.Reset()
-	var flow gopacket.Flow
-	var seqNum uint64
 	for _, layer := range decoded {
 		//log.Printf("%#v", layer)
 		switch l := layer.(type) {
@@ -121,50 +127,26 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 			p.flowBufSrc.Write(l.TransportFlow().Src().Raw())
 			p.flowBufDst.Write(l.TransportFlow().Dst().Raw())
 		case *miax.Mach:
-			flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
-			seqNum = l.SequenceNumber
+			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
+			p.m.seqNum = l.SequenceNumber
 		case miax.TomMessage:
-			m := applicationMessage{
-				layer:     l,
-				flow:      flow,
-				seqNum:    seqNum,
-				timestamp: pkt.Timestamp(),
-			}
-			p.handler.HandleMessage(&m)
+			p.m.layer = l
+			p.handler.HandleMessage(&p.m)
 		case *bats.BSU:
-			flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
-			seqNum = uint64(l.Sequence)
+			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
+			p.m.seqNum = uint64(l.Sequence)
 		case bats.PitchMessage:
-			m := applicationMessage{
-				layer:     l,
-				flow:      flow,
-				seqNum:    seqNum,
-				timestamp: pkt.Timestamp(),
-			}
-			p.handler.HandleMessage(&m)
-			seqNum++
+			p.m.layer = l
+			p.handler.HandleMessage(&p.m)
+			p.m.seqNum++
 		case *nasdaq.MoldUDP64:
-			flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
-			seqNum = l.SequenceNumber
+			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
+			p.m.seqNum = l.SequenceNumber
 		case nasdaq.IttoMessage:
-			m := applicationMessage{
-				layer:     l,
-				flow:      flow,
-				seqNum:    seqNum,
-				timestamp: pkt.Timestamp(),
-			}
-			p.handler.HandleMessage(&m)
-			seqNum++
+			p.m.layer = l
+			p.handler.HandleMessage(&p.m)
+			p.m.seqNum++
 		}
-	}
-	return
-}
-
-func (p *reusingProcessor) CreatePacket(data []byte, ci gopacket.CaptureInfo, decoded []gopacket.DecodingLayer) (packet packet.Packet, err error) {
-	packet = &reusingPacket{
-		data:   data,
-		ci:     ci,
-		layers: decoded,
 	}
 	return
 }
