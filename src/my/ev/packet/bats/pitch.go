@@ -268,7 +268,7 @@ var _ packet.SecondsMessage = &PitchMessageTime{}
 func (m *PitchMessageTime) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	*m = PitchMessageTime{
 		PitchMessageCommon: decodePitchMessage(data),
-		Time:               binary.LittleEndian.Uint32(data[1:5]),
+		Time:               binary.LittleEndian.Uint32(data[2:6]),
 	}
 	return nil
 }
