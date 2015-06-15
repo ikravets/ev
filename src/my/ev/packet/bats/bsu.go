@@ -22,7 +22,7 @@ type BSU struct {
 	Count    uint8
 	Unit     uint8
 	Sequence uint32
-	messages [][]byte
+	tps      []packet.TypedPayload
 }
 
 var (
@@ -42,11 +42,15 @@ func (m *BSU) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (err erro
 		Unit:      uint8(data[3]),
 		Sequence:  binary.LittleEndian.Uint32(data[4:8]),
 		BaseLayer: layers.BaseLayer{data[:8], data[8:]},
+		tps:       m.tps[:0], // reuse the slice storage
 	}
 	data = m.Payload
 	for i := 0; i < int(m.Count); i++ {
 		length := int(data[0])
-		m.messages = append(m.messages, data[:length])
+		m.tps = append(m.tps, packet.TypedPayload{
+			Type:    PitchMessageType(data[1]).LayerType(),
+			Payload: data[:length],
+		})
 		data = data[length:]
 	}
 	return
@@ -55,14 +59,7 @@ func (m *BSU) CanDecode() gopacket.LayerClass {
 	return LayerTypeBSU
 }
 func (m *BSU) NextLayers() []packet.TypedPayload {
-	tps := make([]packet.TypedPayload, len(m.messages))
-	for i, p := range m.messages {
-		tps[i] = packet.TypedPayload{
-			Type:    PitchMessageType(p[1]).LayerType(),
-			Payload: p,
-		}
-	}
-	return tps
+	return m.tps
 }
 func (m *BSU) NextLayerType() gopacket.LayerType {
 	return gopacket.LayerTypeZero // TODO can support chained Pitch messages

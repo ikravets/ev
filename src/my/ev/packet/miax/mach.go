@@ -41,7 +41,7 @@ func init() {
 type MachTop struct {
 	layers.BaseLayer
 	MachPackets int
-	packets     [][]byte
+	tps         []packet.TypedPayload
 }
 
 var (
@@ -55,15 +55,18 @@ func (m *MachTop) LayerType() gopacket.LayerType {
 }
 func (m *MachTop) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (err error) {
 	errs.PassE(&err)
-	m.Contents = data
-	m.Payload = data
-	m.MachPackets = 0
-	m.packets = [][]byte{}
+	*m = MachTop{
+		BaseLayer: layers.BaseLayer{data, data},
+		tps:       m.tps[:0], // reuse the slice storage
+	}
 	for len(data) > 0 {
 		errs.Check(len(data) >= 12)
 		length := int(binary.LittleEndian.Uint16(data[8:10]))
 		errs.Check(length <= len(data))
-		m.packets = append(m.packets, data[:length])
+		m.tps = append(m.tps, packet.TypedPayload{
+			Type:    LayerTypeMach,
+			Payload: data[:length],
+		})
 		m.MachPackets++
 		data = data[length:]
 	}
@@ -73,11 +76,7 @@ func (m *MachTop) CanDecode() gopacket.LayerClass {
 	return LayerTypeMachTop
 }
 func (m *MachTop) NextLayers() []packet.TypedPayload {
-	tps := make([]packet.TypedPayload, len(m.packets))
-	for i, p := range m.packets {
-		tps[i] = packet.TypedPayload{Type: LayerTypeMach, Payload: p}
-	}
-	return tps
+	return m.tps
 }
 func (m *MachTop) NextLayerType() gopacket.LayerType {
 	return gopacket.LayerTypeZero // TODO can support chained Mach messages

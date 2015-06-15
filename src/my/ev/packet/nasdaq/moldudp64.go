@@ -50,7 +50,7 @@ type MoldUDP64 struct {
 	Session        string
 	SequenceNumber uint64
 	MessageCount   uint16
-	messages       [][]byte
+	tps            []packet.TypedPayload
 }
 
 var (
@@ -70,11 +70,15 @@ func (m *MoldUDP64) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) err
 		SequenceNumber: binary.BigEndian.Uint64(data[10:18]),
 		MessageCount:   binary.BigEndian.Uint16(data[18:20]),
 		BaseLayer:      layers.BaseLayer{data[:20], data[20:]},
+		tps:            m.tps[:0], // reuse the slice storage
 	}
 	data = m.Payload
 	for i := 0; i < int(m.MessageCount); i++ {
 		length := binary.BigEndian.Uint16(data[0:2]) + 2
-		m.messages = append(m.messages, data[:length])
+		m.tps = append(m.tps, packet.TypedPayload{
+			Type:    LayerTypeMoldUDP64MessageBlock,
+			Payload: data[:length],
+		})
 		data = data[length:]
 	}
 	return nil
@@ -83,14 +87,7 @@ func (m *MoldUDP64) CanDecode() gopacket.LayerClass {
 	return LayerTypeMoldUDP64
 }
 func (m *MoldUDP64) NextLayers() []packet.TypedPayload {
-	tps := make([]packet.TypedPayload, len(m.messages))
-	for i, p := range m.messages {
-		tps[i] = packet.TypedPayload{
-			Type:    LayerTypeMoldUDP64MessageBlock,
-			Payload: p,
-		}
-	}
-	return tps
+	return m.tps
 }
 func (m *MoldUDP64) NextLayerType() gopacket.LayerType {
 	return LayerTypeMoldUDP64MessageBlockChained
