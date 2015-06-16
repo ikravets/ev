@@ -204,6 +204,12 @@ func (s *SimLogger) PrintQuote(m efhm_quote) {
 func (s *SimLogger) PrintTrade(m efhm_trade) {
 	s.genAppUpdate(m)
 }
+func (s *SimLogger) PrintDefinitionNom(m efhm_definition_nom) {
+	s.genAppUpdate(m)
+}
+func (s *SimLogger) PrintDefinitionBats(m efhm_definition_bats) {
+	s.genAppUpdate(m)
+}
 
 func (s *SimLogger) genAppUpdate(appMessage interface{}) {
 	var bb bytes.Buffer

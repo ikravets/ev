@@ -4,24 +4,32 @@
 package rec
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 
 	"my/ev/packet"
+	"my/ev/packet/bats"
+	"my/ev/packet/nasdaq"
 	"my/ev/sim"
 )
 
 const (
-	EFHM_DEFINITION = 0
-	EFHM_TRADE      = 1
-	EFHM_QUOTE      = 2
-	EFHM_ORDER      = 3
-	EFHM_REFRESHED  = 100
-	EFHM_STOPPED    = 101
-)
-const (
+	EFHM_DEFINITION      = 0
+	EFHM_TRADE           = 1
+	EFHM_QUOTE           = 2
+	EFHM_ORDER           = 3
+	EFHM_DEFINITION_NOM  = 4
+	EFHM_DEFINITION_BATS = 5
+	EFHM_REFRESHED       = 100
+	EFHM_STOPPED         = 101
+
 	EFH_ORDER_BID = 1
 	EFH_ORDER_ASK = -1
+
+	EFH_SECURITY_PUT  = 0
+	EFH_SECURITY_CALL = 1
 )
 
 type efhm_header struct {
@@ -78,9 +86,23 @@ type efhm_trade struct {
 	TradeCondition uint8
 }
 
+type efhm_definition_nom struct {
+	efhm_header
+	Symbol           [8]byte
+	MaturityDate     uint64
+	UnderlyingSymbol [16]byte
+	StrikePrice      uint32
+	PutOrCall        uint8
+}
+
+type efhm_definition_bats struct {
+	efhm_header
+	OsiSymbol [22]byte
+}
+
 func (m efhm_header) String() string {
 	switch m.Type {
-	case EFHM_QUOTE, EFHM_ORDER, EFHM_TRADE:
+	case EFHM_QUOTE, EFHM_ORDER, EFHM_TRADE, EFHM_DEFINITION_NOM, EFHM_DEFINITION_BATS:
 		return fmt.Sprintf("HDR{T:%d, TC:%d, QP:%d, UId:%08x, SId:%016x, SN:%d, TS:%016x}",
 			m.Type,
 			m.TickCondition,
@@ -142,11 +164,38 @@ func (m efhm_trade) String() string {
 		m.TradeCondition,
 	)
 }
+func (m efhm_definition_nom) String() string {
+	return fmt.Sprintf("%s DEF_NOM{S:\"%s\" %016x, MD:%x, US:\"%s\" %016x, SP:%d, PC:%d}",
+		m.efhm_header,
+		trimAsciiz(m.Symbol[:]),
+		binary.LittleEndian.Uint64(m.Symbol[:]),
+		m.MaturityDate,
+		trimAsciiz(m.UnderlyingSymbol[:]),
+		binary.LittleEndian.Uint64(m.UnderlyingSymbol[:]),
+		m.StrikePrice,
+		m.PutOrCall,
+	)
+}
+func (m efhm_definition_bats) String() string {
+	return fmt.Sprintf("%s DEF_BATS{OS:\"%s\"}",
+		m.efhm_header,
+		trimAsciiz(m.OsiSymbol[:]),
+	)
+}
+func trimAsciiz(b []byte) []byte {
+	pos := bytes.IndexByte(b, 0)
+	if pos < 0 {
+		return b
+	}
+	return b[:pos]
+}
 
 type EfhLoggerPrinter interface {
 	PrintOrder(efhm_order)
 	PrintQuote(efhm_quote)
 	PrintTrade(efhm_trade)
+	PrintDefinitionNom(efhm_definition_nom)
+	PrintDefinitionBats(efhm_definition_bats)
 }
 
 type testefhPrinter struct {
@@ -165,6 +214,12 @@ func (p *testefhPrinter) PrintQuote(o efhm_quote) {
 	fmt.Fprintln(p.w, o)
 }
 func (p *testefhPrinter) PrintTrade(m efhm_trade) {
+	fmt.Fprintln(p.w, m)
+}
+func (p *testefhPrinter) PrintDefinitionNom(m efhm_definition_nom) {
+	fmt.Fprintln(p.w, m)
+}
+func (p *testefhPrinter) PrintDefinitionBats(m efhm_definition_bats) {
 	fmt.Fprintln(p.w, m)
 }
 
@@ -200,8 +255,13 @@ func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
 	l.TobLogger.MessageArrived(idm)
-	if m, ok := l.stream.getExchangeMessage().(packet.TradeMessage); ok {
+	switch m := l.stream.getExchangeMessage().(type) {
+	case packet.TradeMessage:
 		l.genUpdateTrades(m)
+	case *nasdaq.IttoMessageOptionDirectory:
+		l.genUpdateDefinitionsNom(m)
+	case *bats.PitchMessageSymbolMapping:
+		l.genUpdateDefinitionsBats(m)
 	}
 }
 
@@ -265,4 +325,28 @@ func (l *EfhLogger) genUpdateTrades(msg packet.TradeMessage) {
 		Size:        uint32(size),
 	}
 	l.printer.PrintTrade(m)
+}
+func (l *EfhLogger) genUpdateDefinitionsNom(msg *nasdaq.IttoMessageOptionDirectory) {
+	m := efhm_definition_nom{
+		efhm_header: l.genUpdateHeaderForOption(EFHM_DEFINITION_NOM, msg.OptionId()),
+		StrikePrice: uint32(msg.StrikePrice),
+	}
+	year, month, day := msg.Expiration.Date()
+	m.MaturityDate = uint64(year%100<<16 + int(month)<<8 + day)
+	copy(m.Symbol[:], msg.Symbol)
+	copy(m.UnderlyingSymbol[:], msg.UnderlyingSymbol)
+	switch msg.OType {
+	case 'C':
+		m.PutOrCall = EFH_SECURITY_CALL
+	case 'P':
+		m.PutOrCall = EFH_SECURITY_PUT
+	}
+	l.printer.PrintDefinitionNom(m)
+}
+func (l *EfhLogger) genUpdateDefinitionsBats(msg *bats.PitchMessageSymbolMapping) {
+	m := efhm_definition_bats{
+		efhm_header: l.genUpdateHeaderForOption(EFHM_DEFINITION_BATS, msg.OptionId()),
+	}
+	copy(m.OsiSymbol[:], msg.OsiSymbol)
+	l.printer.PrintDefinitionBats(m)
 }
