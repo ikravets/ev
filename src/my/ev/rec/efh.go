@@ -208,8 +208,8 @@ func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if l.mode == EfhLoggerOutputOrders {
 		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNew) {
-			l.genUpdateOrders(l.bid)
-			l.genUpdateOrders(l.ask)
+			l.genUpdateOrders(l.TobLogger.bid)
+			l.genUpdateOrders(l.TobLogger.ask)
 		}
 	} else {
 		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
@@ -250,10 +250,10 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 func (l *EfhLogger) genUpdateQuotes() {
 	m := efhm_quote{
 		efhm_header: l.genUpdateHeader(EFHM_QUOTE),
-		BidPrice:    uint32(l.bid.New.Price),
-		BidSize:     uint32(l.bid.New.Size),
-		AskPrice:    uint32(l.ask.New.Price),
-		AskSize:     uint32(l.ask.New.Size),
+		BidPrice:    uint32(l.TobLogger.bid.New.Price),
+		BidSize:     uint32(l.TobLogger.bid.New.Size),
+		AskPrice:    uint32(l.TobLogger.ask.New.Price),
+		AskSize:     uint32(l.TobLogger.ask.New.Size),
 	}
 	l.printer.PrintQuote(m)
 }
