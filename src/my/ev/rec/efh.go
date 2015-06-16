@@ -81,7 +81,7 @@ type efhm_trade struct {
 func (m efhm_header) String() string {
 	switch m.Type {
 	case EFHM_QUOTE, EFHM_ORDER, EFHM_TRADE:
-		return fmt.Sprintf("HDR{T:%d, TC:%d, QP:%d, UId:%08x, SId:%08x, SN:%d, TS:%08x}",
+		return fmt.Sprintf("HDR{T:%d, TC:%d, QP:%d, UId:%08x, SId:%016x, SN:%d, TS:%016x}",
 			m.Type,
 			m.TickCondition,
 			m.QueuePosition,
