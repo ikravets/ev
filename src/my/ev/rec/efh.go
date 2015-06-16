@@ -201,9 +201,7 @@ func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
 	l.TobLogger.MessageArrived(idm)
 	if m, ok := l.stream.getExchangeMessage().(packet.TradeMessage); ok {
-		oid, price, size := m.TradeInfo()
-		l.lastOptionId = oid
-		l.genUpdateTrades(price, size)
+		l.genUpdateTrades(m)
 	}
 }
 
@@ -220,13 +218,16 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	}
 }
 
-func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
+func (l *EfhLogger) genUpdateHeaderForOption(messageType uint8, oid packet.OptionId) efhm_header {
 	return efhm_header{
 		Type:           messageType,
-		SecurityId:     l.lastOptionId.ToUint64(),
+		SecurityId:     oid.ToUint64(),
 		SequenceNumber: l.stream.getSeqNum(),
 		TimeStamp:      l.stream.getTimestamp(),
 	}
+}
+func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
+	return l.genUpdateHeaderForOption(messageType, l.TobLogger.lastOptionId)
 }
 func (l *EfhLogger) genUpdateOrders(tob tob) {
 	if !tob.updated() {
@@ -256,9 +257,10 @@ func (l *EfhLogger) genUpdateQuotes() {
 	}
 	l.printer.PrintQuote(m)
 }
-func (l *EfhLogger) genUpdateTrades(price packet.Price, size int) {
+func (l *EfhLogger) genUpdateTrades(msg packet.TradeMessage) {
+	oid, price, size := msg.TradeInfo()
 	m := efhm_trade{
-		efhm_header: l.genUpdateHeader(EFHM_TRADE),
+		efhm_header: l.genUpdateHeaderForOption(EFHM_TRADE, oid),
 		Price:       uint32(packet.PriceTo4Dec(price)),
 		Size:        uint32(size),
 	}
