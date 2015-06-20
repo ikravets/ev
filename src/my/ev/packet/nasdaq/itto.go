@@ -252,7 +252,7 @@ func decodeIttoMessage(data []byte) IttoMessageCommon {
 	return m
 }
 func (m *IttoMessageCommon) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	buf, err := b.AppendBytes(1)
 	errs.CheckE(err)
 	buf[0] = byte(m.Type)
@@ -295,7 +295,7 @@ func (m *IttoMessageSeconds) DecodeFromBytes(data []byte, df gopacket.DecodeFeed
 	return nil
 }
 func (m *IttoMessageSeconds) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.CheckE(m.IttoMessageCommon.SerializeTo(b, opts))
 	buf, err := b.AppendBytes(4)
 	errs.CheckE(err)
@@ -334,7 +334,7 @@ func (m *IttoMessageBaseReference) DecodeFromBytes(data []byte, df gopacket.Deco
 	return nil
 }
 func (m *IttoMessageBaseReference) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.CheckE(m.IttoMessageCommon.SerializeTo(b, opts))
 	buf, err := b.AppendBytes(8)
 	errs.CheckE(err)
@@ -441,7 +441,7 @@ func (m *IttoMessageAddOrder) DecodeFromBytes(data []byte, df gopacket.DecodeFee
 	return nil
 }
 func (m *IttoMessageAddOrder) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.CheckE(m.IttoMessageCommon.SerializeTo(b, opts))
 	buf, err := b.AppendBytes(9)
 	errs.CheckE(err)

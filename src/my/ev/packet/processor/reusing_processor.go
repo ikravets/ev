@@ -55,7 +55,7 @@ func (p *reusingProcessor) LimitPacketNumber(limit int) {
 }
 
 func (p *reusingProcessor) ProcessAll() (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	pd := NewUdpDstPortPayloadDetector()
 	for port := 30100; port < 30200; port++ {
 		pd.addPortMap(layers.UDPPort(port), bats.LayerTypeBSU)
@@ -105,7 +105,7 @@ func (p *reusingProcessor) ProcessAll() (err error) {
 }
 
 func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, decoded []gopacket.DecodingLayer) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	p.pkt = reusingPacket{
 		data:   data,
 		ci:     ci,

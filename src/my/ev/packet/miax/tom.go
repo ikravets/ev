@@ -184,7 +184,7 @@ func decodeTomMessage(data []byte) TomMessageCommon {
 	return m
 }
 func (m *TomMessageCommon) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	buf, err := b.AppendBytes(1)
 	errs.CheckE(err)
 	buf[0] = byte(m.Type)
@@ -227,7 +227,7 @@ func (m *TomMessageSystemTime) DecodeFromBytes(data []byte, df gopacket.DecodeFe
 	return nil
 }
 func (m *TomMessageSystemTime) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.CheckE(m.TomMessageCommon.SerializeTo(b, opts))
 	buf, err := b.AppendBytes(4)
 	errs.CheckE(err)

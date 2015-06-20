@@ -54,7 +54,7 @@ func (m *MachTop) LayerType() gopacket.LayerType {
 	return LayerTypeMachTop
 }
 func (m *MachTop) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	*m = MachTop{
 		BaseLayer: layers.BaseLayer{data, data},
 		tps:       m.tps[:0], // reuse the slice storage
@@ -100,7 +100,7 @@ func (m *Mach) LayerType() gopacket.LayerType {
 	return LayerTypeMach
 }
 func (m *Mach) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.Check(len(data) >= 12)
 	length := binary.LittleEndian.Uint16(data[8:10])
 	errs.Check(len(data) >= int(length))
@@ -133,7 +133,7 @@ func (m *Mach) Flow() gopacket.Flow {
 }
 func decodeMach(data []byte, p gopacket.PacketBuilder) (err error) {
 	panic("FIXME")
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	m := &Mach{}
 	errs.CheckE(m.DecodeFromBytes(data, p))
 	p.AddLayer(m)

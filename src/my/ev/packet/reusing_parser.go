@@ -49,7 +49,7 @@ func (p *ReusingLayerParser) AddDecodingLayerFactory(f DecodingLayerFactory) {
 }
 
 func (p *ReusingLayerParser) DecodeLayers(data []byte, decoded *[]gopacket.DecodingLayer) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	p.Truncated = false
 
 	dlEnd := 0

@@ -110,7 +110,7 @@ type memh2pcap struct {
 }
 
 func (m *memh2pcap) Open(w io.Writer) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	m.pw = pcapgo.NewWriter(w)
 	errs.CheckE(m.pw.WriteFileHeader(65536, layers.LinkTypeEthernet))
 
@@ -149,7 +149,7 @@ func (m *memh2pcap) Open(w io.Writer) (err error) {
 	return
 }
 func (m *memh2pcap) addOne(r io.Reader) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	m.data.Reset()
 	scanner := bufio.NewScanner(r)
 	for i := 0; scanner.Scan(); i++ {
@@ -183,7 +183,7 @@ func (m *memh2pcap) addOne(r io.Reader) (err error) {
 }
 func (m *memh2pcap) addFile(filename string) (err error) {
 	log.Printf("adding %s\n", filename)
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	in, err := os.Open(filename)
 	errs.CheckE(err)
 	errs.CheckE(m.addOne(in))

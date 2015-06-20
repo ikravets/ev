@@ -25,7 +25,7 @@ type MemhRecorder struct {
 }
 
 func NewMemhRecorder(dir string) (p *MemhRecorder, err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	p = &MemhRecorder{dir: dir}
 	p.hexDigits = []byte("0123456789abcdef")
 	p.outbuf = bytes.NewBuffer(make([]byte, 0, 4096))
@@ -45,7 +45,7 @@ func (p *MemhRecorder) Close() {
 }
 
 func (p *MemhRecorder) AddData(data []byte) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	p.outbuf.Reset()
 	chunk := make([]byte, 8)
 	zeroChunk := make([]byte, 8)

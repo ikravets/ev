@@ -35,7 +35,7 @@ func (m *BSU) LayerType() gopacket.LayerType {
 	return LayerTypeBSU
 }
 func (m *BSU) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	*m = BSU{
 		Length:    binary.LittleEndian.Uint16(data[0:2]),
 		Count:     uint8(data[2]),

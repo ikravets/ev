@@ -39,7 +39,7 @@ func (s *Subscr) Unsubscribe(oid packet.OptionId) {
 	delete(s.subscriptions, oid)
 }
 func (s *Subscr) SubscribeFromReader(rd io.Reader) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	sc := bufio.NewScanner(rd)
 	for sc.Scan() {
 		text := sc.Text()

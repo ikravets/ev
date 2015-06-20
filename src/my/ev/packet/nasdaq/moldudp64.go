@@ -108,7 +108,7 @@ func decodeMoldUDP64(data []byte, p gopacket.PacketBuilder) error {
 }
 
 func (m *MoldUDP64) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	bytes, err := b.PrependBytes(20)
 	errs.CheckE(err)
 	copy(bytes[0:10], m.Session[0:10])
@@ -221,7 +221,7 @@ func decodeMoldUDP64MessageBlockChained(data []byte, p gopacket.PacketBuilder) e
 }
 
 func (m *MoldUDP64MessageBlockChained) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	payload := b.Bytes()
 	bytes, err := b.PrependBytes(2)
 	errs.CheckE(err)

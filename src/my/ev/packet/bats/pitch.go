@@ -231,7 +231,7 @@ func decodePitchMessage(data []byte) PitchMessageCommon {
 	return m
 }
 func (m *PitchMessageCommon) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	buf, err := b.AppendBytes(2)
 	errs.CheckE(err)
 	buf[0] = m.Length
@@ -273,7 +273,7 @@ func (m *PitchMessageTime) DecodeFromBytes(data []byte, df gopacket.DecodeFeedba
 	return nil
 }
 func (m *PitchMessageTime) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.CheckE(m.PitchMessageCommon.SerializeTo(b, opts))
 	buf, err := b.AppendBytes(4)
 	errs.CheckE(err)
@@ -296,7 +296,7 @@ func (m *PitchMessageUnitClear) DecodeFromBytes(data []byte, df gopacket.DecodeF
 	return nil
 }
 func (m *PitchMessageUnitClear) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.CheckE(m.PitchMessageCommon.SerializeTo(b, opts))
 	return
 }

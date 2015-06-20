@@ -167,7 +167,7 @@ type MessageLogout struct {
 }
 
 func ReadMessage(r io.Reader) (m Message, err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	var mc MessageCommon
 	errs.CheckE(binary.Read(r, binary.BigEndian, &mc.Header))
 	mc.Payload = make([]byte, mc.Header.Length-1)
@@ -202,7 +202,7 @@ func ReadMessage(r io.Reader) (m Message, err error) {
 }
 
 func WriteMessage(w io.Writer, m Message) (err error) {
-	errs.PassE(&err)
+	defer errs.PassE(&err)
 	errs.CheckE(m.encodePayload())
 	var mt MessageType
 	switch m.(type) {
