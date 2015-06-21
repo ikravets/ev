@@ -332,7 +332,7 @@ func (l *EfhLogger) genUpdateDefinitionsNom(msg *nasdaq.IttoMessageOptionDirecto
 		StrikePrice: uint32(msg.StrikePrice),
 	}
 	year, month, day := msg.Expiration.Date()
-	m.MaturityDate = uint64(year%100<<16 + int(month)<<8 + day)
+	m.MaturityDate = uint64(day<<16 + int(month)<<8 + year%100)
 	copy(m.Symbol[:], msg.Symbol)
 	copy(m.UnderlyingSymbol[:], msg.UnderlyingSymbol)
 	switch msg.OType {
