@@ -156,3 +156,24 @@ func (d *UdpDstPortPayloadDetector) Detect(payload []byte, decodedLayers *[]gopa
 func (d *UdpDstPortPayloadDetector) addPortMap(dst layers.UDPPort, lt gopacket.LayerType) {
 	d.portMap[dst] = lt
 }
+
+/************************************************************************/
+type LayerFunctionPayloadDetector struct {
+	detectorFn func(gopacket.DecodingLayer) (gopacket.LayerType, error)
+}
+
+var _ PayloadDetector = &LayerFunctionPayloadDetector{}
+var LayerFunctionPayloadDetectorFailedError = errors.New("payload detection by LayerFunction failed")
+
+func NewLayerFunctionPayloadDetector(detectorFn func(gopacket.DecodingLayer) (gopacket.LayerType, error)) *LayerFunctionPayloadDetector {
+	return &LayerFunctionPayloadDetector{detectorFn: detectorFn}
+}
+func (d *LayerFunctionPayloadDetector) Detect(payload []byte, decodedLayers *[]gopacket.DecodingLayer) (layer gopacket.LayerType, err error) {
+	for _, dl := range *decodedLayers {
+		layer, err = d.detectorFn(dl)
+		if err == nil {
+			return
+		}
+	}
+	return gopacket.LayerTypeZero, LayerFunctionPayloadDetectorFailedError
+}
