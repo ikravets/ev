@@ -36,12 +36,16 @@ func NewMemhRecorder(dir string) (p *MemhRecorder, err error) {
 	return
 }
 
-func (p *MemhRecorder) Close() {
-	fmt.Fprintf(p.indexFile, "%x\n", p.packetNum)
+func (p *MemhRecorder) Close() (err error) {
+	defer errs.PassE(&err)
+	_, err = fmt.Fprintf(p.indexFile, "%x\n", p.packetNum)
+	errs.CheckE(err)
 	for _, l := range p.packetLengths {
-		fmt.Fprintf(p.indexFile, "%x\n", l)
+		_, err = fmt.Fprintf(p.indexFile, "%x\n", l)
+		errs.CheckE(err)
 	}
 	p.indexFile.Close()
+	return
 }
 
 func (p *MemhRecorder) AddData(data []byte) (err error) {

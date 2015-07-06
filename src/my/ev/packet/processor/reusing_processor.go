@@ -161,20 +161,25 @@ type reusingPacket struct {
 
 func (rp *reusingPacket) String() string {
 	var b bytes.Buffer
-	fmt.Fprintf(&b, "PACKET: %d bytes", len(rp.Data()))
+	var err error
+	_, err = fmt.Fprintf(&b, "PACKET: %d bytes", len(rp.Data()))
+	errs.CheckE(err)
 	if rp.ci.Length > 0 {
-		fmt.Fprintf(&b, ", wire length %d cap length %d", rp.ci.Length, rp.ci.CaptureLength)
+		_, err = fmt.Fprintf(&b, ", wire length %d cap length %d", rp.ci.Length, rp.ci.CaptureLength)
+		errs.CheckE(err)
 	}
 	if !rp.ci.Timestamp.IsZero() {
-		fmt.Fprintf(&b, " @ %v", rp.ci.Timestamp)
+		_, err = fmt.Fprintf(&b, " @ %v", rp.ci.Timestamp)
+		errs.CheckE(err)
 	}
 	b.WriteByte('\n')
 	for i, l := range rp.layers {
 		if gl, ok := l.(gopacket.Layer); ok {
-			fmt.Fprintf(&b, "- Layer %d (%02d bytes) = %s\n", i+1, len(gl.LayerContents()), gopacket.LayerString(gl))
+			_, err = fmt.Fprintf(&b, "- Layer %d (%02d bytes) = %s\n", i+1, len(gl.LayerContents()), gopacket.LayerString(gl))
 		} else {
-			fmt.Fprintf(&b, "- Layer %d <cannot print>\n", i+1)
+			_, err = fmt.Fprintf(&b, "- Layer %d <cannot print>\n", i+1)
 		}
+		errs.CheckE(err)
 	}
 	return b.String()
 }

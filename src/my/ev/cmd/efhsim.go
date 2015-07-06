@@ -7,10 +7,10 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"io"
-	"log"
 	"os"
 
 	"github.com/jessevdk/go-flags"
+
 	"my/errs"
 
 	"my/ev/anal"
@@ -31,7 +31,7 @@ type cmdEfhsim struct {
 	PacketNumLimit          int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
 	NoHwLim                 bool   `long:"no-hw-lim" description:"do not enforce HW limits"`
 	shouldExecute           bool
-	outFiles                []io.Closer
+	closers                 []io.Closer
 }
 
 func (c *cmdEfhsim) Execute(args []string) error {
@@ -41,27 +41,20 @@ func (c *cmdEfhsim) Execute(args []string) error {
 
 func (c *cmdEfhsim) ConfigParser(parser *flags.Parser) {
 	_, err := parser.AddCommand("efhsim", "simulate efh", "", c)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	errs.CheckE(err)
 }
 
 func (c *cmdEfhsim) ParsingFinished() {
 	if !c.shouldExecute {
 		return
 	}
-	defer func() {
-		for _, f := range c.outFiles {
-			f.Close()
-		}
-	}()
 	efh := efhsim.NewEfhSim()
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
 	if c.SubscriptionFileName != "" {
 		file, err := os.Open(c.SubscriptionFileName)
 		errs.CheckE(err)
 		errs.CheckE(efh.SubscribeFromReader(file))
-		file.Close()
+		errs.CheckE(file.Close())
 	}
 	if !c.NoHwLim {
 		efh.AddLogger(rec.NewHwLimChecker())
@@ -87,19 +80,21 @@ func (c *cmdEfhsim) ParsingFinished() {
 		return efh.AddLogger(logger)
 	})
 	c.addOut(c.OutputFileNameAvt, func(w io.Writer) (err error) {
+		defer errs.PassE(&err)
 		var dict io.ReadCloser
 		if c.InputFileNameAvtDict != "" {
-			if dict, err = os.Open(c.InputFileNameAvtDict); err != nil {
-				return
-			} else {
-				c.outFiles = append(c.outFiles, dict)
-			}
+			dict, err := os.Open(c.InputFileNameAvtDict)
+			errs.CheckE(err)
+			c.closers = append(c.closers, dict)
 		}
 		return efh.AddLogger(rec.NewAvtLogger(w, dict))
 	})
-
 	reporter := c.addAnalyzer(efh)
 	errs.CheckE(efh.AnalyzeInput())
+
+	for _, cl := range c.closers {
+		errs.CheckE(cl.Close())
+	}
 	if reporter != nil {
 		reporter.SaveAll()
 	}
@@ -109,15 +104,10 @@ func (c *cmdEfhsim) addOut(fileName string, setOut func(io.Writer) error) {
 	if fileName == "" {
 		return
 	}
-	file, err := os.Create(fileName)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if err := setOut(file); err != nil {
-		file.Close()
-		log.Fatalln(err)
-	}
-	c.outFiles = append(c.outFiles, file)
+	o, err := os.Create(fileName)
+	errs.CheckE(err)
+	errs.CheckE(setOut(o))
+	c.closers = append(c.closers, o)
 }
 func (c *cmdEfhsim) addAnalyzer(efh *efhsim.EfhSim) *anal.Reporter {
 	if c.OutputDirStats == "" {

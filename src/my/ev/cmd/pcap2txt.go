@@ -6,11 +6,12 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/google/gopacket/pcap"
 	"github.com/jessevdk/go-flags"
+
+	"my/errs"
 
 	"my/ev/packet"
 	"my/ev/packet/processor"
@@ -36,15 +37,11 @@ func (c *cmdPcap2txt) ParsingFinished() {
 		return
 	}
 	handle, err := pcap.OpenOffline(c.InputFileName)
-	if err != nil {
-		log.Fatal(err)
-	}
+	errs.CheckE(err)
 	defer handle.Close()
 	outFile, err := os.OpenFile(c.OutputFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer outFile.Close()
+	errs.CheckE(err)
+	defer func() { errs.CheckE(outFile.Close()) }()
 
 	printer := &packetPrinter{w: outFile}
 	pp := processor.NewProcessor()
@@ -65,7 +62,8 @@ type packetPrinter struct {
 
 func (p *packetPrinter) HandlePacket(packet packet.Packet) {
 	p.packetNumber++
-	fmt.Fprintf(p.w, "%d %s\n", p.packetNumber, packet)
+	_, err := fmt.Fprintf(p.w, "%d %s\n", p.packetNumber, packet)
+	errs.CheckE(err)
 }
 func (_ *packetPrinter) HandleMessage(_ packet.ApplicationMessage) {
 }

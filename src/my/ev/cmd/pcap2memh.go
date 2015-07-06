@@ -4,10 +4,10 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/google/gopacket/pcap"
 	"github.com/jessevdk/go-flags"
+
+	"my/errs"
 
 	"my/ev/packet/processor"
 	"my/ev/rec"
@@ -34,16 +34,12 @@ func (c *cmdPcap2memh) ParsingFinished() {
 		return
 	}
 	handle, err := pcap.OpenOffline(c.InputFileName)
-	if err != nil {
-		log.Fatal(err)
-	}
+	errs.CheckE(err)
 	defer handle.Close()
 
 	printer, err := rec.NewMemhRecorder(c.DestDirName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer printer.Close()
+	errs.CheckE(err)
+	defer func() { errs.CheckE(printer.Close()) }()
 	printer.AddDummy()
 
 	pp := processor.NewProcessor()

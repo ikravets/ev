@@ -8,7 +8,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
+
+	"my/errs"
 
 	"my/ev/packet"
 	"my/ev/packet/bats"
@@ -34,9 +35,8 @@ func (s *SimLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 }
 
 func (s *SimLogger) printf(format string, vs ...interface{}) {
-	if _, err := fmt.Fprintf(s.w, format, vs...); err != nil {
-		log.Fatal("output error", err)
-	}
+	_, err := fmt.Fprintf(s.w, format, vs...)
+	errs.CheckE(err)
 }
 func (s *SimLogger) printfln(format string, vs ...interface{}) {
 	f := format + "\n"
@@ -195,43 +195,44 @@ func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	s.efhLogger.AfterBookUpdate(book, operation)
 }
 
-func (s *SimLogger) PrintOrder(m efhm_order) {
-	s.genAppUpdate(m)
+func (s *SimLogger) PrintOrder(m efhm_order) error {
+	return s.genAppUpdate(m)
 }
-func (s *SimLogger) PrintQuote(m efhm_quote) {
-	s.genAppUpdate(m)
+func (s *SimLogger) PrintQuote(m efhm_quote) error {
+	return s.genAppUpdate(m)
 }
-func (s *SimLogger) PrintTrade(m efhm_trade) {
-	s.genAppUpdate(m)
+func (s *SimLogger) PrintTrade(m efhm_trade) error {
+	return s.genAppUpdate(m)
 }
-func (s *SimLogger) PrintDefinitionNom(m efhm_definition_nom) {
-	s.genAppUpdate(m)
+func (s *SimLogger) PrintDefinitionNom(m efhm_definition_nom) error {
+	return s.genAppUpdate(m)
 }
-func (s *SimLogger) PrintDefinitionBats(m efhm_definition_bats) {
-	s.genAppUpdate(m)
+func (s *SimLogger) PrintDefinitionBats(m efhm_definition_bats) error {
+	return s.genAppUpdate(m)
 }
 
-func (s *SimLogger) genAppUpdate(appMessage interface{}) {
+func (s *SimLogger) genAppUpdate(appMessage interface{}) (err error) {
+	defer errs.PassE(&err)
 	var bb bytes.Buffer
-	if err := binary.Write(&bb, binary.LittleEndian, appMessage); err != nil {
-		log.Fatal(err)
-	}
+	errs.CheckE(binary.Write(&bb, binary.LittleEndian, appMessage))
 	if r := bb.Len() % 8; r > 0 {
 		// pad to  multiple of 8 bytes
 		z := make([]byte, 8)
-		bb.Write(z[0 : 8-r])
+		_, err = bb.Write(z[0 : 8-r])
+		errs.CheckE(err)
 	}
 
 	for {
 		var qw uint64
-		if err := binary.Read(&bb, binary.LittleEndian, &qw); err != nil {
+		if err = binary.Read(&bb, binary.LittleEndian, &qw); err != nil {
 			if err == io.EOF {
 				break
 			}
-			log.Fatal(err)
+			errs.CheckE(err)
 		} else {
 			s.printfln("DMATOHOST_DATA %016x", qw)
 		}
 	}
 	s.printfln("DMATOHOST_TRAILER 00656e696c616b45")
+	return
 }

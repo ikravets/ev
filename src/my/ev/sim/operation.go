@@ -4,7 +4,7 @@
 package sim
 
 import (
-	"log"
+	"my/errs"
 
 	"my/ev/packet"
 )
@@ -119,9 +119,7 @@ func (o *OperationRemove) GetSide() (side packet.MarketSide) {
 }
 func (o *OperationRemove) GetSizeDelta() int {
 	o.Operation.populate()
-	if o.origOrder == nil {
-		log.Fatal("no origOrder")
-	}
+	errs.Check(o.origOrder != nil)
 	return -o.origOrder.Size
 }
 func (o *OperationRemove) GetNewSize() int {
@@ -129,9 +127,7 @@ func (o *OperationRemove) GetNewSize() int {
 }
 func (o *OperationRemove) GetPrice() int {
 	o.Operation.populate()
-	if o.origOrder == nil {
-		log.Fatal("no origOrder")
-	}
+	errs.Check(o.origOrder != nil)
 	return packet.PriceTo4Dec(o.origOrder.Price)
 }
 
@@ -154,15 +150,11 @@ func (o *OperationUpdate) GetSizeDelta() int {
 }
 func (o *OperationUpdate) GetNewSize() int {
 	o.Operation.populate()
-	if o.origOrder == nil {
-		log.Fatal("no origOrder")
-	}
+	errs.Check(o.origOrder != nil)
 	return o.origOrder.Size - o.sizeChange
 }
 func (o *OperationUpdate) GetPrice() int {
 	o.Operation.populate()
-	if o.origOrder == nil {
-		log.Fatal("no origOrder")
-	}
+	errs.Check(o.origOrder != nil)
 	return packet.PriceTo4Dec(o.origOrder.Price)
 }

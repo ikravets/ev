@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"time"
 
+	"my/errs"
+
 	"my/ev/sim"
 )
 
@@ -32,16 +34,13 @@ func NewAvtLogger(w io.Writer, rDict io.Reader) *AvtLogger {
 		stream:    *NewStream(),
 	}
 	var err error
-	if l.location, err = time.LoadLocation("EST"); err != nil {
-		log.Fatal(err)
-	}
+	l.location, err = time.LoadLocation("EST")
+	errs.CheckE(err)
 
 	if rDict != nil {
 		r := csv.NewReader(rDict)
 		records, err := r.ReadAll()
-		if err != nil {
-			log.Fatal(err)
-		}
+		errs.CheckE(err)
 		l.oid2AvtName = make(map[int]string)
 		for _, rec := range records {
 			if len(rec) != 2 {
@@ -50,11 +49,9 @@ func NewAvtLogger(w io.Writer, rDict io.Reader) *AvtLogger {
 			if rec[0] == "avtSymbol" && rec[1] == "exchangeId" {
 				continue // header
 			}
-			if oid, err := strconv.Atoi(rec[1]); err != nil {
-				log.Fatal(err)
-			} else {
-				l.oid2AvtName[oid] = rec[0]
-			}
+			oid, err := strconv.Atoi(rec[1])
+			errs.CheckE(err)
+			l.oid2AvtName[oid] = rec[0]
 		}
 	}
 	return l
@@ -96,7 +93,7 @@ func (l *AvtLogger) genUpdate() {
 	avtTimestamp := dayStart.Add(time.Duration(l.stream.getTimestamp())).UnixNano() / 1000000
 	if false {
 		// OptionMarketDataNASDAQ2,date,time,Security,Underlying,SecurityType,BidSize,BidPrice,OrderBidSize,AskSize,AskPrice,OrderAskSize,TradeStatus,TickCondition,ExchangeTimestamp
-		fmt.Fprintf(l.w, "OptionMarketDataNASDAQ2,%s,%s,%s,1,%d,%s,0,%d,%s,0,,,%d\n",
+		_, err := fmt.Fprintf(l.w, "OptionMarketDataNASDAQ2,%s,%s,%s,1,%d,%s,0,%d,%s,0,,,%d\n",
 			dateTime,
 			optName,
 			underlying,
@@ -106,12 +103,13 @@ func (l *AvtLogger) genUpdate() {
 			priceString(l.ask.New.Price),
 			avtTimestamp,
 		)
+		errs.CheckE(err)
 	} else {
 		if underlying == "<?>" {
 			return
 		}
 		// ExchangeTimestamp, Date, Time, Security, BidSize, BidPrice, AskSize, AskPrice,
-		fmt.Fprintf(l.w, "%d,%s,%s,%d,%s,%d,%s\n",
+		_, err := fmt.Fprintf(l.w, "%d,%s,%s,%d,%s,%d,%s\n",
 			avtTimestamp,
 			dateTime[0:21],
 			optName,
@@ -120,6 +118,7 @@ func (l *AvtLogger) genUpdate() {
 			l.ask.New.Size,
 			priceString(l.ask.New.Price),
 		)
+		errs.CheckE(err)
 	}
 }
 

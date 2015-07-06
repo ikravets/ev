@@ -42,7 +42,7 @@ func (c *cmdSoupbin2memh) ParsingFinished() {
 
 	printer, err := rec.NewMemhRecorder(c.DestDirName)
 	errs.CheckE(err)
-	defer printer.Close()
+	defer func() { errs.CheckE(printer.Close()) }()
 	printer.AddDummy()
 
 	var buf []byte

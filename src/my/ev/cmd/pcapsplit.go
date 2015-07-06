@@ -11,6 +11,8 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
+	"my/errs"
+
 	"my/ev/packet"
 	"my/ev/pcapsplit"
 )
@@ -41,15 +43,11 @@ func (p *cmdPcapsplit) ParsingFinished() {
 	if !p.shouldExecute {
 		return
 	}
-	if err := os.MkdirAll(p.DestDirName, 0755); err != nil {
-		log.Fatal(err)
-	}
+	errs.CheckE(os.MkdirAll(p.DestDirName, 0755))
 	splitter := pcapsplit.NewSplitter()
 	splitter.SetInput(p.InputFileName, p.PacketNumLimit)
 	splitter.Filter(p.OptionIds)
-	if err := splitter.AnalyzeInput(); err != nil {
-		log.Fatal(err)
-	}
+	errs.CheckE(splitter.AnalyzeInput())
 	pbo := splitter.PacketByOptionAll()
 	//log.Println(splitter.AllPacketOids())
 	//log.Println(pbo)

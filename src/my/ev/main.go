@@ -42,12 +42,12 @@ func main() {
 	logFile, err := os.OpenFile(opts.LogFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	errs.CheckE(err)
 	log.SetOutput(logFile)
-	defer logFile.Close()
+	defer func() { errs.CheckE(logFile.Close()) }()
 
 	if opts.ProfileCpu != "" {
 		profFile, err := os.Create(opts.ProfileCpu)
 		errs.CheckE(err)
-		pprof.StartCPUProfile(profFile)
+		errs.CheckE(pprof.StartCPUProfile(profFile))
 		defer pprof.StopCPUProfile()
 	}
 
@@ -56,7 +56,7 @@ func main() {
 	if opts.ProfileMem != "" {
 		profFile, err := os.Create(opts.ProfileMem)
 		errs.CheckE(err)
-		pprof.WriteHeapProfile(profFile)
-		profFile.Close()
+		errs.CheckE(pprof.WriteHeapProfile(profFile))
+		errs.CheckE(profFile.Close())
 	}
 }

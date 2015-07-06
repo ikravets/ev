@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 
+	"my/errs"
+
 	"my/ev/packet"
 	"my/ev/packet/bats"
 	"my/ev/packet/nasdaq"
@@ -191,11 +193,11 @@ func trimAsciiz(b []byte) []byte {
 }
 
 type EfhLoggerPrinter interface {
-	PrintOrder(efhm_order)
-	PrintQuote(efhm_quote)
-	PrintTrade(efhm_trade)
-	PrintDefinitionNom(efhm_definition_nom)
-	PrintDefinitionBats(efhm_definition_bats)
+	PrintOrder(efhm_order) error
+	PrintQuote(efhm_quote) error
+	PrintTrade(efhm_trade) error
+	PrintDefinitionNom(efhm_definition_nom) error
+	PrintDefinitionBats(efhm_definition_bats) error
 }
 
 type testefhPrinter struct {
@@ -207,20 +209,24 @@ var _ EfhLoggerPrinter = &testefhPrinter{}
 func NewTestefhPrinter(w io.Writer) EfhLoggerPrinter {
 	return &testefhPrinter{w: w}
 }
-func (p *testefhPrinter) PrintOrder(o efhm_order) {
-	fmt.Fprintln(p.w, o)
+func (p *testefhPrinter) PrintOrder(o efhm_order) error {
+	return p.print(o)
 }
-func (p *testefhPrinter) PrintQuote(o efhm_quote) {
-	fmt.Fprintln(p.w, o)
+func (p *testefhPrinter) PrintQuote(o efhm_quote) error {
+	return p.print(o)
 }
-func (p *testefhPrinter) PrintTrade(m efhm_trade) {
-	fmt.Fprintln(p.w, m)
+func (p *testefhPrinter) PrintTrade(m efhm_trade) error {
+	return p.print(m)
 }
-func (p *testefhPrinter) PrintDefinitionNom(m efhm_definition_nom) {
-	fmt.Fprintln(p.w, m)
+func (p *testefhPrinter) PrintDefinitionNom(m efhm_definition_nom) error {
+	return p.print(m)
 }
-func (p *testefhPrinter) PrintDefinitionBats(m efhm_definition_bats) {
-	fmt.Fprintln(p.w, m)
+func (p *testefhPrinter) PrintDefinitionBats(m efhm_definition_bats) error {
+	return p.print(m)
+}
+func (p *testefhPrinter) print(v interface{}) error {
+	_, err := fmt.Fprintln(p.w, v)
+	return err
 }
 
 type EfhLogger struct {
@@ -305,7 +311,7 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 	case packet.MarketSideAsk:
 		m.OrderSide = EFH_ORDER_ASK
 	}
-	l.printer.PrintOrder(m)
+	errs.CheckE(l.printer.PrintOrder(m))
 }
 func (l *EfhLogger) genUpdateQuotes() {
 	m := efhm_quote{
@@ -315,7 +321,7 @@ func (l *EfhLogger) genUpdateQuotes() {
 		AskPrice:    uint32(l.TobLogger.ask.New.Price),
 		AskSize:     uint32(l.TobLogger.ask.New.Size),
 	}
-	l.printer.PrintQuote(m)
+	errs.CheckE(l.printer.PrintQuote(m))
 }
 func (l *EfhLogger) genUpdateTrades(msg packet.TradeMessage) {
 	oid, price, size := msg.TradeInfo()
@@ -324,7 +330,7 @@ func (l *EfhLogger) genUpdateTrades(msg packet.TradeMessage) {
 		Price:       uint32(packet.PriceTo4Dec(price)),
 		Size:        uint32(size),
 	}
-	l.printer.PrintTrade(m)
+	errs.CheckE(l.printer.PrintTrade(m))
 }
 func (l *EfhLogger) genUpdateDefinitionsNom(msg *nasdaq.IttoMessageOptionDirectory) {
 	m := efhm_definition_nom{
@@ -341,12 +347,12 @@ func (l *EfhLogger) genUpdateDefinitionsNom(msg *nasdaq.IttoMessageOptionDirecto
 	case 'P':
 		m.PutOrCall = EFH_SECURITY_PUT
 	}
-	l.printer.PrintDefinitionNom(m)
+	errs.CheckE(l.printer.PrintDefinitionNom(m))
 }
 func (l *EfhLogger) genUpdateDefinitionsBats(msg *bats.PitchMessageSymbolMapping) {
 	m := efhm_definition_bats{
 		efhm_header: l.genUpdateHeaderForOption(EFHM_DEFINITION_BATS, msg.OptionId()),
 	}
 	copy(m.OsiSymbol[:], msg.OsiSymbol)
-	l.printer.PrintDefinitionBats(m)
+	errs.CheckE(l.printer.PrintDefinitionBats(m))
 }

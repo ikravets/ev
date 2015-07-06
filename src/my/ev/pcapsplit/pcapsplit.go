@@ -12,6 +12,8 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/pcapgo"
 
+	"my/errs"
+
 	"my/ev/packet"
 	"my/ev/packet/processor"
 	"my/ev/sim"
@@ -38,19 +40,18 @@ func (s *Splitter) SetInput(fileName string, limit int) {
 	s.inputPacketLimit = limit
 }
 
-func (s *Splitter) AnalyzeInput() error {
+func (s *Splitter) AnalyzeInput() (err error) {
+	defer errs.PassE(&err)
 	handle, err := pcap.OpenOffline(s.inputFileName)
-	if err != nil {
-		return err
-	}
+	errs.CheckE(err)
 	defer handle.Close()
 	pp := processor.NewProcessor()
 	pp.LimitPacketNumber(s.inputPacketLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(s)
-	pp.ProcessAll()
+	errs.CheckE(pp.ProcessAll())
 	s.HandlePacket(nil) // process the last packet
-	return nil
+	return
 }
 
 type SplitByOptionsConfig struct {
@@ -59,11 +60,10 @@ type SplitByOptionsConfig struct {
 	AppendOnly    bool
 }
 
-func (s *Splitter) SplitByOptions(confs map[packet.OptionId]SplitByOptionsConfig) error {
+func (s *Splitter) SplitByOptions(confs map[packet.OptionId]SplitByOptionsConfig) (err error) {
+	defer errs.PassE(&err)
 	inHandle, err := pcap.OpenOffline(s.inputFileName)
-	if err != nil {
-		return err
-	}
+	errs.CheckE(err)
 	defer inHandle.Close()
 
 	type state struct {
@@ -83,23 +83,17 @@ func (s *Splitter) SplitByOptions(confs map[packet.OptionId]SplitByOptionsConfig
 			state.lastPacketNum = new(int)
 		}
 		if !conf.AppendOnly {
-			if err := state.w.WriteFileHeader(65536, layers.LinkTypeEthernet); err != nil {
-				return err
-			}
+			errs.CheckE(state.w.WriteFileHeader(65536, layers.LinkTypeEthernet))
 		}
 		states[oid] = &state
 	}
 
 	for i, poids := range s.allPacketOids[1:] {
 		data, ci, err := inHandle.ZeroCopyReadPacketData()
-		if err != nil {
-			return err
-		}
+		errs.CheckE(err)
 		for _, poid := range poids {
 			if state := states[poid]; state != nil && *state.lastPacketNum < i {
-				if err := state.w.WritePacket(ci, data); err != nil {
-					return err
-				}
+				errs.CheckE(state.w.WritePacket(ci, data))
 				*state.lastPacketNum = i
 			}
 		}
@@ -107,12 +101,11 @@ func (s *Splitter) SplitByOptions(confs map[packet.OptionId]SplitByOptionsConfig
 	return nil
 }
 
-func (s *Splitter) SplitByOption(oid packet.OptionId, fileName string) error {
+func (s *Splitter) SplitByOption(oid packet.OptionId, fileName string) (err error) {
+	defer errs.PassE(&err)
 	outFile, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
+	errs.CheckE(err)
+	defer func() { errs.CheckE(outFile.Close()) }()
 	confs := make(map[packet.OptionId]SplitByOptionsConfig)
 	confs[oid] = SplitByOptionsConfig{Writer: outFile}
 	return s.SplitByOptions(confs)

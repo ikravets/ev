@@ -56,7 +56,8 @@ func (r *Reporter) SaveOrderCollisionsHistogram() {
 		_, err = fmt.Fprintf(file, "maxCollisions\tbuckets\n")
 		errs.CheckE(err)
 		for _, h := range ohs {
-			fmt.Fprintf(file, "%d\t%d\n", h.Bin, h.Count)
+			_, err = fmt.Fprintf(file, "%d\t%d\n", h.Bin, h.Count)
+			errs.CheckE(err)
 		}
 	}
 }

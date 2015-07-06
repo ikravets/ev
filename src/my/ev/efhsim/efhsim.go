@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/gopacket/pcap"
 
+	"my/errs"
+
 	"my/ev/packet"
 	"my/ev/packet/processor"
 	"my/ev/sim"
@@ -43,18 +45,17 @@ func (s *EfhSim) AddLogger(logger sim.Observer) error {
 	return nil
 }
 
-func (s *EfhSim) AnalyzeInput() error {
+func (s *EfhSim) AnalyzeInput() (err error) {
+	defer errs.PassE(&err)
 	handle, err := pcap.OpenOffline(s.inputFileName)
-	if err != nil {
-		return err
-	}
+	errs.CheckE(err)
 	defer handle.Close()
 	pp := processor.NewProcessor()
 	pp.LimitPacketNumber(s.inputPacketLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(s)
-	pp.ProcessAll()
-	return nil
+	errs.CheckE(pp.ProcessAll())
+	return
 }
 
 func (s *EfhSim) HandlePacket(packet packet.Packet) {
