@@ -4,7 +4,10 @@
 package cmd
 
 import (
+	"crypto/md5"
 	"encoding/binary"
+	"fmt"
+	"hash"
 	"hash/crc32"
 	"io"
 	"os"
@@ -30,6 +33,7 @@ type cmdEfhsim struct {
 	OutputDirStats          string `long:"output-stats" value-name:"DIR" description:"output dir for stats"`
 	PacketNumLimit          int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
 	NoHwLim                 bool   `long:"no-hw-lim" description:"do not enforce HW limits"`
+	Md5sum                  bool   `long:"md5sum" description:"compute md5sum on output file(s)"`
 	shouldExecute           bool
 	closers                 []io.Closer
 }
@@ -90,6 +94,8 @@ func (c *cmdEfhsim) ParsingFinished() {
 		return efh.AddLogger(rec.NewAvtLogger(w, dict))
 	})
 	reporter := c.addAnalyzer(efh)
+
+	// run efhsim
 	errs.CheckE(efh.AnalyzeInput())
 
 	for _, cl := range c.closers {
@@ -104,7 +110,13 @@ func (c *cmdEfhsim) addOut(fileName string, setOut func(io.Writer) error) {
 	if fileName == "" {
 		return
 	}
-	o, err := os.Create(fileName)
+	var err error
+	var o io.WriteCloser
+	if c.Md5sum {
+		o, err = NewHashedOut(fileName)
+	} else {
+		o, err = os.Create(fileName)
+	}
 	errs.CheckE(err)
 	errs.CheckE(setOut(o))
 	c.closers = append(c.closers, o)
@@ -135,4 +147,43 @@ func (c *cmdEfhsim) addAnalyzer(efh *efhsim.EfhSim) *anal.Reporter {
 func init() {
 	var c cmdEfhsim
 	Registry.Register(&c)
+}
+
+type hashedOut struct {
+	file    *os.File
+	md5file *os.File
+	md5sum  hash.Hash
+	mw      io.Writer
+}
+
+func NewHashedOut(baseName string) (o *hashedOut, err error) {
+	defer errs.PassE(&err)
+	o = &hashedOut{}
+	o.file, err = os.Create(baseName)
+	errs.CheckE(err)
+	o.md5file, err = os.Create(baseName + ".md5sum")
+	errs.CheckE(err)
+	o.md5sum = md5.New()
+	o.mw = io.MultiWriter(o.file, o.md5sum)
+	return
+}
+func (o *hashedOut) writer() io.Writer {
+	return o.mw
+}
+func (o *hashedOut) Write(b []byte) (int, error) {
+	return o.mw.Write(b)
+}
+func (o *hashedOut) Close() (err error) {
+	name := "-"
+	defer errs.PassE(&err)
+	if o.file != nil {
+		errs.CheckE(o.file.Close())
+		name = o.file.Name()
+	}
+	if o.md5file != nil {
+		_, err := fmt.Fprintf(o.md5file, "%x\t%s\n", o.md5sum.Sum(nil), name)
+		errs.CheckE(err)
+		errs.CheckE(o.md5file.Close())
+	}
+	return
 }
