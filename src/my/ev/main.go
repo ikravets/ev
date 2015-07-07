@@ -59,4 +59,5 @@ func main() {
 		errs.CheckE(pprof.WriteHeapProfile(profFile))
 		errs.CheckE(profFile.Close())
 	}
+	log.Println("finished")
 }
