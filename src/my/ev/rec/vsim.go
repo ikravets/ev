@@ -224,7 +224,7 @@ func (s *SimLogger) genAppUpdate(appMessage interface{}) (err error) {
 
 	for {
 		var qw uint64
-		if err = binary.Read(&bb, binary.LittleEndian, &qw); err != nil {
+		if err := binary.Read(&bb, binary.LittleEndian, &qw); err != nil {
 			if err == io.EOF {
 				break
 			}
