@@ -18,12 +18,12 @@ import (
 )
 
 type cmdPcapsplit struct {
-	DestDirName      string            `short:"d" long:"dest-dir" default:"." default-mask:"current dir" value-name:"DIR" description:"destination directory, will be created if does not exist" `
-	InputFileName    string            `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
-	PacketNumLimit   int               `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
-	MinPacketsPerOid int               `long:"min-chain" short:"m" value-name:"NUM" description:"ignore options which appear in less than NUM packets"`
-	UseEditcap       bool              `long:"editcap" short:"e" description:"don't write pcap files, just output editcap commands"`
-	OptionIds        []packet.OptionId `long:"filter" short:"f" value-name:"OPTION_ID" description:"process OPTION_ID only"`
+	DestDirName      string     `short:"d" long:"dest-dir" default:"." default-mask:"current dir" value-name:"DIR" description:"destination directory, will be created if does not exist" `
+	InputFileName    string     `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
+	PacketNumLimit   int        `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
+	MinPacketsPerOid int        `long:"min-chain" short:"m" value-name:"NUM" description:"ignore options which appear in less than NUM packets"`
+	UseEditcap       bool       `long:"editcap" short:"e" description:"don't write pcap files, just output editcap commands"`
+	OptionIds        []optionId `long:"filter" short:"f" value-name:"OPTION_ID" description:"process OPTION_ID only"`
 	shouldExecute    bool
 }
 
@@ -46,7 +46,9 @@ func (p *cmdPcapsplit) ParsingFinished() {
 	errs.CheckE(os.MkdirAll(p.DestDirName, 0755))
 	splitter := pcapsplit.NewSplitter()
 	splitter.SetInput(p.InputFileName, p.PacketNumLimit)
-	splitter.Filter(p.OptionIds)
+	for _, o := range p.OptionIds {
+		splitter.FilterAdd(o.OptionId)
+	}
 	errs.CheckE(splitter.AnalyzeInput())
 	pbo := splitter.PacketByOptionAll()
 	//log.Println(splitter.AllPacketOids())
@@ -81,4 +83,17 @@ func (p *cmdPcapsplit) ParsingFinished() {
 func init() {
 	var c cmdPcapsplit
 	Registry.Register(&c)
+}
+
+// packet.OptionId wrapper supporting go-flags parsing
+type optionId struct {
+	packet.OptionId
+}
+
+func (o *optionId) UnmarshalFlag(value string) (err error) {
+	defer errs.PassE(&err)
+	v, err := strconv.ParseUint(value, 0, 64)
+	errs.CheckE(err)
+	o.OptionId = packet.OptionIdFromUint64(v)
+	return
 }
