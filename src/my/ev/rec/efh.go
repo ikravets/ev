@@ -353,6 +353,8 @@ func (l *EfhLogger) genUpdateDefinitionsBats(msg *bats.PitchMessageSymbolMapping
 	m := efhm_definition_bats{
 		efhm_header: l.genUpdateHeaderForOption(EFHM_DEFINITION_BATS, msg.OptionId()),
 	}
+	m.efhm_header.SequenceNumber = 0
+	m.efhm_header.TimeStamp = 0
 	copy(m.OsiSymbol[:], msg.OsiSymbol)
 	errs.CheckE(l.printer.PrintDefinitionBats(m))
 }
