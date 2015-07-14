@@ -188,7 +188,7 @@ func (o *hashedOut) Close() (err error) {
 		name = o.file.Name()
 	}
 	if o.md5file != nil {
-		_, err := fmt.Fprintf(o.md5file, "%x\t%s\n", o.md5sum.Sum(nil), name)
+		_, err := fmt.Fprintf(o.md5file, "%x  %s\n", o.md5sum.Sum(nil), name)
 		errs.CheckE(err)
 		errs.CheckE(o.md5file.Close())
 	}
