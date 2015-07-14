@@ -39,6 +39,9 @@ func (s *EfhSim) SetInput(fileName string, limit int) {
 func (s *EfhSim) SubscribeFromReader(r io.Reader) error {
 	return s.simu.Subscr().SubscribeFromReader(r)
 }
+func (s *EfhSim) SubscriptionsNum() int {
+	return s.simu.Subscr().Num()
+}
 
 func (s *EfhSim) AddLogger(logger sim.Observer) error {
 	s.observer.AppendSlave(logger)

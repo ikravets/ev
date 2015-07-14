@@ -71,3 +71,15 @@ func (s *Subscr) Subscribed(oid packet.OptionId) bool {
 	_, ok := s.subscriptions[oid]
 	return ok
 }
+func (s *Subscr) Num() int {
+	if s.autoSubscribe {
+		return 0
+	}
+	num := len(s.subscriptions)
+	for k := range s.stoplist {
+		if _, ok := s.subscriptions[k]; ok {
+			num--
+		}
+	}
+	return num
+}

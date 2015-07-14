@@ -16,6 +16,8 @@ var _ sim.Observer = &HwLimChecker{}
 const supernodeLevels = 256
 const supernodes = 256 * 1024
 
+var HwMaxSubscriptions int = supernodeLevels
+
 func NewHwLimChecker() *HwLimChecker {
 	return &HwLimChecker{}
 }

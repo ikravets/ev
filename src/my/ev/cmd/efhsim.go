@@ -10,6 +10,7 @@ import (
 	"hash"
 	"hash/crc32"
 	"io"
+	"log"
 	"os"
 
 	"github.com/jessevdk/go-flags"
@@ -61,7 +62,13 @@ func (c *cmdEfhsim) ParsingFinished() {
 		errs.CheckE(file.Close())
 	}
 	if !c.NoHwLim {
-		efh.AddLogger(rec.NewHwLimChecker())
+		if efh.SubscriptionsNum() == 0 {
+			log.Println("running in auto-subscription mode, not enforcing hw limit")
+		} else if efh.SubscriptionsNum() > rec.HwMaxSubscriptions {
+			log.Println("too many subscriptions, not enforcing hw limit")
+		} else {
+			efh.AddLogger(rec.NewHwLimChecker())
+		}
 	}
 	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
 		logger := rec.NewSimLogger(w)
