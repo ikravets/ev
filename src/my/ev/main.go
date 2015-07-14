@@ -43,6 +43,7 @@ func main() {
 	errs.CheckE(err)
 	log.SetOutput(logFile)
 	defer func() { errs.CheckE(logFile.Close()) }()
+	log.Printf("args: %v\n", os.Args)
 
 	if opts.ProfileCpu != "" {
 		profFile, err := os.Create(opts.ProfileCpu)
