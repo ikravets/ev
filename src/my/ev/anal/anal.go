@@ -46,7 +46,8 @@ var _ sim.Observer = &observer{}
 func (*observer) MessageArrived(*sim.SimMessage) {}
 func (o *observer) OperationAppliedToOrders(op sim.SimOperation) {
 	sess := op.GetMessage().Session.Index()
-	errs.Check(sess < 4, sess)
+	//errs.Check(sess < 4, sess)
+	errs.Check(sess < 32, sess)
 	var key uint64
 	var delta int
 	switch o := op.(type) {
