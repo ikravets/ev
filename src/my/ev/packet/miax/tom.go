@@ -319,6 +319,7 @@ func (m *TomMessageTom) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 		TomMessageCommon: decodeTomMessage(data),
 		ProductId:        parseProductId(data[5:9]),
 	}
+	//log.Printf("m.Type %c %d %v\n", m.Type, len(data), data)
 	if m.Type == TomMessageTypeTomBidCompact || m.Type == TomMessageTypeTomOfferCompact {
 		m.Price = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[9:11])))
 		m.Size = int(binary.LittleEndian.Uint16(data[11:13]))
@@ -328,7 +329,7 @@ func (m *TomMessageTom) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 		m.Price = packet.PriceFrom4Dec(int(binary.LittleEndian.Uint32(data[9:13])))
 		m.Size = int(binary.LittleEndian.Uint32(data[13:17]))
 		m.PriorityCustomerSize = int(binary.LittleEndian.Uint32(data[17:21]))
-		m.Condition = data[22]
+		m.Condition = data[21]
 	} else {
 		panic("wrong message type")
 	}

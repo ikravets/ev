@@ -62,7 +62,7 @@ func (m *MachTop) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (err 
 	for len(data) > 0 {
 		errs.Check(len(data) >= 12)
 		length := int(binary.LittleEndian.Uint16(data[8:10]))
-		errs.Check(length <= len(data))
+		errs.Check(length <= len(data), length, len(data))
 		m.tps = append(m.tps, packet.TypedPayload{
 			Type:    LayerTypeMach,
 			Payload: data[:length],
