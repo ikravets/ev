@@ -13,6 +13,7 @@ import (
 
 	"my/ev/packet"
 	"my/ev/packet/bats"
+	"my/ev/packet/miax"
 	"my/ev/packet/nasdaq"
 	"my/ev/sim"
 )
@@ -49,6 +50,10 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 	}
 	outBats := func(f string, vs ...interface{}) {
 		s.printf("NORM ORDER %02x ", idm.Pam.Layer().(bats.PitchMessage).Base().Type.ToInt())
+		s.printfln(f, vs...)
+	}
+	outMiax := func(f string, vs ...interface{}) {
+		s.printf("NORM TOM %02x ", idm.Pam.Layer().(miax.TomMessage).Base().Type.ToInt())
 		s.printfln(f, vs...)
 	}
 	sideChar := func(s packet.MarketSide) byte {
@@ -98,6 +103,8 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 		outBats("%016x %08x", im.OrderId.ToUint64(), im.Size)
 	case *bats.PitchMessageModifyOrder:
 		outBats("%016x %08x %08x", im.OrderId.ToUint64(), im.Size, packet.PriceTo4Dec(im.Price))
+	case *miax.TomMessageTom:
+		outMiax("%c %08x %08x %08x %08x", sideChar(im.Side), im.ProductId.ToUint32(), packet.PriceTo4Dec(im.Price), im.Size, im.PriorityCustomerSize)
 	}
 	s.efhLogger.MessageArrived(idm)
 }
@@ -117,7 +124,9 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 
 	var or ordrespLogInfo
 	var ou orduLogInfo
-	if op, ok := operation.(*sim.OperationAdd); ok {
+	if _, ok := operation.(*sim.OperationTop); ok {
+		return
+	} else if op, ok := operation.(*sim.OperationAdd); ok {
 		var oid packet.OptionId
 		if op.Independent() {
 			oid = op.GetOptionId()

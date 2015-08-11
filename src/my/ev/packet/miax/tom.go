@@ -39,6 +39,9 @@ func (a TomMessageType) String() string {
 func (a TomMessageType) LayerType() gopacket.LayerType {
 	return TomMessageTypeMetadata[a].LayerType
 }
+func (a TomMessageType) ToInt() int {
+	return int(a)
+}
 
 /************************************************************************/
 const (
