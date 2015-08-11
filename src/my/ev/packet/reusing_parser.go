@@ -71,6 +71,7 @@ func (p *ReusingLayerParser) DecodeLayers(data []byte, decoded *[]gopacket.Decod
 			errs.CheckE(err)
 		}
 		(*decoded)[dlEnd] = layer
+		//log.Printf("decoded %T %v\n", layer, layer)
 		dlEnd++
 
 		if dml, ok := layer.(DecodingMultiLayer); ok {
