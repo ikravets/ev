@@ -158,3 +158,30 @@ func (o *OperationUpdate) GetPrice() int {
 	errs.Check(o.origOrder != nil)
 	return packet.PriceTo4Dec(o.origOrder.Price)
 }
+
+type OperationTop struct {
+	Operation
+	optionId packet.OptionId
+	side     packet.MarketSide
+	size     int
+	price    packet.Price
+}
+
+func (o *OperationTop) getOperation() *Operation {
+	return &o.Operation
+}
+func (o *OperationTop) GetOptionId() packet.OptionId {
+	return o.optionId
+}
+func (o *OperationTop) GetSide() (side packet.MarketSide) {
+	return o.side
+}
+func (o *OperationTop) GetSizeDelta() int {
+	return o.size
+}
+func (o *OperationTop) GetNewSize() int {
+	return o.size
+}
+func (o *OperationTop) GetPrice() int {
+	return packet.PriceTo4Dec(o.price)
+}

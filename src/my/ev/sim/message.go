@@ -8,6 +8,7 @@ import (
 
 	"my/ev/packet"
 	"my/ev/packet/bats"
+	"my/ev/packet/miax"
 	"my/ev/packet/nasdaq"
 )
 
@@ -115,6 +116,14 @@ func (m *SimMessage) populateOps() {
 			Size:    int(im.Size),
 		}
 		addOperationReplace(im.OrderId, ord)
+	case *miax.TomMessageTom:
+		op := OperationTop{
+			optionId: m.subscribedOptionId(),
+			side:     im.Side,
+			price:    im.Price,
+			size:     im.Size,
+		}
+		addOperation(packet.OrderIdUnknown, &op)
 	case
 		*nasdaq.IttoMessageNoii,
 		*nasdaq.IttoMessageOptionsTrade,
@@ -126,7 +135,11 @@ func (m *SimMessage) populateOps() {
 		*bats.PitchMessageTime,
 		*bats.PitchMessageSymbolMapping,
 		*bats.PitchMessageTrade,
-		*bats.PitchMessageTradingStatus:
+		*bats.PitchMessageTradingStatus,
+		*miax.TomMessageLiquiditySeeking,
+		*miax.TomMessageUnderlyingTradeStatus,
+		*miax.TomMessageSystemTime,
+		*miax.TomMessageUnknown: // FIXME
 		// silently ignore
 	default:
 		log.Printf("unexpected message %#v\n", m.Pam.Layer())

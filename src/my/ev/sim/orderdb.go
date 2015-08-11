@@ -73,6 +73,8 @@ func (d *orderDb) ApplyOperation(operation SimOperation) {
 		return
 	}
 	switch op := operation.(type) {
+	case *OperationTop:
+		// nothing to do
 	case *OperationAdd:
 		// intentionally allow adding zero price/size orders
 		o := op.order
