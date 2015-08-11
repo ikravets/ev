@@ -37,9 +37,7 @@ func (b *book) ApplyOperation(operation SimOperation) {
 		os = NewOptionState()
 		b.options[oid] = os
 	}
-	if operation.GetPrice() != 0 {
-		os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
-	}
+	os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
 }
 func (b *book) GetTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel {
 	os, ok := b.options[optionId]
@@ -47,19 +45,7 @@ func (b *book) GetTop(optionId packet.OptionId, side packet.MarketSide, levels i
 		return nil
 	}
 	s := os.Side(side)
-
-	pl := make([]PriceLevel, 0, levels)
-	if it, err := s.levels.SeekFirst(); err == nil {
-		for i := 0; i < levels || levels == 0; i++ {
-			if _, v, err := it.Next(); err != nil {
-				break
-			} else {
-				pl = append(pl, v.(PriceLevel))
-			}
-		}
-		it.Close()
-	}
-	return pl
+	return s.getTop(optionId, side, levels)
 }
 func (b *book) NumOptions() int {
 	return len(b.options)
@@ -85,28 +71,33 @@ type optionState struct {
 
 func NewOptionState() *optionState {
 	return &optionState{
-		bid: NewOptionSideState(packet.MarketSideBid),
-		ask: NewOptionSideState(packet.MarketSideAsk),
+		bid: NewOptionSideStateDeep(packet.MarketSideBid),
+		ask: NewOptionSideStateDeep(packet.MarketSideAsk),
 	}
 }
 
-type optionSideState struct {
-	levels *b.Tree
-}
-
-func (os *optionState) Side(side packet.MarketSide) *optionSideState {
+func (os *optionState) Side(side packet.MarketSide) optionSideState {
 	switch side {
 	case packet.MarketSideBid:
-		return &os.bid
+		return os.bid
 	case packet.MarketSideAsk:
-		return &os.ask
+		return os.ask
 	default:
 		log.Fatal("wrong side ", side)
 	}
 	return nil
 }
 
-func NewOptionSideState(side packet.MarketSide) optionSideState {
+type optionSideState interface {
+	updateLevel(price int, delta int)
+	getTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel
+}
+
+type optionSideStateDeep struct {
+	levels *b.Tree
+}
+
+func NewOptionSideStateDeep(side packet.MarketSide) optionSideState {
 	ComparePrice := func(lhs, rhs interface{}) int {
 		l, r := lhs.(int), rhs.(int)
 		return l - r
@@ -125,13 +116,16 @@ func NewOptionSideState(side packet.MarketSide) optionSideState {
 	default:
 		log.Fatal("unexpected market side ", side)
 	}
-	s := optionSideState{
+	s := &optionSideStateDeep{
 		levels: b.TreeNew(cmp),
 	}
 	return s
 }
 
-func (s *optionSideState) updateLevel(price int, delta int) {
+func (s *optionSideStateDeep) updateLevel(price int, delta int) {
+	if price == 0 {
+		return
+	}
 	upd := func(oldV interface{}, exists bool) (newV interface{}, write bool) {
 		var v PriceLevel
 		if exists {
@@ -145,4 +139,18 @@ func (s *optionSideState) updateLevel(price int, delta int) {
 	if _, written := s.levels.Put(price, upd); !written {
 		s.levels.Delete(price)
 	}
+}
+func (s *optionSideStateDeep) getTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel {
+	pl := make([]PriceLevel, 0, levels)
+	if it, err := s.levels.SeekFirst(); err == nil {
+		for i := 0; i < levels || levels == 0; i++ {
+			if _, v, err := it.Next(); err != nil {
+				break
+			} else {
+				pl = append(pl, v.(PriceLevel))
+			}
+		}
+		it.Close()
+	}
+	return pl
 }
