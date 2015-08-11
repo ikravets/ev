@@ -8,6 +8,7 @@ import (
 
 	"github.com/cznic/b"
 
+	"my/errs"
 	"my/ev/packet"
 )
 
@@ -19,12 +20,20 @@ type Book interface {
 
 func NewBook() Book {
 	return &book{
-		options: make(map[packet.OptionId]*optionState),
+		options:            make(map[packet.OptionId]*optionState),
+		newOptionSideState: NewOptionSideStateDeep,
+	}
+}
+func NewBookTop() Book {
+	return &book{
+		options:            make(map[packet.OptionId]*optionState),
+		newOptionSideState: NewOptionSideStateTop,
 	}
 }
 
 type book struct {
-	options map[packet.OptionId]*optionState
+	options            map[packet.OptionId]*optionState
+	newOptionSideState func(side packet.MarketSide) optionSideState
 }
 
 func (b *book) ApplyOperation(operation SimOperation) {
@@ -34,7 +43,7 @@ func (b *book) ApplyOperation(operation SimOperation) {
 	}
 	os, ok := b.options[oid]
 	if !ok {
-		os = NewOptionState()
+		os = NewOptionState(b.newOptionSideState)
 		b.options[oid] = os
 	}
 	os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
@@ -69,10 +78,10 @@ type optionState struct {
 	ask optionSideState
 }
 
-func NewOptionState() *optionState {
+func NewOptionState(noss func(side packet.MarketSide) optionSideState) *optionState {
 	return &optionState{
-		bid: NewOptionSideStateDeep(packet.MarketSideBid),
-		ask: NewOptionSideStateDeep(packet.MarketSideAsk),
+		bid: noss(packet.MarketSideBid),
+		ask: noss(packet.MarketSideAsk),
 	}
 }
 
@@ -151,6 +160,29 @@ func (s *optionSideStateDeep) getTop(optionId packet.OptionId, side packet.Marke
 			}
 		}
 		it.Close()
+	}
+	return pl
+}
+
+type optionSideStateTop struct {
+	top PriceLevel
+}
+
+func NewOptionSideStateTop(side packet.MarketSide) optionSideState {
+	return &optionSideStateTop{}
+}
+func (s *optionSideStateTop) updateLevel(price int, delta int) {
+	errs.Check(price != 0 || delta == 0, price, delta)
+	errs.Check(delta >= 0)
+	s.top = PriceLevel{
+		Price: price,
+		Size:  delta,
+	}
+}
+func (s *optionSideStateTop) getTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel {
+	pl := make([]PriceLevel, 0, 1)
+	if s.top.Price != 0 || s.top.Size != 0 {
+		pl = append(pl, s.top)
 	}
 	return pl
 }
