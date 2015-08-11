@@ -19,20 +19,28 @@ import (
 )
 
 type SimLogger struct {
-	w              io.Writer
-	tobOld, tobNew []sim.PriceLevel
-	efhLogger      EfhLogger
+	w               io.Writer
+	tobOld, tobNew  []sim.PriceLevel
+	efhLogger       EfhLogger
+	supernodeLevels int
 }
 
-const SimLoggerSupernodeLevels = 256
+const SimLoggerDefaultSupernodeLevels = 256
 
 func NewSimLogger(w io.Writer) *SimLogger {
-	s := &SimLogger{w: w}
+	s := &SimLogger{
+		w:               w,
+		supernodeLevels: SimLoggerDefaultSupernodeLevels,
+	}
 	s.efhLogger = *NewEfhLogger(s)
 	return s
 }
 func (s *SimLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 	s.efhLogger.SetOutputMode(mode)
+}
+func (s *SimLogger) SetSupernodeLevels(levels int) {
+	errs.Check(levels > 0)
+	s.supernodeLevels = levels
 }
 
 func (s *SimLogger) printf(format string, vs ...interface{}) {
@@ -177,17 +185,17 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 	}
 }
 func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) {
-	s.tobOld = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
+	s.tobOld = book.GetTop(operation.GetOptionId(), operation.GetSide(), s.supernodeLevels)
 	s.efhLogger.BeforeBookUpdate(book, operation)
 }
 func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if operation.GetOptionId().Valid() {
-		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), SimLoggerSupernodeLevels)
+		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), s.supernodeLevels)
 		empty := sim.PriceLevel{}
 		if operation.GetSide() == packet.MarketSideAsk {
 			empty.Price = -1
 		}
-		for i := 0; i < SimLoggerSupernodeLevels; i++ {
+		for i := 0; i < s.supernodeLevels; i++ {
 			plo, pln := empty, empty
 			if i < len(s.tobOld) {
 				plo = s.tobOld[i]
