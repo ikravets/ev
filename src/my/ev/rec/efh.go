@@ -279,7 +279,7 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 		}
 	} else {
 		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
-			l.genUpdateQuotes()
+			l.genUpdateQuotes(l.TobLogger.bid, l.TobLogger.ask)
 		}
 	}
 }
@@ -313,13 +313,13 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 	}
 	errs.CheckE(l.printer.PrintOrder(m))
 }
-func (l *EfhLogger) genUpdateQuotes() {
+func (l *EfhLogger) genUpdateQuotes(bid, ask tob) {
 	m := efhm_quote{
 		efhm_header: l.genUpdateHeader(EFHM_QUOTE),
-		BidPrice:    uint32(l.TobLogger.bid.New.Price),
-		BidSize:     uint32(l.TobLogger.bid.New.Size),
-		AskPrice:    uint32(l.TobLogger.ask.New.Price),
-		AskSize:     uint32(l.TobLogger.ask.New.Size),
+		BidPrice:    uint32(bid.New.Price),
+		BidSize:     uint32(bid.New.Size),
+		AskPrice:    uint32(ask.New.Price),
+		AskSize:     uint32(ask.New.Size),
 	}
 	errs.CheckE(l.printer.PrintQuote(m))
 }
