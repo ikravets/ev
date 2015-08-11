@@ -68,11 +68,13 @@ func (s *EfhSim) HandlePacket(packet packet.Packet) {
 			Packets      int
 			OrderDbStats sim.OrderDbStats
 			Options      int
+			Sessions     int
 		}
 		s := Stats{
 			Packets:      s.packetNum,
 			OrderDbStats: s.simu.OrderDb().Stats(),
 			Options:      s.simu.Book().NumOptions(),
+			Sessions:     len(s.simu.Sessions()),
 		}
 		log.Printf("%#v", s)
 	}

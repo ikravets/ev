@@ -14,6 +14,7 @@ type Sim interface {
 	Subscr() *Subscr
 	OrderDb() OrderDb
 	Book() Book
+	Sessions() []Session
 	NewMessage(packet.ApplicationMessage) *SimMessage
 }
 
@@ -40,6 +41,9 @@ func (sim *simu) Book() Book {
 }
 func (sim *simu) OrderDb() OrderDb {
 	return sim.orderDb
+}
+func (sim *simu) Sessions() []Session {
+	return sim.sessions
 }
 func (sim *simu) NewMessage(pam packet.ApplicationMessage) *SimMessage {
 	return NewSimMessage(sim, pam)
