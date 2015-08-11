@@ -26,7 +26,7 @@ func (c *cmdExch) ParsingFinished() {
 	if !c.shouldExecute {
 		return
 	}
-	es := exch.NewExchangeSimulatorServer()
+	es := exch.NewNasdaqExchangeSimulatorServer()
 	es.Run()
 }
 
