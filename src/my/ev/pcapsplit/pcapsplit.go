@@ -29,9 +29,9 @@ type Splitter struct {
 	stats            SplitterStats
 }
 
-func NewSplitter() *Splitter {
+func NewSplitter(shallow bool) *Splitter {
 	return &Splitter{
-		simu: sim.NewSim(),
+		simu: sim.NewSim(shallow),
 	}
 }
 

@@ -24,6 +24,7 @@ type cmdPcapsplit struct {
 	MinPacketsPerOid int        `long:"min-chain" short:"m" value-name:"NUM" description:"ignore options which appear in less than NUM packets"`
 	UseEditcap       bool       `long:"editcap" short:"e" description:"don't write pcap files, just output editcap commands"`
 	OptionIds        []optionId `long:"filter" short:"f" value-name:"OPTION_ID" description:"process OPTION_ID only"`
+	TobBook          bool       `long:"tob" short:"t" description:"use 1-level-deep book (for exchange disseminating ToB only)"`
 	shouldExecute    bool
 }
 
@@ -44,7 +45,7 @@ func (p *cmdPcapsplit) ParsingFinished() {
 		return
 	}
 	errs.CheckE(os.MkdirAll(p.DestDirName, 0755))
-	splitter := pcapsplit.NewSplitter()
+	splitter := pcapsplit.NewSplitter(p.TobBook)
 	splitter.SetInput(p.InputFileName, p.PacketNumLimit)
 	for _, o := range p.OptionIds {
 		splitter.FilterAdd(o.OptionId)

@@ -24,6 +24,7 @@ import (
 
 type cmdEfhsim struct {
 	InputFileName           string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
+	TobBook                 bool   `long:"tob" short:"t" description:"use 1-level-deep book (for exchange disseminating ToB only)"`
 	SubscriptionFileName    string `long:"subscribe" short:"s" value-name:"SUBSCRIPTION_FILE" description:"read subscriptions from file"`
 	OutputFileNameSimOrders string `long:"output-sim-orders" value-name:"FILE" description:"output file for hw simulator"`
 	OutputFileNameSimQuotes string `long:"output-sim-quotes" value-name:"FILE" description:"output file for hw simulator"`
@@ -53,7 +54,7 @@ func (c *cmdEfhsim) ParsingFinished() {
 	if !c.shouldExecute {
 		return
 	}
-	efh := efhsim.NewEfhSim()
+	efh := efhsim.NewEfhSim(c.TobBook)
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
 	if c.SubscriptionFileName != "" {
 		file, err := os.Open(c.SubscriptionFileName)
@@ -70,13 +71,19 @@ func (c *cmdEfhsim) ParsingFinished() {
 			efh.AddLogger(rec.NewHwLimChecker())
 		}
 	}
+	supernodeLevels := rec.SimLoggerDefaultSupernodeLevels
+	if c.TobBook {
+		supernodeLevels = 1
+	}
 	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
 		logger := rec.NewSimLogger(w)
+		logger.SetSupernodeLevels(supernodeLevels)
 		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
 		return efh.AddLogger(logger)
 	})
 	c.addOut(c.OutputFileNameSimQuotes, func(w io.Writer) error {
 		logger := rec.NewSimLogger(w)
+		logger.SetSupernodeLevels(supernodeLevels)
 		logger.SetOutputMode(rec.EfhLoggerOutputQuotes)
 		return efh.AddLogger(logger)
 	})

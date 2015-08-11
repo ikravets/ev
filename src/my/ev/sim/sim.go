@@ -25,10 +25,14 @@ type simu struct {
 	sessions []Session
 }
 
-func NewSim() Sim {
+func NewSim(shallow bool) Sim {
 	sim := &simu{
 		subscr: NewSubscr(),
-		book:   NewBook(),
+	}
+	if shallow {
+		sim.book = NewBookTop()
+	} else {
+		sim.book = NewBook()
 	}
 	sim.orderDb = NewOrderDb(sim)
 	return sim
