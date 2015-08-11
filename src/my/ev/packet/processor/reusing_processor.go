@@ -29,6 +29,9 @@ type reusingProcessor struct {
 	flowBufDst     bytes.Buffer
 	pkt            reusingPacket
 	m              applicationMessage
+	nextSeqNums    []uint64
+	messageNum     int
+	messageIndex   int
 }
 
 // default processor is reusing processor
@@ -126,11 +129,19 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 		case *layers.UDP:
 			p.flowBufSrc.Write(l.TransportFlow().Src().Raw())
 			p.flowBufDst.Write(l.TransportFlow().Dst().Raw())
-		case *miax.Mach:
+		case *miax.MachTop:
 			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
-			p.m.seqNum = l.SequenceNumber
+			p.messageNum = l.MachPackets
+			p.messageIndex = 0
+			p.nextSeqNums = p.nextSeqNums[:0]
+		case *miax.Mach:
+			errs.Check(len(p.nextSeqNums) < p.messageNum, len(p.nextSeqNums), p.messageNum)
+			p.nextSeqNums = append(p.nextSeqNums, l.SequenceNumber)
 		case miax.TomMessage:
+			errs.Check(p.messageIndex < p.messageNum, p.messageIndex, p.messageNum)
 			p.m.layer = l
+			p.m.seqNum = p.nextSeqNums[p.messageIndex]
+			p.messageIndex++
 			p.handler.HandleMessage(&p.m)
 		case *bats.BSU:
 			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
