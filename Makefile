@@ -21,6 +21,7 @@ build:
 	mkdir -p "$(BUILD_DIR)/$(VENDOR_DIR)"
 	$(foreach d,src $(VENDOR_DIR)/src,\
 	    [[ -e "$(BUILD_DIR)/$(d)" ]] || ln -s "$(CURDIR)/$(d)" "$(BUILD_DIR)/$(d)" $(NL))
+	@echo GOPATH=$(GOPATH)
 	go install -v my/ev/...
 
 build-centos: BUILD_DIR=/home/devuser/go
@@ -33,8 +34,10 @@ build-centos:
 	    ekagobuild \
 	    go install -v my/ev/...
 
-deploy: build-centos
-	rsync -aP $(BUILD_DIR_centos)/bin/ev xn02:bin/ev
+deploy: deploy-xn02 deploy-xn01
+deploy-%: build-centos
+	rsync -azP $(BUILD_DIR_centos)/bin/ev $*:
+	ssh -t $* 'sudo cp ev /usr/local/bin && sudo setcap CAP_NET_RAW=+ep /usr/local/bin/ev'
 
 shell:
 	@echo GOPATH=$$GOPATH
