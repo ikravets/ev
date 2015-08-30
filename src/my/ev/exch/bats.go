@@ -20,16 +20,17 @@ type MessageSource interface {
 	Stop()
 }
 
-func NewBatsExchangeSimulatorServer() ExchangeSimulator {
+func NewBatsExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) {
+	errs.Check(c.Protocol == "bats")
 	src := NewBatsMessageSource()
-	e := &exchangeBats{
+	es = &exchangeBats{
 		src: src,
 		spin: &spinServer{
 			laddr: ":16002",
 			src:   src,
 		},
 	}
-	return e
+	return
 }
 
 type exchangeBats struct {

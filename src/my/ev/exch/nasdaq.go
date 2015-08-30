@@ -18,8 +18,10 @@ import (
 	"my/ev/exch/sbtcp"
 )
 
-func NewNasdaqExchangeSimulatorServer() ExchangeSimulator {
-	return &exchangeNasdaq{
+func NewNasdaqExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) {
+	errs.Check(c.Protocol == "nasdaq")
+	errs.Check(!c.Interactive)
+	es = &exchangeNasdaq{
 		glimpse: &glimpseServer{
 			laddr:          ":16001",
 			snapshotSeqNum: 5,
@@ -35,6 +37,7 @@ func NewNasdaqExchangeSimulatorServer() ExchangeSimulator {
 			pps:   1,
 		},
 	}
+	return
 }
 
 type exchangeNasdaq struct {

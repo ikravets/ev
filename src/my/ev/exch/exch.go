@@ -3,6 +3,29 @@
 
 package exch
 
+import (
+	"errors"
+)
+
 type ExchangeSimulator interface {
 	Run()
+}
+
+type Config struct {
+	Protocol    string
+	Interactive bool
+}
+
+var IllegalProtocol = errors.New("Illegal protocol")
+
+func NewExchangeSimulator(c Config) (es ExchangeSimulator, err error) {
+	switch c.Protocol {
+	case "nasdaq":
+		es, err = NewNasdaqExchangeSimulatorServer(c)
+	case "bats":
+		es, err = NewBatsExchangeSimulatorServer(c)
+	default:
+		err = IllegalProtocol
+	}
+	return
 }
