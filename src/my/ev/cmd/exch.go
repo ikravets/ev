@@ -6,10 +6,14 @@ package cmd
 import (
 	"github.com/jessevdk/go-flags"
 
+	"my/errs"
+
 	"my/ev/exch"
 )
 
 type cmdExch struct {
+	Type          string `long:"type" short:"t" value-name:"EXCH" default:"nasdaq" description:"exchange type: nasdaq, bats"`
+	Interactive   bool   `long:"interactive" short:"i" description:"run interactively"`
 	shouldExecute bool
 }
 
@@ -26,7 +30,12 @@ func (c *cmdExch) ParsingFinished() {
 	if !c.shouldExecute {
 		return
 	}
-	es := exch.NewNasdaqExchangeSimulatorServer()
+	conf := exch.Config{
+		Protocol:    c.Type,
+		Interactive: c.Interactive,
+	}
+	es, err := exch.NewExchangeSimulator(conf)
+	errs.CheckE(err)
 	es.Run()
 }
 
