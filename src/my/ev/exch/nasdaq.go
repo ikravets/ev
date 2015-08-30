@@ -135,7 +135,8 @@ func (s *replayServer) run() {
 			} else if num > MAX_MESSAGES {
 				num = MAX_MESSAGES
 			}
-			resp := createMoldPacket(int(req.SequenceNumber), num)
+			resp, err := createMoldPacket(int(req.SequenceNumber), num)
+			errs.CheckE(err)
 			errs.Check(len(resp) < 1500-34)
 
 			if s.sleepEnabled {
@@ -165,8 +166,10 @@ func (s *mcastServer) run() {
 	raddr, err := net.ResolveUDPAddr("udp", s.raddr)
 	errs.CheckE(err)
 	conn, err := net.DialUDP("udp", laddr, raddr)
+	errs.CheckE(err)
 	for {
-		p := createMoldPacket(s.seq, 1)
+		p, err := createMoldPacket(s.seq, 1)
+		errs.CheckE(err)
 		log.Printf("send mcast: %v\n", p)
 		n, err := conn.Write(p)
 		errs.CheckE(err)
@@ -179,7 +182,8 @@ func (s *mcastServer) run() {
 	defer conn.Close()
 }
 
-func createMoldPacket(startSeqNum, count int) []byte {
+func createMoldPacket(startSeqNum, count int) (bs []byte, err error) {
+	defer errs.PassE(&err)
 	type moldUDP64 struct {
 		Session        string `struc:"[10]byte"`
 		SequenceNumber uint64
@@ -205,7 +209,8 @@ func createMoldPacket(startSeqNum, count int) []byte {
 		}
 		errs.CheckE(struc.Pack(&bb, &mb))
 	}
-	return bb.Bytes()
+	bs = bb.Bytes()
+	return
 }
 
 func generateIttoMessage(seqNum int) []byte {
