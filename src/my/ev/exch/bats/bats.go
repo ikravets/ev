@@ -8,7 +8,7 @@ import (
 	"encoding/binary"
 	"io"
 	"log"
-	"net"
+	"math"
 
 	"my/errs"
 )
@@ -91,7 +91,7 @@ type MessageLogin struct {
 	MessageCommon
 	SessionSubId [4]byte
 	Username     [4]byte
-	filler       [2]byte
+	Filler       [2]byte
 	Password     [10]byte
 }
 
@@ -181,30 +181,39 @@ type BsuHeader struct {
 
 type Conn interface {
 	ReadMessage() (m Message, err error)
+	GetPacketWriter() PacketWriter
+	WriteMessageSimple(m Message) (err error)
+}
+type PacketWriter interface {
+	SetSequence(int) (err error)
+	SetUnit(int) (err error)
 	WriteMessage(m Message) (err error)
+	Flush() (err error)
+	Reset()
 }
 
 type conn struct {
-	rw             io.ReadWriter
-	messageReader  io.LimitedReader
-	buf            bytes.Buffer
-	nextSeqNum     uint32
-	unreadMessages uint8
-	unit           int
+	rw            io.ReadWriter
+	pw            PacketWriter
+	messageReader io.LimitedReader
+	rbuf          bytes.Buffer
+	nextSeqNum    uint32
+	unit          int
 }
 
-func NewConn(c net.Conn) *conn {
+func NewConn(rw io.ReadWriter) Conn {
 	return &conn{
-		rw: c,
+		rw: rw,
+		pw: NewPacketWriter(rw),
 	}
 }
 
-func (c conn) readBsuHeader() (err error) {
+func (c *conn) readBsuHeader() (err error) {
 	defer errs.PassE(&err)
-	errs.Check(c.unreadMessages == 0, c.unreadMessages)
 	errs.Check(c.messageReader.N == 0, c.messageReader.N)
 	var h BsuHeader
 	errs.CheckE(binary.Read(c.rw, binary.LittleEndian, &h))
+	log.Printf("rcv BSU header %#v", h)
 	if h.Sequence != 0 {
 		errs.Check(h.Sequence == c.nextSeqNum, h.Sequence, c.nextSeqNum)
 		c.nextSeqNum += uint32(h.Count)
@@ -218,51 +227,94 @@ func (c conn) readBsuHeader() (err error) {
 			errs.Check(c.unit == int(h.Unit), c.unit, h.Unit)
 		}
 	}
-	c.unreadMessages = h.Count
-	c.messageReader = io.LimitedReader{R: c.rw, N: int64(h.Length)}
+	c.messageReader = io.LimitedReader{R: c.rw, N: int64(h.Length) - 8}
 	return
 }
 
-func (c conn) readBsuHeaderMaybe() (err error) {
-	if c.unreadMessages != 0 {
-		c.unreadMessages--
-		return
-	}
-	return c.readBsuHeader()
-}
-
-func (c conn) ReadMessage() (m Message, err error) {
+func (c *conn) ReadMessage() (m Message, err error) {
 	defer errs.PassE(&err)
-	errs.CheckE(c.readBsuHeaderMaybe())
+	for c.messageReader.N == 0 {
+		errs.CheckE(c.readBsuHeader())
+	}
 
-	c.buf.Reset()
+	c.rbuf.Reset()
 	var b [2]byte
 	var n int
 	_, err = io.ReadFull(&c.messageReader, b[:])
-	n, err = c.buf.Write(b[:])
+	errs.CheckE(err)
+	log.Printf("rcv bytes %v", b)
+	n, err = c.rbuf.Write(b[:])
 	errs.CheckE(err)
 	errs.Check(n == len(b))
 	h := MessageHeader{
 		Length: uint8(b[0]),
 		Type:   MessageType(b[1]),
 	}
-	io.CopyN(&c.buf, &c.messageReader, int64(h.Length)-2)
+	log.Printf("rcv header %#v", h)
+	io.CopyN(&c.rbuf, &c.messageReader, int64(h.Length)-2)
 	f := MessageFactory[h.Type]
 	errs.Check(f != nil)
 	m = f()
-	errs.CheckE(binary.Read(&c.buf, binary.LittleEndian, m))
+	errs.CheckE(binary.Read(&c.rbuf, binary.LittleEndian, m))
 	log.Printf("rcv %#v\n", m)
 	return
 }
-func (c conn) WriteMessage(m Message) (err error) {
+func (c *conn) GetPacketWriter() PacketWriter {
+	return NewPacketWriter(c.rw)
+}
+func (c *conn) WriteMessageSimple(m Message) (err error) {
+	defer errs.PassE(&err)
+	c.pw.Reset()
+	errs.CheckE(c.pw.WriteMessage(m))
+	errs.CheckE(c.pw.Flush())
+	return
+}
+
+type packetWriter struct {
+	pb bytes.Buffer
+	mb bytes.Buffer
+	bh BsuHeader
+	w  io.Writer
+}
+
+func NewPacketWriter(w io.Writer) PacketWriter {
+	return &packetWriter{w: w}
+}
+func (p *packetWriter) SetSequence(seq int) (err error) {
+	defer errs.PassE(&err)
+	errs.Check(seq >= 0 && seq <= math.MaxUint32)
+	p.bh.Sequence = uint32(seq)
+	return
+}
+func (p *packetWriter) SetUnit(unit int) (err error) {
+	defer errs.PassE(&err)
+	errs.Check(unit >= 0 && unit <= math.MaxUint8)
+	p.bh.Unit = uint8(unit)
+	return
+}
+func (p *packetWriter) WriteMessage(m Message) (err error) {
 	defer errs.PassE(&err)
 	m.getCommon().setHeader(m.Type())
-	log.Printf("snd %#v\n", m)
-	bh := BsuHeader{
-		Length: uint16(m.getCommon().Header.Length) + 8,
-		Count:  1,
-	}
-	errs.CheckE(binary.Write(c.rw, binary.LittleEndian, bh))
-	errs.CheckE(binary.Write(c.rw, binary.LittleEndian, m))
+	errs.CheckE(binary.Write(&p.mb, binary.LittleEndian, m))
+	p.bh.Count++
+	errs.Check(p.bh.Count != 0)
 	return
+}
+func (p *packetWriter) Flush() (err error) {
+	defer errs.PassE(&err)
+	length := p.mb.Len() + 8
+	errs.Check(length <= math.MaxUint16, length)
+	p.bh.Length = uint16(length)
+	errs.CheckE(binary.Write(&p.pb, binary.LittleEndian, p.bh))
+	_, err = p.mb.WriteTo(&p.pb)
+	errs.CheckE(err)
+	_, err = p.w.Write(p.pb.Bytes())
+	errs.CheckE(err)
+	p.Reset()
+	return
+}
+func (p *packetWriter) Reset() {
+	p.mb.Reset()
+	p.pb.Reset()
+	p.bh = BsuHeader{}
 }
