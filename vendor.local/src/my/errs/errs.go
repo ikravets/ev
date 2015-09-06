@@ -69,8 +69,10 @@ type Checker interface {
 	CheckE(err error, v ...interface{})
 	Check(cond bool, v ...interface{})
 	PassE(errptr *error)
+	PassFromRecover(errptr *error, recovered interface{})
 	Is(Checker) bool
 	Catch(func(CheckerError))
+	CatchFromRecover(f func(CheckerError), recovered interface{})
 }
 
 type checkerLight struct {
@@ -94,12 +96,14 @@ func (c *checkerLight) Check(cond bool, args ...interface{}) {
 	}
 }
 func (c *checkerLight) PassE(errptr *error) {
-	r := recover()
-	if r == nil {
-		return
+	if r := recover(); r != nil {
+		c.PassFromRecover(errptr, r)
 	}
-	ce := r.(*checkerError)
-	if ce == nil {
+}
+func (c *checkerLight) PassFromRecover(errptr *error, recovered interface{}) {
+	r := recovered
+	ce, ok := r.(*checkerError)
+	if !ok {
 		// XXX no way to keep stack trace when re-panicing :(
 		panic(r)
 	}
@@ -113,14 +117,15 @@ func (c *checkerLight) PassE(errptr *error) {
 	}
 }
 func (c *checkerLight) Catch(f func(CheckerError)) {
-	r := recover()
-	if r == nil {
-		return
+	if r := recover(); r != nil {
+		c.CatchFromRecover(f, r)
 	}
-	ce := r.(*checkerError)
-	if ce == nil {
+}
+func (c *checkerLight) CatchFromRecover(f func(CheckerError), recovered interface{}) {
+	ce, ok := recovered.(*checkerError)
+	if !ok {
 		// XXX no way to keep stack trace when re-panicing :(
-		panic(r)
+		panic(recovered)
 	}
 	f(ce)
 }
@@ -159,7 +164,14 @@ func Check(cond bool, args ...interface{}) {
 	defaultChecker.Check(cond, args...)
 }
 func PassE(errptr *error) {
-	defaultChecker.PassE(errptr)
+	if r := recover(); r != nil {
+		defaultChecker.PassFromRecover(errptr, r)
+	}
+}
+func Catch(f func(CheckerError)) {
+	if r := recover(); r != nil {
+		defaultChecker.CatchFromRecover(f, r)
+	}
 }
 
 /*
