@@ -23,6 +23,7 @@ type cmdEfhReplay struct {
 	EfhDump      string   `long:"efh-dump"`
 	EfhSubscribe []string `long:"efh-subscribe"`
 	EfhChannel   []string `long:"efh-channel"`
+	EfhProf      bool     `long:"efh-prof"`
 
 	TestEfh string `long:"test-efh" default:"/usr/libexec/test_efh"`
 	Local   bool   `long:"local"`
@@ -54,6 +55,7 @@ func (c *cmdEfhReplay) ParsingFinished() {
 		EfhDump:         c.EfhDump,
 		EfhSubscribe:    c.EfhSubscribe,
 		EfhChannel:      c.EfhChannel,
+		EfhProf:         c.EfhProf,
 		TestEfh:         c.TestEfh,
 		Local:           c.Local,
 	}

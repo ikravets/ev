@@ -31,6 +31,7 @@ type ReplayConfig struct {
 	EfhDump      string
 	EfhSubscribe []string
 	EfhChannel   []string
+	EfhProf      bool
 
 	TestEfh string
 	Local   bool
@@ -91,6 +92,9 @@ func (e *efhReplay) startTestEfh() (err error) {
 		"--loglevel", strconv.Itoa(e.EfhLoglevel),
 		"--logfile", "test_efh.log",
 	)
+	if e.EfhProf {
+		e.testEfhArgs = append(e.testEfhArgs, "--prof")
+	}
 	for _, ch := range e.EfhChannel {
 		e.testEfhArgs = append(e.testEfhArgs, "--channel", ch)
 	}
