@@ -60,6 +60,7 @@ func NewEfhReplay(conf ReplayConfig) EfhReplay {
 var DumpsDifferError = errors.New("dumps differ")
 
 func (e *efhReplay) Run() (err error) {
+	defer errs.PassE(&err)
 	if e.EfhDump != "" {
 		e.testEfhDump = "test_efh.dump"
 	}
@@ -76,7 +77,8 @@ func (e *efhReplay) Run() (err error) {
 	errs.CheckE(e.stopDumpReplay())
 	errs.CheckE(e.stopTestEfh())
 	if e.testEfhDump != "" {
-		same, err := e.diffAppDump()
+		var same bool
+		same, err = e.diffAppDump()
 		errs.CheckE(err)
 		if !same {
 			log.Printf("dumps differ")
@@ -98,10 +100,13 @@ func (e *efhReplay) startTestEfh() (err error) {
 	for _, ch := range e.EfhChannel {
 		e.testEfhArgs = append(e.testEfhArgs, "--channel", ch)
 	}
-	for _, s := range e.EfhSubscribe {
-		e.testEfhArgs = append(e.testEfhArgs, "--subscribe", s)
+	if len(e.EfhSubscribe) == 0 {
+		e.testEfhArgs = append(e.testEfhArgs, "--debug-assume-subscribed")
+	} else {
+		for _, s := range e.EfhSubscribe {
+			e.testEfhArgs = append(e.testEfhArgs, "--subscribe", s)
+		}
 	}
-	e.testEfhArgs = append(e.testEfhArgs, "--debug-assume-subscribed")
 	e.testEfhArgs = append(e.testEfhArgs,
 		"--debug-stop-on-status", "STATUS_RX_QUEUE_FULL",
 		"--debug-stop-on-status", "STATUS_DESTINATION_IP_UNKNOWN",
@@ -145,7 +150,7 @@ func (e *efhReplay) startTestEfh() (err error) {
 	e.testEfhDoneCh = make(chan struct{})
 	go func() {
 		e.testEfhExit = e.testEfhCmd.Wait()
-		e.testEfhDoneCh <- struct{}{}
+		close(e.testEfhDoneCh)
 	}()
 	return
 }
