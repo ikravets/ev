@@ -70,10 +70,29 @@ func (e *efhReplay) Run() (err error) {
 	}
 	errs.CheckE(e.startTestEfh())
 	errs.CheckE(e.startDumpReplay())
-	select {
-	case <-e.testEfhDoneCh:
-	case <-e.replay.DoneCh:
-	}
+	func() {
+		ticker := time.NewTicker(time.Second / 10)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-e.testEfhDoneCh:
+				fmt.Println()
+				return
+			case <-e.replay.DoneCh:
+				fmt.Printf("\rdone: 100%%   \n")
+				return
+			case <-ticker.C:
+				select {
+				case done, ok := <-e.replay.ProgressCh:
+					if !ok {
+						done = 1
+					}
+					fmt.Printf("\rdone: %.1f%%", done*100)
+				default:
+				}
+			}
+		}
+	}()
 	errs.CheckE(e.stopDumpReplay())
 	errs.CheckE(e.stopTestEfh())
 	if e.testEfhDump != "" {
@@ -166,13 +185,14 @@ func (e *efhReplay) stopTestEfh() (err error) {
 
 func (e *efhReplay) startDumpReplay() (err error) {
 	e.replay = &packet.Replay{
-		IfaceName: e.OutputInterface,
-		DumpName:  e.InputFileName,
-		Limit:     e.Limit,
-		Pps:       e.Pps,
-		Loop:      e.Loop,
-		StopCh:    make(chan struct{}),
-		DoneCh:    make(chan struct{}),
+		IfaceName:  e.OutputInterface,
+		DumpName:   e.InputFileName,
+		Limit:      e.Limit,
+		Pps:        e.Pps,
+		Loop:       e.Loop,
+		StopCh:     make(chan struct{}),
+		DoneCh:     make(chan struct{}),
+		ProgressCh: make(chan float64, 1),
 	}
 	log.Printf("starting replay %v", e.replay)
 	go func() {
