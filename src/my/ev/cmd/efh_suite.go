@@ -23,10 +23,11 @@ type cmdEfhSuite struct {
 	Exchange    string   `long:"exch"  short:"e" value-name:"EXCHANGE" default:"nasdaq" description:"nasdaq, bats, etc."`
 	Suites      []string `long:"suite" short:"s" value-name:"SUITE"`
 	Tests       []string `long:"test"  short:"t" value-name:"TEST"`
-	Speed       int      `long:"speed" value-name:"NUM" default:"80000"`
+	Speed       int      `long:"speed" value-name:"NUM" default:"50000"`
 	Limit       int      `long:"limit" value-name:"NUM"`
 	Local       bool     `long:"local"`
 	EfhLoglevel int      `long:"efh-loglevel" default:"6"`
+	EfhProf     bool     `long:"efh-prof"`
 
 	shouldExecute bool
 	topOutDirName string
@@ -105,6 +106,7 @@ func (c *cmdEfhSuite) ParsingFinished() {
 		}
 	}
 	log.Printf("Tests OK/Total: %d/%d\n", c.testRunsOk, c.testRunsTotal)
+	fmt.Printf("Tests OK/Total: %d/%d\n", c.testRunsOk, c.testRunsTotal)
 }
 func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	defer errs.Catch(func(ce errs.CheckerError) {
@@ -140,6 +142,7 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 		EfhIgnoreGap:    true,
 		EfhDump:         "expout_orders",
 		EfhChannel:      c.genEfhChannels(testDirName),
+		EfhProf:         c.EfhProf,
 		TestEfh:         "/usr/libexec/test_efh",
 		Local:           c.Local,
 	}
