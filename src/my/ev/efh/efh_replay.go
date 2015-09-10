@@ -148,6 +148,11 @@ func (e *efhReplay) startTestEfh() (err error) {
 	e.testEfhCmd.Stderr = out
 
 	errs.CheckE(e.testEfhCmd.Start())
+	e.testEfhDoneCh = make(chan struct{})
+	go func() {
+		e.testEfhExit = e.testEfhCmd.Wait()
+		close(e.testEfhDoneCh)
+	}()
 
 	func() {
 		for {
@@ -160,16 +165,12 @@ func (e *efhReplay) startTestEfh() (err error) {
 				}
 			case <-time.After(30 * time.Second):
 				err = errors.New("timeout starting test_efh")
-				log.Printf("timeout starting test_efh")
+				return
+			case <-e.testEfhDoneCh:
+				err = errors.New("test_efh exited too soon")
 				return
 			}
 		}
-	}()
-
-	e.testEfhDoneCh = make(chan struct{})
-	go func() {
-		e.testEfhExit = e.testEfhCmd.Wait()
-		close(e.testEfhDoneCh)
 	}()
 	return
 }
@@ -179,7 +180,9 @@ func (e *efhReplay) stopTestEfh() (err error) {
 	e.testEfhCmd.Process.Signal(os.Interrupt)
 	time.AfterFunc(10*time.Second, func() { e.testEfhCmd.Process.Kill() })
 	<-e.testEfhDoneCh
-	log.Printf("test_efh wait: %s\n", e.testEfhExit)
+	if e.testEfhExit != nil {
+		log.Printf("test_efh wait: %s\n", e.testEfhExit)
+	}
 	return
 }
 
