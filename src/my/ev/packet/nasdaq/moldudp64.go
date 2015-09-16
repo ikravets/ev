@@ -9,8 +9,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )

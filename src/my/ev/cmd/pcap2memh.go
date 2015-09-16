@@ -5,9 +5,8 @@ package cmd
 
 import (
 	"github.com/google/gopacket/pcap"
+	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
-
-	"my/errs"
 
 	"my/ev/packet/processor"
 	"my/ev/rec"

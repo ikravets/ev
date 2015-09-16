@@ -11,8 +11,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/pcapgo"
-
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 	"my/ev/packet/processor"

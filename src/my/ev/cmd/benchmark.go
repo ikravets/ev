@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/google/gopacket/pcap"
+	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
-
-	"my/errs"
 
 	"my/ev/packet"
 	"my/ev/packet/processor"

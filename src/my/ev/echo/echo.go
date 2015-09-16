@@ -9,7 +9,7 @@ import (
 	"log"
 	"net"
 
-	"my/errs"
+	"github.com/ikravets/errs"
 )
 
 type EchoServer interface {

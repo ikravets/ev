@@ -6,7 +6,7 @@ package anal
 import (
 	"sort"
 
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 	"my/ev/sim"

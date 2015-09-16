@@ -8,8 +8,7 @@ import (
 	"log"
 
 	"github.com/google/gopacket/pcap"
-
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 	"my/ev/packet/processor"

@@ -7,11 +7,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 
-	"math"
-	"my/errs"
+	"github.com/ikravets/errs"
 )
 
 type MessageType byte

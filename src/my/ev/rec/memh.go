@@ -11,7 +11,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"my/errs"
+	"github.com/ikravets/errs"
+
 	"my/ev/packet"
 )
 

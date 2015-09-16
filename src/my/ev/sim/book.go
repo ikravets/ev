@@ -7,8 +7,8 @@ import (
 	"log"
 
 	"github.com/cznic/b"
+	"github.com/ikravets/errs"
 
-	"my/errs"
 	"my/ev/packet"
 )
 

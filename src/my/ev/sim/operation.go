@@ -4,7 +4,7 @@
 package sim
 
 import (
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )

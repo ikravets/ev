@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"time"
 
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )

@@ -51,6 +51,10 @@ edit:
 
 DEPS := b go-flags struc gopacket errs
 
+errs-url := https://github.com/ikravets/errs
+errs-dir := $(errs-url:https://%=%)
+errs-cid := master
+
 b-url := https://github.com/cznic/b
 b-dir := $(b-url:https://%=%)
 b-cid := master
@@ -68,9 +72,6 @@ gopacket-dir := $(gopacket-url:https://%=%)
 gopacket-cid := master
 
 .SECONDARY: $(DEPS:%=$(VENDOR_DIR)/.stamp.get-%)
-$(VENDOR_DIR)/.stamp.get-errs:
-	ln -s ../../$(VENDOR_LOCAL_DIR)/src/my $(VENDOR_DIR)/src
-	touch "$@"
 $(VENDOR_DIR)/.stamp.get-%:
 	git clone $($*-url) $(VENDOR_DIR)/src/$($*-dir)
 	git -C $(VENDOR_DIR)/src/$($*-dir) checkout $($*-cid)

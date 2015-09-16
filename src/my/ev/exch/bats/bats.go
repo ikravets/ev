@@ -10,7 +10,7 @@ import (
 	"log"
 	"math"
 
-	"my/errs"
+	"github.com/ikravets/errs"
 )
 
 type MessageType byte

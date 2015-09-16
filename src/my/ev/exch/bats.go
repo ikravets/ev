@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/bchan"
 	"my/ev/exch/bats"

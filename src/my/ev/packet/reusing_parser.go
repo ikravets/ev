@@ -7,8 +7,7 @@ import (
 	"log"
 
 	"github.com/google/gopacket"
-
-	"my/errs"
+	"github.com/ikravets/errs"
 )
 
 type DecodingLayerFactory interface {

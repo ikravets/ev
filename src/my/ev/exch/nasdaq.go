@@ -11,9 +11,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/ikravets/errs"
 	"github.com/lunixbochs/struc"
-
-	"my/errs"
 
 	"my/ev/exch/sbtcp"
 )

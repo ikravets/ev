@@ -13,9 +13,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
-
-	"my/errs"
 
 	"my/ev/anal"
 	"my/ev/efhsim"

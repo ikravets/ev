@@ -9,9 +9,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
-
-	"my/errs"
 
 	"my/ev/packet"
 	"my/ev/pcapsplit"

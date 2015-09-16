@@ -10,8 +10,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
-
-	"my/errs"
+	"github.com/ikravets/errs"
 )
 
 type Replay struct {

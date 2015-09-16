@@ -12,9 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
-
-	"my/errs"
 
 	"my/ev/efh"
 )

@@ -8,8 +8,7 @@ import (
 	"errors"
 
 	"github.com/google/gopacket"
-
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )

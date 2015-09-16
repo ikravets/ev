@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"my/errs"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )
