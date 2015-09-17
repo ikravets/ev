@@ -218,6 +218,7 @@ func (s *batsMcastServer) run() {
 		case seq := <-ch:
 			log.Printf("mcast seq %d", seq)
 			m := s.src.GetMessage(seq)
+			s.pw.SyncStart()
 			errs.CheckE(s.pw.SetSequence(seq))
 			errs.CheckE(s.pw.WriteMessage(m))
 			errs.CheckE(s.pw.Flush())

@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"sync"
 
 	"github.com/ikravets/errs"
 )
@@ -185,6 +186,7 @@ type Conn interface {
 	WriteMessageSimple(m Message) (err error)
 }
 type PacketWriter interface {
+	SyncStart()
 	SetSequence(int) (err error)
 	SetUnit(int) (err error)
 	WriteMessage(m Message) (err error)
@@ -264,21 +266,25 @@ func (c *conn) GetPacketWriter() PacketWriter {
 }
 func (c *conn) WriteMessageSimple(m Message) (err error) {
 	defer errs.PassE(&err)
-	c.pw.Reset()
+	c.pw.SyncStart()
 	errs.CheckE(c.pw.WriteMessage(m))
 	errs.CheckE(c.pw.Flush())
 	return
 }
 
 type packetWriter struct {
-	pb bytes.Buffer
-	mb bytes.Buffer
-	bh BsuHeader
-	w  io.Writer
+	pb   bytes.Buffer
+	mb   bytes.Buffer
+	bh   BsuHeader
+	w    io.Writer
+	lock sync.Locker
 }
 
 func NewPacketWriter(w io.Writer) PacketWriter {
-	return &packetWriter{w: w}
+	return &packetWriter{w: w, lock: &sync.Mutex{}}
+}
+func (p *packetWriter) SyncStart() {
+	p.lock.Lock()
 }
 func (p *packetWriter) SetSequence(seq int) (err error) {
 	defer errs.PassE(&err)
@@ -317,4 +323,5 @@ func (p *packetWriter) Reset() {
 	p.mb.Reset()
 	p.pb.Reset()
 	p.bh = BsuHeader{}
+	p.lock.Unlock()
 }
