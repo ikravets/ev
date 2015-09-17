@@ -53,9 +53,9 @@ func (b *bchan) run() {
 			log.Printf("producer channel closed")
 			break
 		}
-		log.Printf("produced %#v", val)
+		//log.Printf("produced %#v", val)
 		for cons := range b.cons {
-			log.Printf("consider consumer %#v", cons)
+			//log.Printf("consider consumer %#v", cons)
 			if atomic.LoadInt32(&cons.closed) != 0 {
 				close(cons.ch)
 				delete(b.cons, cons)
@@ -63,7 +63,7 @@ func (b *bchan) run() {
 			}
 			select {
 			case cons.ch <- val:
-				log.Printf("value sent to consumer %#v", cons)
+				//log.Printf("value sent to consumer %#v", cons)
 			default:
 			}
 		}
