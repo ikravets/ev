@@ -183,6 +183,7 @@ type BsuHeader struct {
 type Conn interface {
 	ReadMessage() (m Message, err error)
 	GetPacketWriter() PacketWriter
+	GetPacketWriterUnsync() PacketWriter
 	WriteMessageSimple(m Message) (err error)
 }
 type PacketWriter interface {
@@ -197,6 +198,7 @@ type PacketWriter interface {
 type conn struct {
 	rw            io.ReadWriter
 	pw            PacketWriter
+	wLock         sync.Locker
 	messageReader io.LimitedReader
 	rbuf          bytes.Buffer
 	nextSeqNum    uint32
@@ -204,9 +206,11 @@ type conn struct {
 }
 
 func NewConn(rw io.ReadWriter) Conn {
+	wLock := &sync.Mutex{}
 	return &conn{
-		rw: rw,
-		pw: NewPacketWriter(rw),
+		rw:    rw,
+		wLock: wLock,
+		pw:    NewPacketWriter(rw, wLock),
 	}
 }
 
@@ -262,7 +266,10 @@ func (c *conn) ReadMessage() (m Message, err error) {
 	return
 }
 func (c *conn) GetPacketWriter() PacketWriter {
-	return NewPacketWriter(c.rw)
+	return NewPacketWriter(c.rw, c.wLock)
+}
+func (c *conn) GetPacketWriterUnsync() PacketWriter {
+	return NewPacketWriter(c.rw, nil)
 }
 func (c *conn) WriteMessageSimple(m Message) (err error) {
 	defer errs.PassE(&err)
@@ -280,8 +287,16 @@ type packetWriter struct {
 	lock sync.Locker
 }
 
-func NewPacketWriter(w io.Writer) PacketWriter {
-	return &packetWriter{w: w, lock: &sync.Mutex{}}
+type nilLocker struct{}
+
+func (_ *nilLocker) Lock()   {}
+func (_ *nilLocker) Unlock() {}
+
+func NewPacketWriter(w io.Writer, lock sync.Locker) PacketWriter {
+	if lock == nil {
+		lock = &nilLocker{}
+	}
+	return &packetWriter{w: w, lock: lock}
 }
 func (p *packetWriter) SyncStart() {
 	p.lock.Lock()

@@ -199,7 +199,7 @@ func (s *batsMcastServer) start() (err error) {
 	s.conn, err = net.DialUDP("udp", laddr, raddr)
 	errs.CheckE(err)
 	bconn := bats.NewConn(s.conn)
-	s.pw = bconn.GetPacketWriter()
+	s.pw = bconn.GetPacketWriterUnsync()
 	s.bmsc = s.src.NewClient()
 	go s.run()
 	return
