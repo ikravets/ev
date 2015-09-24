@@ -78,16 +78,18 @@ func (s *spinServer) run() {
 }
 
 type spinServerConn struct {
-	conn  net.Conn
-	bconn bats.Conn
-	src   MessageSource
+	conn     net.Conn
+	bconn    bats.Conn
+	src      MessageSource
+	imageLag int
 }
 
 func NewSpinServerConn(conn net.Conn, src MessageSource) *spinServerConn {
 	return &spinServerConn{
-		conn:  conn,
-		bconn: bats.NewConn(conn),
-		src:   src,
+		conn:     conn,
+		bconn:    bats.NewConn(conn),
+		src:      src,
+		imageLag: 10,
 	}
 }
 
@@ -154,7 +156,7 @@ func (s *spinServerConn) sendImageAvail(cancel <-chan struct{}) {
 			log.Printf("image avail cancelled")
 			return
 		case <-ticker.C:
-			seq := s.src.CurrentSequence() - 10
+			seq := s.src.CurrentSequence() - s.imageLag
 			if seq > 0 {
 				log.Printf("image avail %d", seq)
 				sia := bats.MessageSpinImageAvail{
