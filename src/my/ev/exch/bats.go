@@ -17,6 +17,7 @@ import (
 )
 
 type MessageSource interface {
+	SetSequence(int)
 	CurrentSequence() int
 	GetMessage(int) bats.Message
 	Run()
@@ -238,18 +239,19 @@ func NewBatsMessageSource() *batsMessageSource {
 		cancel: make(chan struct{}),
 		bchan:  bchan.NewBchan(),
 		mps:    1,
+		curSeq: 1000000,
 	}
 }
 func (bms *batsMessageSource) Run() {
-	ticker := time.NewTicker(time.Duration(1000/bms.mps) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(1000000000/bms.mps) * time.Nanosecond)
 	defer ticker.Stop()
 	defer bms.bchan.Close()
-	for seq := 100; ; seq++ {
+	for {
 		select {
 		case _, _ = <-bms.cancel:
 			return
 		case <-ticker.C:
-			bms.produce(seq)
+			bms.produceOne()
 		}
 	}
 }
@@ -262,17 +264,26 @@ func (bms *batsMessageSource) RunInteractive() {
 		bms.produce(seq)
 	}
 }
-func (bms *batsMessageSource) produce(seq int) {
-	log.Printf("source seq %d", seq)
-	atomic.StoreInt64(&bms.curSeq, int64(seq))
+func (bms *batsMessageSource) publish(seq int) {
 	select {
 	case bms.bchan.ProducerChan() <- seq:
-		log.Printf("produced")
+		log.Printf("publish source seq %d", seq)
 	default:
 	}
 }
+func (bms *batsMessageSource) produceOne() {
+	seq := int(atomic.AddInt64(&bms.curSeq, int64(1)))
+	bms.publish(seq)
+}
+func (bms *batsMessageSource) produce(seq int) {
+	bms.SetSequence(seq)
+	bms.publish(seq)
+}
 func (bms *batsMessageSource) Stop() {
 	close(bms.cancel)
+}
+func (bms *batsMessageSource) SetSequence(seq int) {
+	atomic.StoreInt64(&bms.curSeq, int64(seq))
 }
 func (bms *batsMessageSource) CurrentSequence() int {
 	return int(atomic.LoadInt64(&bms.curSeq))
