@@ -61,7 +61,7 @@ func (e *exchangeBats) Run() {
 
 type spinServer struct {
 	laddr string
-	src   MessageSource
+	src   *batsMessageSource
 }
 
 func (s *spinServer) run() {
@@ -78,18 +78,20 @@ func (s *spinServer) run() {
 }
 
 type spinServerConn struct {
-	conn     net.Conn
-	bconn    bats.Conn
-	src      MessageSource
-	imageLag int
+	conn            net.Conn
+	bconn           bats.Conn
+	src             *batsMessageSource
+	imageLag        int
+	mcastDuringSpin int
 }
 
-func NewSpinServerConn(conn net.Conn, src MessageSource) *spinServerConn {
+func NewSpinServerConn(conn net.Conn, src *batsMessageSource) *spinServerConn {
 	return &spinServerConn{
-		conn:     conn,
-		bconn:    bats.NewConn(conn),
-		src:      src,
-		imageLag: 10,
+		conn:            conn,
+		bconn:           bats.NewConn(conn),
+		src:             src,
+		imageLag:        10,
+		mcastDuringSpin: 10,
 	}
 }
 
@@ -128,6 +130,7 @@ func (s *spinServerConn) run() {
 	}
 	errs.CheckE(s.bconn.WriteMessageSimple(&res))
 	errs.CheckE(s.sendAll(int(req.Sequence), seq+1))
+	s.waitForMcast(seq)
 	res2 := bats.MessageSpinFinished{
 		Sequence: req.Sequence,
 	}
@@ -176,6 +179,15 @@ func (s *spinServerConn) sendAll(start, end int) (err error) {
 	}
 	log.Printf("spin send %d .. %d done", start, end)
 	return
+}
+func (s *spinServerConn) waitForMcast(startSeq int) {
+	waitSeq := startSeq + s.mcastDuringSpin
+	log.Printf("wait for mcast seq %d, current %d", waitSeq, s.src.CurrentSequence())
+	bmsc := s.src.NewClient()
+	defer bmsc.Close()
+	ch := bmsc.Chan()
+	for seq := s.src.CurrentSequence(); seq < waitSeq; seq = <-ch {
+	}
 }
 
 type batsMcastServer struct {
