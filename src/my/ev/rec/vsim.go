@@ -26,6 +26,7 @@ type SimLogger struct {
 }
 
 const SimLoggerDefaultSupernodeLevels = 256
+const SimLoggerUpperSupernodeLevels = 8
 
 func NewSimLogger(w io.Writer) *SimLogger {
 	s := &SimLogger{
@@ -195,12 +196,30 @@ func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 		if operation.GetSide() == packet.MarketSideAsk {
 			empty.Price = -1
 		}
-		for i := 0; i < s.supernodeLevels; i++ {
+		PrintLevel := SimLoggerDefaultSupernodeLevels
+		lenOld, lenNew := len(s.tobOld), len(s.tobNew)
+		if 0 == operation.GetNewSize() && 0 == operation.GetPrice() {
+			PrintLevel = SimLoggerUpperSupernodeLevels
+		} else if lenOld < SimLoggerUpperSupernodeLevels && lenNew < SimLoggerUpperSupernodeLevels {
+			PrintLevel = SimLoggerUpperSupernodeLevels // book is less than 8 levels
+		} else if lenOld > SimLoggerUpperSupernodeLevels || lenNew > SimLoggerUpperSupernodeLevels {
+			if lenOld == lenNew {
+				// see if changed one of first 8 recs
+				for i := 0; i < SimLoggerUpperSupernodeLevels; i++ {
+					if s.tobOld[i].Price != s.tobNew[i].Price || s.tobOld[i].Size != s.tobNew[i].Size {
+						PrintLevel = SimLoggerUpperSupernodeLevels
+					}
+				}
+			}
+		} else if lenOld <= lenNew { // add 7to8 or change 8-levels book
+			PrintLevel = SimLoggerUpperSupernodeLevels
+		}
+		for i := 0; i < PrintLevel; i++ {
 			plo, pln := empty, empty
-			if i < len(s.tobOld) {
+			if i < lenOld {
 				plo = s.tobOld[i]
 			}
-			if i < len(s.tobNew) {
+			if i < lenNew {
 				pln = s.tobNew[i]
 			}
 			s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
