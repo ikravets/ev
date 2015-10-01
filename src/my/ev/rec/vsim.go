@@ -72,31 +72,31 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 	}
 	switch im := idm.Pam.Layer().(type) {
 	case *nasdaq.IttoMessageAddOrder:
-		outItto("ORDER", im.Type, "%c %08x %08x %08x %08x", sideChar(im.Side), im.OId, im.RefNumD.ToUint32(), im.Size, im.Price)
+		outItto("ORDER", im.Type, "%c %012x %016x %08x %08x", sideChar(im.Side), im.OId.ToUint64(), im.RefNumD.ToUint32(), im.Size, im.Price)
 	case *nasdaq.IttoMessageAddQuote:
-		outItto("QBID", im.Type, "%08x %08x %08x %08x", im.OId, im.Bid.RefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
-		outItto("QASK", im.Type, "%08x %08x %08x %08x", im.OId, im.Ask.RefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
+		outItto("QBID", im.Type, "%012x %016x %08x %08x", im.OId.ToUint64(), im.Bid.RefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
+		outItto("QASK", im.Type, "%012x %016x %08x %08x", im.OId.ToUint64(), im.Ask.RefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
 	case *nasdaq.IttoMessageSingleSideExecuted:
-		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
+		outItto("ORDER", im.Type, "%016x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *nasdaq.IttoMessageSingleSideExecutedWithPrice:
-		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
+		outItto("ORDER", im.Type, "%016x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *nasdaq.IttoMessageOrderCancel:
-		outItto("ORDER", im.Type, "%08x %08x", im.OrigRefNumD.ToUint32(), im.Size)
+		outItto("ORDER", im.Type, "%016x %08x", im.OrigRefNumD.ToUint32(), im.Size)
 	case *nasdaq.IttoMessageSingleSideReplace:
-		outItto("ORDER", im.Type, "%08x %08x %08x %08x", im.RefNumD.ToUint32(), im.OrigRefNumD.ToUint32(), im.Size, im.Price)
+		outItto("ORDER", im.Type, "%016x %016x %08x %08x", im.RefNumD.ToUint32(), im.OrigRefNumD.ToUint32(), im.Size, im.Price)
 	case *nasdaq.IttoMessageSingleSideDelete:
-		outItto("ORDER", im.Type, "%08x", im.OrigRefNumD.ToUint32())
+		outItto("ORDER", im.Type, "%016x", im.OrigRefNumD.ToUint32())
 	case *nasdaq.IttoMessageSingleSideUpdate:
-		outItto("ORDER", im.Type, "%08x %08x %08x", im.RefNumD.ToUint32(), im.Size, im.Price)
+		outItto("ORDER", im.Type, "%016x %08x %08x", im.RefNumD.ToUint32(), im.Size, im.Price)
 	case *nasdaq.IttoMessageQuoteReplace:
-		outItto("QBID", im.Type, "%08x %08x %08x %08x", im.Bid.RefNumD.ToUint32(), im.Bid.OrigRefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
-		outItto("QASK", im.Type, "%08x %08x %08x %08x", im.Ask.RefNumD.ToUint32(), im.Ask.OrigRefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
+		outItto("QBID", im.Type, "%016x %016x %08x %08x", im.Bid.RefNumD.ToUint32(), im.Bid.OrigRefNumD.ToUint32(), im.Bid.Size, im.Bid.Price)
+		outItto("QASK", im.Type, "%016x %016x %08x %08x", im.Ask.RefNumD.ToUint32(), im.Ask.OrigRefNumD.ToUint32(), im.Ask.Size, im.Ask.Price)
 	case *nasdaq.IttoMessageQuoteDelete:
-		outItto("QBID", im.Type, "%08x", im.BidOrigRefNumD.ToUint32())
-		outItto("QASK", im.Type, "%08x", im.AskOrigRefNumD.ToUint32())
+		outItto("QBID", im.Type, "%016x", im.BidOrigRefNumD.ToUint32())
+		outItto("QASK", im.Type, "%016x", im.AskOrigRefNumD.ToUint32())
 	case *nasdaq.IttoMessageBlockSingleSideDelete:
 		for _, r := range im.RefNumDs {
-			outItto("ORDER", im.Type, "%08x", r.ToUint32())
+			outItto("ORDER", im.Type, "%016x", r.ToUint32())
 		}
 
 	case *bats.PitchMessageAddOrder:
