@@ -35,7 +35,8 @@ func NewBatsExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) 
 			laddr: ":16002",
 			src:   src,
 		},
-		mcast: newBatsMcastServer("10.2.0.5:0", "224.0.131.2:30110", src),
+//		mcast: newBatsMcastServer("10.2.0.5:0", "224.0.131.2:30110", src),
+		mcast: newBatsMcastServer(c.LocalAddr, c.RemoteAddr, src),
 	}
 	return
 }

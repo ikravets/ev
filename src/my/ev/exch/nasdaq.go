@@ -30,8 +30,8 @@ func NewNasdaqExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error
 			sleepEnabled: true,
 		},
 		mcast: &mcastServer{
-			laddr: "10.2.0.5:0",
-			raddr: "233.54.12.1:18001",
+			laddr: c.LocalAddr,
+			raddr: c.RemoteAddr,
 			seq:   1000,
 			pps:   1,
 		},

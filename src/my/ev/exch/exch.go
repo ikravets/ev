@@ -13,6 +13,8 @@ type ExchangeSimulator interface {
 
 type Config struct {
 	Protocol    string
+	LocalAddr   string
+	RemoteAddr  string
 	Interactive bool
 }
 
