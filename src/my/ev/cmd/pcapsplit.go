@@ -56,8 +56,11 @@ func (p *cmdPcapsplit) ParsingFinished() {
 	for oid, pnums := range pbo {
 		if len(pnums) < p.MinPacketsPerOid {
 			//log.Printf("option %s with %d packets ignored\n", oid, len(pnums))
-			continue
+			delete(pbo, oid)
 		}
+	}
+	confs := make(map[packet.OptionId]pcapsplit.SplitByOptionsConfig)
+	for oid, pnums := range pbo {
 		log.Printf("oid %s => pkts %d : %v\n", oid, len(pnums), pnums)
 		outFileName := fmt.Sprintf("%s/%s.pcap", p.DestDirName, oid)
 		if p.UseEditcap {
@@ -75,8 +78,14 @@ func (p *cmdPcapsplit) ParsingFinished() {
 			cmdStr = "editcap " + cmdStr
 			fmt.Println(cmdStr)
 		} else {
-			splitter.SplitByOption(oid, outFileName)
+			outFile, err := os.Create(outFileName)
+			errs.CheckE(err)
+			defer func() { errs.CheckE(outFile.Close()) }()
+			confs[oid] = pcapsplit.SplitByOptionsConfig{Writer: outFile}
 		}
+	}
+	if !p.UseEditcap {
+		errs.CheckE(splitter.SplitByOptions(confs))
 	}
 }
 
