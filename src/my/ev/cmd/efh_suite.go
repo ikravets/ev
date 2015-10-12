@@ -69,7 +69,16 @@ func (c *cmdEfhSuite) ParsingFinished() {
 	}
 
 	for _, suite := range c.Suites {
-		suiteDirName := filepath.Join(suitesDirName, suite)
+		var suiteDirName string
+		if strings.HasPrefix(suite, "/") {
+			suiteDirName = suite
+		} else if strings.HasPrefix(suite, "./") {
+			cwd, err := os.Getwd()
+			errs.CheckE(err)
+			suiteDirName = filepath.Join(cwd, suite)
+		} else {
+			suiteDirName = filepath.Join(suitesDirName, suite)
+		}
 		var tests []string
 		if len(c.Tests) == 0 || c.Tests[0] == "?" {
 			tests, err = listDirs(suiteDirName)
