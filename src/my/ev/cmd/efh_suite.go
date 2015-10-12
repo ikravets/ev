@@ -127,12 +127,17 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	if suffix != nil {
 		expoutName += *suffix
 	}
+	inputPcapName := filepath.Join(testDirName, "dump.pcap")
+	_, err = os.Stat(expoutName)
+	errs.CheckE(err)
+	_, err = os.Stat(inputPcapName)
+	errs.CheckE(err)
 	efhDumpName := filepath.Join(outDirName, "expout_orders")
 	errs.CheckE(os.Symlink(expoutName, efhDumpName))
 	errs.CheckE(os.Symlink(testDirName, filepath.Join(outDirName, "dump_dir")))
-	errs.CheckE(os.Symlink(filepath.Join(testDirName, "dump.pcap"), filepath.Join(outDirName, "dump.pcap")))
+	errs.CheckE(os.Symlink(inputPcapName, filepath.Join(outDirName, "dump.pcap")))
 	conf := efh.ReplayConfig{
-		InputFileName:   filepath.Join(testDirName, "dump.pcap"),
+		InputFileName:   inputPcapName,
 		OutputInterface: "eth1",
 		Pps:             c.Speed,
 		Limit:           c.Limit,
