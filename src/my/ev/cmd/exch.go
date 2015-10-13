@@ -25,7 +25,7 @@ func (c *cmdExch) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("exch", "run exchange simulating server", "", c)
 }
 
-func (c *cmdExch) ParsingFinished() {
+func (c *cmdExch) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -36,6 +36,7 @@ func (c *cmdExch) ParsingFinished() {
 	es, err := exch.NewExchangeSimulator(conf)
 	errs.CheckE(err)
 	es.Run()
+	return
 }
 
 func init() {

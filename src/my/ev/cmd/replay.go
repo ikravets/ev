@@ -28,7 +28,7 @@ func (c *cmdReplay) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("replay", "replay pcap dump", "", c)
 }
 
-func (c *cmdReplay) ParsingFinished() {
+func (c *cmdReplay) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -45,6 +45,7 @@ func (c *cmdReplay) ParsingFinished() {
 	for i := 0; i < loop; i++ {
 		errs.CheckE(r.Run())
 	}
+	return
 }
 
 func init() {

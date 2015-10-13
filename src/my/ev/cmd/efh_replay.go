@@ -40,7 +40,7 @@ func (c *cmdEfhReplay) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("efh_replay", "run test_efh and replay pcap dump", "", c)
 }
 
-func (c *cmdEfhReplay) ParsingFinished() {
+func (c *cmdEfhReplay) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -60,10 +60,11 @@ func (c *cmdEfhReplay) ParsingFinished() {
 		Local:           c.Local,
 	}
 	er := efh.NewEfhReplay(conf)
-	err := er.Run()
+	err = er.Run()
 	if err != nil {
 		log.Printf("ERROR %s", err)
 	}
+	return
 }
 
 func init() {

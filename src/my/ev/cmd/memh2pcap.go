@@ -49,7 +49,7 @@ func (c *cmdMemh2pcap) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("memh2pcap", "convert readmemh file to pcap", "", c)
 }
 
-func (c *cmdMemh2pcap) ParsingFinished() {
+func (c *cmdMemh2pcap) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -73,6 +73,7 @@ func (c *cmdMemh2pcap) ParsingFinished() {
 			errs.CheckE(m2p.addFile(fn))
 		}
 	}
+	return
 }
 
 type SortedFiles []os.FileInfo

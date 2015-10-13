@@ -31,7 +31,7 @@ func (c *cmdBenchmark) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("benchmark", "run benchmark", "", c)
 }
 
-func (c *cmdBenchmark) ParsingFinished() {
+func (c *cmdBenchmark) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -59,6 +59,7 @@ func (c *cmdBenchmark) ParsingFinished() {
 	}
 	timePerPacket := totalDuration / time.Duration(c.Iter*bo.Packets())
 	fmt.Printf("total duration: %s, time/pkt: %s\n", totalDuration, timePerPacket)
+	return
 }
 
 func init() {

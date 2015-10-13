@@ -7,7 +7,7 @@ import "github.com/jessevdk/go-flags"
 
 type Extender interface {
 	ConfigParser(*flags.Parser)
-	ParsingFinished()
+	ParsingFinished() error
 }
 
 type ExtenderRegistry interface {
@@ -34,10 +34,14 @@ func (r *extenderRegistry) ConfigParser(parser *flags.Parser) {
 	}
 }
 
-func (r *extenderRegistry) ParsingFinished() {
+func (r *extenderRegistry) ParsingFinished() (err error) {
 	for _, e := range r.extenders {
-		e.ParsingFinished()
+		err = e.ParsingFinished()
+		if err != nil {
+			break
+		}
 	}
+	return
 }
 
 var Registry = extenderRegistry{}

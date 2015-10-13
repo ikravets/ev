@@ -30,7 +30,7 @@ func (c *cmdCleanavt) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("cleanavt", "clean AVT CSV ticker file", "", c)
 }
 
-func (c *cmdCleanavt) ParsingFinished() {
+func (c *cmdCleanavt) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -46,6 +46,7 @@ func (c *cmdCleanavt) ParsingFinished() {
 
 	dict := loadDictReverse(dictFile)
 	errs.CheckE(filterAvt(inFile, outFile, dict))
+	return
 }
 
 func init() {

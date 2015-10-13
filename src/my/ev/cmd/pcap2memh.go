@@ -28,7 +28,7 @@ func (c *cmdPcap2memh) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("pcap2memh", "convert pcap file to readmemh simulator input", "", c)
 }
 
-func (c *cmdPcap2memh) ParsingFinished() {
+func (c *cmdPcap2memh) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -46,6 +46,7 @@ func (c *cmdPcap2memh) ParsingFinished() {
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)
 	pp.ProcessAll()
+	return
 }
 
 func init() {

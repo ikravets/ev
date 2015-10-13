@@ -39,7 +39,7 @@ func (p *cmdPcapsplit) ConfigParser(parser *flags.Parser) {
 		p)
 }
 
-func (p *cmdPcapsplit) ParsingFinished() {
+func (p *cmdPcapsplit) ParsingFinished() (err error) {
 	if !p.shouldExecute {
 		return
 	}
@@ -87,6 +87,7 @@ func (p *cmdPcapsplit) ParsingFinished() {
 	if !p.UseEditcap {
 		errs.CheckE(splitter.SplitByOptions(confs))
 	}
+	return
 }
 
 func init() {

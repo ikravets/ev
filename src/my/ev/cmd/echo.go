@@ -22,12 +22,13 @@ func (c *cmdEcho) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("echo", "run echo server", "", c)
 }
 
-func (c *cmdEcho) ParsingFinished() {
+func (c *cmdEcho) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
 	es := echo.NewEchoServer()
 	es.Run()
+	return
 }
 
 func init() {

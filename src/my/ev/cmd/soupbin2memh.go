@@ -31,8 +31,7 @@ func (c *cmdSoupbin2memh) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("soupbin2memh", "convert soupbin file to readmemh simulator input", "", c)
 }
 
-func (c *cmdSoupbin2memh) ParsingFinished() {
-	var err error
+func (c *cmdSoupbin2memh) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -72,6 +71,7 @@ func (c *cmdSoupbin2memh) ParsingFinished() {
 			log.Printf("record type '%c' != 'S'\n", header.Type)
 		}
 	}
+	return
 }
 
 func init() {

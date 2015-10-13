@@ -49,7 +49,7 @@ func (c *cmdEfhsim) ConfigParser(parser *flags.Parser) {
 	errs.CheckE(err)
 }
 
-func (c *cmdEfhsim) ParsingFinished() {
+func (c *cmdEfhsim) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -117,6 +117,7 @@ func (c *cmdEfhsim) ParsingFinished() {
 	if reporter != nil {
 		reporter.SaveAll()
 	}
+	return
 }
 
 func (c *cmdEfhsim) addOut(fileName string, setOut func(io.Writer) error) {

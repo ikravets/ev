@@ -43,20 +43,19 @@ func (c *cmdEfhSuite) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("efh_suite", "run test_efh test suite", "", c)
 }
 
-func (c *cmdEfhSuite) ParsingFinished() {
+func (c *cmdEfhSuite) ParsingFinished() (err error) {
 	defer errs.Catch(func(ce errs.CheckerError) {
 		log.Printf("caught %s\n", ce)
 	})
 	if !c.shouldExecute {
 		return
 	}
-	var err error
 	c.topOutDirName = time.Now().Format("efh_regression.2006-01-02-15:04:05")
 	suitesDirName := fmt.Sprintf("/local/dumps/%s/regression", c.Exchange)
 
 	if len(c.Suites) == 0 || c.Suites[0] == "?" {
-		suites, err := listDirs(suitesDirName)
-		errs.CheckE(err)
+		suites, err2 := listDirs(suitesDirName)
+		errs.CheckE(err2)
 		if len(c.Suites) > 0 {
 			fmt.Printf("suites: %s\n", suites)
 			return
@@ -115,6 +114,7 @@ func (c *cmdEfhSuite) ParsingFinished() {
 	}
 	log.Printf("Tests OK/Total: %d/%d\n", c.testRunsOk, c.testRunsTotal)
 	fmt.Printf("Tests OK/Total: %d/%d\n", c.testRunsOk, c.testRunsTotal)
+	return
 }
 func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	defer errs.Catch(func(ce errs.CheckerError) {

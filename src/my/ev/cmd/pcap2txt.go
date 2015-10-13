@@ -31,7 +31,7 @@ func (c *cmdPcap2txt) ConfigParser(parser *flags.Parser) {
 	parser.AddCommand("pcap2txt", "convert pcap file to human-readable text", "", c)
 }
 
-func (c *cmdPcap2txt) ParsingFinished() {
+func (c *cmdPcap2txt) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
@@ -47,6 +47,7 @@ func (c *cmdPcap2txt) ParsingFinished() {
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)
 	pp.ProcessAll()
+	return
 }
 
 func init() {
