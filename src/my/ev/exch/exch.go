@@ -12,10 +12,11 @@ type ExchangeSimulator interface {
 }
 
 type Config struct {
-	Protocol    string
-	LocalAddr   string
-	RemoteAddr  string
-	Interactive bool
+	Protocol     string
+	LocalAddr    string
+	RemoteAddr   string
+	Interactive  bool
+	ConnNumLimit int
 }
 
 var IllegalProtocol = errors.New("Illegal protocol")

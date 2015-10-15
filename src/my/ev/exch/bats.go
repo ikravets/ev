@@ -25,19 +25,60 @@ type MessageSource interface {
 	Stop()
 }
 
-func NewBatsExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) {
-	errs.Check(c.Protocol == "bats")
-	src := NewBatsMessageSource()
-	es = &exchangeBats{
+type exchangeBatsRegistry struct {
+	exchangeBatsN      []*exchangeBats
+	batsMessageSourceN []*batsMessageSource
+}
+
+func (e *exchangeBatsRegistry) NewBatsRegistry(c Config, src *batsMessageSource, num int)  (eb *exchangeBats){
+	var err error
+	laddr, err := net.ResolveUDPAddr("udp", c.LocalAddr)
+	errs.CheckE(err)
+	raddr, err := net.ResolveUDPAddr("udp", c.RemoteAddr)
+	errs.CheckE(err)
+
+	laddr.Port += num
+	raddr.Port += num
+	raddr.IP[net.IPv6len - 1] += (byte)(num / 4)
+
+	eb = &exchangeBats{
 		interactive: c.Interactive,
 		src:         src,
 		spin: &spinServer{
-			laddr: ":16002",
+			laddr: fmt.Sprintf(":%d", 16002 + num),
 			src:   src,
 		},
-//		mcast: newBatsMcastServer("10.2.0.5:0", "224.0.131.2:30110", src),
-		mcast: newBatsMcastServer(c.LocalAddr, c.RemoteAddr, src),
+		mcast: newBatsMcastServer(laddr, raddr, src, num),
 	}
+	return
+}
+func InitBatsRegistry(c Config) (es ExchangeSimulator) {
+	esr := &exchangeBatsRegistry{}
+	for i := 0; i < c.ConnNumLimit; i++ {
+		src := NewBatsMessageSource(i)
+		esr.exchangeBatsN = append(esr.exchangeBatsN, esr.NewBatsRegistry(c, src, i))
+		esr.exchangeBatsN[i].num = i;
+	}
+	es = esr
+	return
+}
+func (e *exchangeBatsRegistry) Run() {
+	for _,r := range e.exchangeBatsN {
+		if r.interactive {
+			go r.src.RunInteractive()
+		} else {
+			go r.src.Run()
+		}
+		go r.spin.run()
+		errs.CheckE(r.mcast.start(r.num))
+		log.Println(r.num,"started local", r.mcast.laddr.String(), "mcast", r.mcast.raddr.String())
+	}
+	select {}
+}
+
+func NewBatsExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) {
+	errs.Check(c.Protocol == "bats")
+	es = InitBatsRegistry(c)
 	return
 }
 
@@ -46,18 +87,7 @@ type exchangeBats struct {
 	src         MessageSource
 	spin        *spinServer
 	mcast       *batsMcastServer
-}
-
-func (e *exchangeBats) Run() {
-	if e.interactive {
-		go e.src.RunInteractive()
-	} else {
-		go e.src.Run()
-	}
-	go e.spin.run()
-	errs.CheckE(e.mcast.start())
-	log.Println("started")
-	select {}
+	num         int
 }
 
 type spinServer struct {
@@ -69,6 +99,7 @@ func (s *spinServer) run() {
 	l, err := net.Listen("tcp", s.laddr)
 	errs.CheckE(err)
 	defer l.Close()
+	log.Println(s.src.num,"started tcp", s.laddr)
 	for {
 		conn, err := l.Accept()
 		errs.CheckE(err)
@@ -192,31 +223,28 @@ func (s *spinServerConn) waitForMcast(startSeq int) {
 }
 
 type batsMcastServer struct {
-	laddr string
-	raddr string
+	laddr *net.UDPAddr
+	raddr *net.UDPAddr
 	src   *batsMessageSource
 
 	cancel chan struct{}
 	bmsc   *batsMessageSourceClient
 	pw     bats.PacketWriter
 	conn   net.Conn
+	num    int
 }
 
-func newBatsMcastServer(laddr, raddr string, src *batsMessageSource) *batsMcastServer {
+func newBatsMcastServer(laddr, raddr *net.UDPAddr, src *batsMessageSource, i int) *batsMcastServer {
 	return &batsMcastServer{
-		laddr:  laddr,
-		raddr:  raddr,
+		laddr :  laddr,
+		raddr :  raddr,
 		src:    src,
 		cancel: make(chan struct{}),
+		num:    i,
 	}
 }
-func (s *batsMcastServer) start() (err error) {
-	defer errs.PassE(&err)
-	laddr, err := net.ResolveUDPAddr("udp", s.laddr)
-	errs.CheckE(err)
-	raddr, err := net.ResolveUDPAddr("udp", s.raddr)
-	errs.CheckE(err)
-	s.conn, err = net.DialUDP("udp", laddr, raddr)
+func (s *batsMcastServer) start(num int) (err error) {
+	s.conn, err = net.DialUDP("udp", s.laddr, s.raddr)
 	errs.CheckE(err)
 	bconn := bats.NewConn(s.conn)
 	s.pw = bconn.GetPacketWriterUnsync()
@@ -229,14 +257,14 @@ func (s *batsMcastServer) run() {
 	defer s.bmsc.Close()
 	ch := s.bmsc.Chan()
 
-	log.Printf("ready. source chan %v", ch)
+	log.Printf("%d ready. source chan %v", s.num, ch)
 	for {
 		select {
 		case _, _ = <-s.cancel:
-			log.Printf("cancelled")
+			log.Printf("%d cancelled", s.num)
 			return
 		case seq := <-ch:
-			log.Printf("mcast seq %d", seq)
+			log.Printf("%d mcast seq %d", s.num, seq)
 			m := s.src.GetMessage(seq)
 			s.pw.SyncStart()
 			errs.CheckE(s.pw.SetSequence(seq))
@@ -251,14 +279,16 @@ type batsMessageSource struct {
 	cancel chan struct{}
 	bchan  bchan.Bchan
 	mps    int
+	num    int
 }
 
-func NewBatsMessageSource() *batsMessageSource {
+func NewBatsMessageSource(i int) *batsMessageSource {
 	return &batsMessageSource{
 		cancel: make(chan struct{}),
 		bchan:  bchan.NewBchan(),
 		mps:    1,
 		curSeq: 1000000,
+		num:    i,
 	}
 }
 func (bms *batsMessageSource) Run() {
@@ -286,7 +316,7 @@ func (bms *batsMessageSource) RunInteractive() {
 func (bms *batsMessageSource) publish(seq int) {
 	select {
 	case bms.bchan.ProducerChan() <- seq:
-		log.Printf("publish source seq %d", seq)
+		log.Printf("%d publish source seq %d", bms.num, seq)
 	default:
 	}
 }

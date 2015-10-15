@@ -13,7 +13,8 @@ import (
 type cmdExch struct {
 	Type          string `long:"type" short:"t" value-name:"EXCH" default:"nasdaq" description:"exchange type: nasdaq, bats"`
 	Laddr         string `long:"local-addr" value-name:"IPADDR" default:"10.2.0.5:0" description:"local address"`
-	Raddr         string `long:"remote-addr"value-name:"IPADDR" default:"224.0.131.2:30110" description:"remote server address"`
+	Raddr         string `long:"remote-addr" value-name:"IPADDR" default:"224.0.131.0:30101" description:"remote mcast address"`
+	ConnNumLimit  int    `long:"count" short:"c" value-name:"NUM" default:"1" description:"limit number of connections"`
 	Interactive   bool   `long:"interactive" short:"i" description:"run interactively"`
 	shouldExecute bool
 }
@@ -32,10 +33,11 @@ func (c *cmdExch) ParsingFinished() (err error) {
 		return
 	}
 	conf := exch.Config{
-		Protocol:    c.Type,
-		LocalAddr:   c.Laddr,
-		RemoteAddr:  c.Raddr,
-		Interactive: c.Interactive,
+		Protocol:     c.Type,
+		LocalAddr:    c.Laddr,
+		RemoteAddr:   c.Raddr,
+		Interactive:  c.Interactive,
+		ConnNumLimit: c.ConnNumLimit,
 	}
 	es, err := exch.NewExchangeSimulator(conf)
 	errs.CheckE(err)
