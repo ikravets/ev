@@ -196,30 +196,12 @@ func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 		if operation.GetSide() == packet.MarketSideAsk {
 			empty.Price = -1
 		}
-		PrintLevel := SimLoggerDefaultSupernodeLevels
-		lenOld, lenNew := len(s.tobOld), len(s.tobNew)
-		if 0 == operation.GetNewSize() && 0 == operation.GetPrice() {
-			PrintLevel = SimLoggerUpperSupernodeLevels
-		} else if lenOld < SimLoggerUpperSupernodeLevels && lenNew < SimLoggerUpperSupernodeLevels {
-			PrintLevel = SimLoggerUpperSupernodeLevels // book is less than 8 levels
-		} else if lenOld > SimLoggerUpperSupernodeLevels || lenNew > SimLoggerUpperSupernodeLevels {
-			if lenOld == lenNew {
-				// see if changed one of first 8 recs
-				for i := 0; i < SimLoggerUpperSupernodeLevels; i++ {
-					if s.tobOld[i].Price != s.tobNew[i].Price || s.tobOld[i].Size != s.tobNew[i].Size {
-						PrintLevel = SimLoggerUpperSupernodeLevels
-					}
-				}
-			}
-		} else if lenOld <= lenNew { // add 7to8 or change 8-levels book
-			PrintLevel = SimLoggerUpperSupernodeLevels
-		}
-		for i := 0; i < PrintLevel; i++ {
+		for i := 0; i < s.accessedLevels(operation); i++ {
 			plo, pln := empty, empty
-			if i < lenOld {
+			if i < len(s.tobOld) {
 				plo = s.tobOld[i]
 			}
-			if i < lenNew {
+			if i < len(s.tobNew) {
 				pln = s.tobNew[i]
 			}
 			s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
@@ -229,6 +211,28 @@ func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 		}
 	}
 	s.efhLogger.AfterBookUpdate(book, operation)
+}
+func (s *SimLogger) accessedLevels(operation sim.SimOperation) (levels int) {
+	levels = SimLoggerUpperSupernodeLevels
+	if s.supernodeLevels <= levels {
+		return s.supernodeLevels
+	}
+	if operation.GetPrice() == 0 {
+		// TODO hw can skip SN access at all
+		return
+	}
+	lenOld, lenNew := len(s.tobOld), len(s.tobNew)
+	if lenOld < levels {
+		return
+	}
+	if lenOld == lenNew {
+		for i := 0; i < levels; i++ {
+			if s.tobOld[i] != s.tobNew[i] {
+				return
+			}
+		}
+	}
+	return s.supernodeLevels
 }
 
 func (s *SimLogger) PrintOrder(m efhm_order) error {
