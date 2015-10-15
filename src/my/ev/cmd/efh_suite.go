@@ -129,6 +129,7 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	if suffix != nil {
 		testRunName += *suffix
 	}
+	fmt.Printf("run %s\n", testRunName)
 	outDirName := filepath.Join(c.topOutDirName, testRunName)
 	errs.CheckE(os.MkdirAll(outDirName, 0777))
 	errs.CheckE(ioutil.WriteFile(filepath.Join(outDirName, "fail"), nil, 0666))
