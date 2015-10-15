@@ -191,19 +191,19 @@ func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) 
 }
 func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if operation.GetOptionId().Valid() {
-		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), s.supernodeLevels)
 		empty := sim.PriceLevel{}
 		if operation.GetSide() == packet.MarketSideAsk {
 			empty.Price = -1
 		}
+		printablePriceLevel := func(pls []sim.PriceLevel, pos int) sim.PriceLevel {
+			if pos < len(pls) {
+				return pls[pos]
+			}
+			return empty
+		}
+		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), s.supernodeLevels)
 		for i := 0; i < s.accessedLevels(operation); i++ {
-			plo, pln := empty, empty
-			if i < len(s.tobOld) {
-				plo = s.tobOld[i]
-			}
-			if i < len(s.tobNew) {
-				pln = s.tobNew[i]
-			}
+			plo, pln := printablePriceLevel(s.tobOld, i), printablePriceLevel(s.tobNew, i)
 			s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
 				plo.Size, uint32(plo.Price),
 				pln.Size, uint32(pln.Price),
