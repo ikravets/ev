@@ -16,7 +16,16 @@ import (
 )
 
 func main() {
-	var err error
+	if err := do_main(); err != nil {
+		log.Printf("exit error: %s\n", err)
+		os.Exit(1)
+	} else {
+		log.Println("exit ok")
+	}
+}
+
+func do_main() (err error) {
+	defer errs.PassE(&err)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	var opts struct {
@@ -41,7 +50,6 @@ func main() {
 	logFile, err := os.OpenFile(opts.LogFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	errs.CheckE(err)
 	log.SetOutput(logFile)
-	defer func() { errs.CheckE(logFile.Close()) }()
 	log.Printf("args: %v\n", os.Args)
 
 	if opts.ProfileCpu != "" {
@@ -51,7 +59,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	cmd.Registry.ParsingFinished()
+	err = cmd.Registry.ParsingFinished()
 
 	if opts.ProfileMem != "" {
 		profFile, err := os.Create(opts.ProfileMem)
@@ -59,5 +67,5 @@ func main() {
 		errs.CheckE(pprof.WriteHeapProfile(profFile))
 		errs.CheckE(profFile.Close())
 	}
-	log.Println("finished")
+	return
 }
