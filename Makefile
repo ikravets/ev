@@ -74,7 +74,7 @@ gopacket-cid := master
 .SECONDARY: $(DEPS:%=$(VENDOR_DIR)/.stamp.get-%)
 $(VENDOR_DIR)/.stamp.get-%:
 	git clone $($*-url) $(VENDOR_DIR)/src/$($*-dir)
-	git -C $(VENDOR_DIR)/src/$($*-dir) checkout $($*-cid)
+	cd $(VENDOR_DIR)/src/$($*-dir) && git checkout $($*-cid)
 	touch "$@"
 get-%: $(VENDOR_DIR)/.stamp.get-%
 	@
