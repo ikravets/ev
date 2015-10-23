@@ -31,7 +31,7 @@ func NewNasdaqExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error
 		},
 		mcast: &mcastServer{
 			laddr: c.LocalAddr,
-			raddr: c.RemoteAddr,
+			raddr: c.FeedAddr,
 			seq:   1000,
 			pps:   1,
 		},

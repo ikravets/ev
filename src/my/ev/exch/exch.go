@@ -14,8 +14,10 @@ type ExchangeSimulator interface {
 type Config struct {
 	Protocol     string
 	LocalAddr    string
-	RemoteAddr   string
+	FeedAddr     string
+	GapAddr      string
 	Interactive  bool
+	Gap          bool
 	ConnNumLimit int
 }
 

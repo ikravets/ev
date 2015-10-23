@@ -31,16 +31,10 @@ type exchangeBatsRegistry struct {
 }
 
 func (e *exchangeBatsRegistry) NewBatsRegistry(c Config, src *batsMessageSource, num int)  (eb *exchangeBats){
-	var err error
-	laddr, err := net.ResolveUDPAddr("udp", c.LocalAddr)
+	feed_mc, err := newBatsFeedMcastServer(c, src, num)
 	errs.CheckE(err)
-	raddr, err := net.ResolveUDPAddr("udp", c.RemoteAddr)
+	gap_mc, err :=  newBatsGapMcastServer(c, src, num)
 	errs.CheckE(err)
-
-	laddr.Port += num
-	raddr.Port += num
-	raddr.IP[net.IPv6len - 1] += (byte)(num / 4)
-
 	eb = &exchangeBats{
 		interactive: c.Interactive,
 		src:         src,
@@ -48,7 +42,13 @@ func (e *exchangeBatsRegistry) NewBatsRegistry(c Config, src *batsMessageSource,
 			laddr: fmt.Sprintf(":%d", 16002 + num),
 			src:   src,
 		},
-		mcast: newBatsMcastServer(laddr, raddr, src, num),
+		feed_mc: feed_mc,
+		gap:  &gapProxy{
+			laddr: fmt.Sprintf(":%d", 17002 + num),
+			src:   src,
+			gmc:   gap_mc,
+		},
+		gap_mc:  gap_mc,
 	}
 	return
 }
@@ -70,8 +70,11 @@ func (e *exchangeBatsRegistry) Run() {
 			go r.src.Run()
 		}
 		go r.spin.run()
-		errs.CheckE(r.mcast.start(r.num))
-		log.Println(r.num,"started local", r.mcast.laddr.String(), "mcast", r.mcast.raddr.String())
+		errs.CheckE(r.feed_mc.start(r.num))
+		go r.gap.run()
+		errs.CheckE(r.gap_mc.start(r.num))
+		log.Println(r.num,"started local", r.feed_mc.laddr.String(), "to feed mcast", r.feed_mc.mcaddr.String())
+		log.Println(r.num,"started local", r.gap_mc.laddr.String(), "to gap mcast", r.gap_mc.mcaddr.String())
 	}
 	select {}
 }
@@ -86,8 +89,156 @@ type exchangeBats struct {
 	interactive bool
 	src         MessageSource
 	spin        *spinServer
-	mcast       *batsMcastServer
+	feed_mc     *batsFeedMcastServer
+	gap         *gapProxy
+	gap_mc      *batsGapMcastServer
 	num         int
+}
+type gapMessage struct {
+	start   int
+	end     int
+}
+
+type batsGapMcastServer struct {
+	laddr  *net.UDPAddr
+	mcaddr *net.UDPAddr
+	src    *batsMessageSource
+
+	cancel chan struct{}
+	gap    chan gapMessage
+	pw     bats.PacketWriter
+	conn   net.Conn
+	num    int
+}
+
+func newBatsGapMcastServer(c Config, src *batsMessageSource, i int) (gmc *batsGapMcastServer, err error) {
+	laddr, err := net.ResolveUDPAddr("udp", c.LocalAddr)
+	errs.CheckE(err)
+	mcaddr, err := net.ResolveUDPAddr("udp", c.GapAddr)
+	errs.CheckE(err)
+	laddr.Port += i + 1000
+	mcaddr.Port += i
+	mcaddr.IP[net.IPv6len - 1] += (byte)(i / 4)
+	gmc = &batsGapMcastServer{
+		laddr:  laddr,
+		mcaddr: mcaddr,
+		src:    src,
+		cancel: make(chan struct{}),
+		gap:    make(chan gapMessage),
+		num:    i,
+	}
+	return
+}
+func (g *batsGapMcastServer) start(num int) (err error) {
+	g.conn, err = net.DialUDP("udp", g.laddr, g.mcaddr)
+	errs.CheckE(err)
+	bconn := bats.NewConn(g.conn)
+	g.pw = bconn.GetPacketWriterUnsync()
+	go g.run()
+	return
+}
+func (g *batsGapMcastServer) run() {
+	defer g.conn.Close()
+	ch := g.gap
+
+	log.Printf("%d ready gap source chan %v", g.num, ch)
+	for {
+		select {
+		case _, _ = <-g.cancel:
+			log.Printf("%d cancelled", g.num)
+			return
+		case gap := <-ch:
+			log.Printf("gap send %d .. %d", gap.start, gap.end)
+			for i := gap.start; i < gap.end; i++ {
+				m := g.src.GetMessage(i)
+				g.pw.SyncStart()
+				errs.CheckE(g.pw.SetSequence(i))
+				errs.CheckE(g.pw.WriteMessage(m))
+				errs.CheckE(g.pw.Flush())
+			}
+			log.Printf("gap send %d .. %d done", gap.start, gap.end)
+		}
+	}
+}
+
+const MaxDropMessageCount = 100
+
+type gapProxy struct {
+	laddr string
+	src   *batsMessageSource
+	gmc   *batsGapMcastServer
+}
+
+func (g *gapProxy) run() {
+	l, err := net.Listen("tcp", g.laddr)
+	errs.CheckE(err)
+	defer l.Close()
+	log.Println(g.src.num,"started gap proxy", g.laddr)
+	for {
+		conn, err := l.Accept()
+		errs.CheckE(err)
+		log.Printf("accepted %s -> %s \n", conn.RemoteAddr(), conn.LocalAddr())
+		c := NewGapProxyConn(conn, g.gmc)
+		go c.run()
+	}
+}
+
+type gapProxyConn struct {
+	conn            net.Conn
+	bconn           bats.Conn
+	gmc             *batsGapMcastServer
+}
+
+func NewGapProxyConn(conn net.Conn, gmc *batsGapMcastServer) *gapProxyConn {
+	return &gapProxyConn{
+		conn:      conn,
+		bconn:     bats.NewConn(conn),
+		gmc:       gmc,
+	}
+}
+func (gc *gapProxyConn) login() (err error) {
+	defer errs.PassE(&err)
+	m, err := gc.bconn.ReadMessage()
+	errs.CheckE(err)
+	_, ok := m.(*bats.MessageLogin)
+	errs.Check(ok)
+	res := bats.MessageLoginResponse{
+		Status: bats.LoginAccepted,
+	}
+	errs.CheckE(gc.bconn.WriteMessageSimple(&res))
+	log.Printf("login done")
+	return
+}
+func (gc *gapProxyConn) run() {
+	defer errs.Catch(func(ce errs.CheckerError) {
+		log.Printf("caught %s\n", ce)
+	})
+	defer gc.conn.Close()
+	errs.CheckE(gc.login())
+
+	m, err := gc.bconn.ReadMessage()
+	errs.CheckE(err)
+	req, ok := m.(*bats.MessageGapRequest)
+	errs.Check(ok)
+	res := bats.MessageGapResponse{
+		Unit:        req.Unit,
+		Sequence:    req.Sequence,
+		Count:       req.Count,
+		Status:      bats.GapStatusAccepted,
+	}
+	errs.CheckE(gc.bconn.WriteMessageSimple(&res))
+	gc.noticeGapMultiCast(int(req.Sequence), int(req.Sequence + uint32(req.Count)))
+//	gc.noticeGapMultiCast(5, 12)
+
+
+	log.Println("gap finished")
+}
+func (gc *gapProxyConn) noticeGapMultiCast(start, end int) {
+	gap := gapMessage {
+		start:  start,
+		end:    end,
+	}
+	gc.gmc.gap <- gap
 }
 
 type spinServer struct {
@@ -222,29 +373,39 @@ func (s *spinServerConn) waitForMcast(startSeq int) {
 	}
 }
 
-type batsMcastServer struct {
-	laddr *net.UDPAddr
-	raddr *net.UDPAddr
-	src   *batsMessageSource
+type batsFeedMcastServer struct {
+	laddr  *net.UDPAddr
+	mcaddr *net.UDPAddr
+	src    *batsMessageSource
 
 	cancel chan struct{}
 	bmsc   *batsMessageSourceClient
 	pw     bats.PacketWriter
 	conn   net.Conn
 	num    int
+	gap    bool
 }
 
-func newBatsMcastServer(laddr, raddr *net.UDPAddr, src *batsMessageSource, i int) *batsMcastServer {
-	return &batsMcastServer{
-		laddr :  laddr,
-		raddr :  raddr,
+func newBatsFeedMcastServer(c Config, src *batsMessageSource, i int) (fmc *batsFeedMcastServer, err error) {
+	laddr, err := net.ResolveUDPAddr("udp", c.LocalAddr)
+	errs.CheckE(err)
+	mcaddr, err := net.ResolveUDPAddr("udp", c.FeedAddr)
+	errs.CheckE(err)
+	laddr.Port += i
+	mcaddr.Port += i
+	mcaddr.IP[net.IPv6len - 1] += (byte)(i / 4)
+	fmc = &batsFeedMcastServer{
+		laddr:  laddr,
+		mcaddr: mcaddr,
 		src:    src,
 		cancel: make(chan struct{}),
 		num:    i,
+		gap:    c.Gap,
 	}
+	return
 }
-func (s *batsMcastServer) start(num int) (err error) {
-	s.conn, err = net.DialUDP("udp", s.laddr, s.raddr)
+func (s *batsFeedMcastServer) start(num int) (err error) {
+	s.conn, err = net.DialUDP("udp", s.laddr, s.mcaddr)
 	errs.CheckE(err)
 	bconn := bats.NewConn(s.conn)
 	s.pw = bconn.GetPacketWriterUnsync()
@@ -252,7 +413,7 @@ func (s *batsMcastServer) start(num int) (err error) {
 	go s.run()
 	return
 }
-func (s *batsMcastServer) run() {
+func (s *batsFeedMcastServer) run() {
 	defer s.conn.Close()
 	defer s.bmsc.Close()
 	ch := s.bmsc.Chan()
@@ -264,12 +425,16 @@ func (s *batsMcastServer) run() {
 			log.Printf("%d cancelled", s.num)
 			return
 		case seq := <-ch:
-			log.Printf("%d mcast seq %d", s.num, seq)
-			m := s.src.GetMessage(seq)
-			s.pw.SyncStart()
-			errs.CheckE(s.pw.SetSequence(seq))
-			errs.CheckE(s.pw.WriteMessage(m))
-			errs.CheckE(s.pw.Flush())
+			if s.gap && 0 == seq%27 {
+				log.Printf("%d mcast seq gap %d", s.num, seq)
+			} else {
+				log.Printf("%d mcast seq %d", s.num, seq)
+				m := s.src.GetMessage(seq)
+				s.pw.SyncStart()
+				errs.CheckE(s.pw.SetSequence(seq))
+				errs.CheckE(s.pw.WriteMessage(m))
+				errs.CheckE(s.pw.Flush())
+			}
 		}
 	}
 }

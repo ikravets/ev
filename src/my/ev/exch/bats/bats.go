@@ -130,7 +130,7 @@ type MessageGapResponse struct {
 	MessageCommon
 	Unit     uint8
 	Sequence uint32
-	Count    uint8
+	Count    uint16
 	Status   byte
 }
 
