@@ -19,6 +19,7 @@ import (
 type cmdPcap2txt struct {
 	InputFileName  string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
 	OutputFileName string `long:"output" short:"o" value-name:"FILE" default:"/dev/stdout" default-mask:"stdout" description:"output file"`
+	PacketNumLimit int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
 	shouldExecute  bool
 }
 
@@ -44,6 +45,7 @@ func (c *cmdPcap2txt) ParsingFinished() (err error) {
 
 	printer := &packetPrinter{w: outFile}
 	pp := processor.NewProcessor()
+	pp.LimitPacketNumber(c.PacketNumLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)
 	pp.ProcessAll()
