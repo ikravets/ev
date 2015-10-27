@@ -377,6 +377,10 @@ func (m *TomMessageTrade) OptionId() packet.OptionId {
 	return m.ProductId
 }
 
+func (m *TomMessageTrade) TradeInfo() (packet.OptionId, packet.Price, int) {
+	return m.ProductId, m.Price, m.Size
+}
+
 /************************************************************************/
 type TomMessageTradeCancel struct {
 	TomMessageTrade
