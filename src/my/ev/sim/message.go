@@ -137,6 +137,7 @@ func (m *SimMessage) populateOps() {
 		*bats.PitchMessageTrade,
 		*bats.PitchMessageTradingStatus,
 		*miax.TomMessageLiquiditySeeking,
+		*miax.TomMessageTrade,
 		*miax.TomMessageUnderlyingTradeStatus,
 		*miax.TomMessageSystemTime,
 		*miax.TomMessageUnknown: // FIXME
