@@ -121,7 +121,10 @@ func (m *SimMessage) populateOps() {
 			optionId: m.subscribedOptionId(),
 			side:     im.Side,
 			price:    im.Price,
-			size:     im.Size,
+			sizes: [SizeKinds]int{
+				SizeKindDefault:  im.Size,
+				SizeKindCustomer: im.PriorityCustomerSize,
+			},
 		}
 		addOperation(packet.OrderIdUnknown, &op)
 	case

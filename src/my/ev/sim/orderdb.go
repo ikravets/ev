@@ -95,7 +95,7 @@ func (d *orderDb) ApplyOperation(operation SimOperation) {
 	default:
 		o := *operation.getOperation().origOrder
 		oidx := operation.getOperation().origOrderIndex()
-		o.Size += op.GetSizeDelta()
+		o.Size += op.GetDefaultSizeDelta()
 		switch {
 		case o.Size > 0:
 			d.orders[oidx] = o

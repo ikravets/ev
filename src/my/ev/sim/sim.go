@@ -75,3 +75,14 @@ type Session struct {
 func (s *Session) Index() int {
 	return s.index
 }
+
+// a mix of OrderCapacity and ExecInst (in FIX terms)
+type SizeKind int
+
+const (
+	SizeKindDefault SizeKind = iota
+	SizeKindAON
+	SizeKindCustomer
+	SizeKindCustomerAON
+	SizeKinds
+)

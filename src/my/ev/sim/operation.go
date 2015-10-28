@@ -14,8 +14,8 @@ type SimOperation interface {
 	GetOptionId() packet.OptionId
 	GetOrigOrderId() packet.OrderId
 	GetSide() packet.MarketSide
-	GetSizeDelta() int
-	GetNewSize() int
+	GetDefaultSizeDelta() int
+	GetNewSize(SizeKind) int
 	GetPrice() int
 	getOperation() *Operation
 }
@@ -94,10 +94,11 @@ func (o *OperationAdd) GetSide() (side packet.MarketSide) {
 func (o *OperationAdd) GetPrice() int {
 	return packet.PriceTo4Dec(o.Price)
 }
-func (o *OperationAdd) GetSizeDelta() int {
+func (o *OperationAdd) GetDefaultSizeDelta() int {
 	return o.Size
 }
-func (o *OperationAdd) GetNewSize() int {
+func (o *OperationAdd) GetNewSize(sk SizeKind) int {
+	errs.Check(sk == SizeKindDefault)
 	return o.Size
 }
 func (op *OperationAdd) orderIndex() orderIndex {
@@ -117,12 +118,13 @@ func (o *OperationRemove) GetOptionId() packet.OptionId {
 func (o *OperationRemove) GetSide() (side packet.MarketSide) {
 	return o.Operation.getSide()
 }
-func (o *OperationRemove) GetSizeDelta() int {
+func (o *OperationRemove) GetDefaultSizeDelta() int {
 	o.Operation.populate()
 	errs.Check(o.origOrder != nil)
 	return -o.origOrder.Size
 }
-func (o *OperationRemove) GetNewSize() int {
+func (o *OperationRemove) GetNewSize(sk SizeKind) int {
+	errs.Check(sk == SizeKindDefault)
 	return 0
 }
 func (o *OperationRemove) GetPrice() int {
@@ -145,10 +147,11 @@ func (o *OperationUpdate) GetOptionId() packet.OptionId {
 func (o *OperationUpdate) GetSide() (side packet.MarketSide) {
 	return o.Operation.getSide()
 }
-func (o *OperationUpdate) GetSizeDelta() int {
+func (o *OperationUpdate) GetDefaultSizeDelta() int {
 	return -o.sizeChange
 }
-func (o *OperationUpdate) GetNewSize() int {
+func (o *OperationUpdate) GetNewSize(sk SizeKind) int {
+	errs.Check(sk == SizeKindDefault)
 	o.Operation.populate()
 	errs.Check(o.origOrder != nil)
 	return o.origOrder.Size - o.sizeChange
@@ -163,7 +166,7 @@ type OperationTop struct {
 	Operation
 	optionId packet.OptionId
 	side     packet.MarketSide
-	size     int
+	sizes    [SizeKinds]int
 	price    packet.Price
 }
 
@@ -176,11 +179,12 @@ func (o *OperationTop) GetOptionId() packet.OptionId {
 func (o *OperationTop) GetSide() (side packet.MarketSide) {
 	return o.side
 }
-func (o *OperationTop) GetSizeDelta() int {
-	return o.size
+func (o *OperationTop) GetDefaultSizeDelta() int {
+	errs.Check(false)
+	return 0
 }
-func (o *OperationTop) GetNewSize() int {
-	return o.size
+func (o *OperationTop) GetNewSize(sk SizeKind) int {
+	return o.sizes[sk]
 }
 func (o *OperationTop) GetPrice() int {
 	return packet.PriceTo4Dec(o.price)
