@@ -146,8 +146,6 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	}
 	fmt.Printf("run %s\n", testRunName)
 	outDirName := filepath.Join(c.topOutDirName, testRunName)
-	errs.CheckE(os.MkdirAll(outDirName, 0777))
-	errs.CheckE(ioutil.WriteFile(filepath.Join(outDirName, "fail"), nil, 0666))
 	expoutName := filepath.Join(testDirName, "expout-efh-orders")
 	if suffix != nil {
 		expoutName += *suffix
@@ -157,6 +155,8 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	errs.CheckE(err)
 	_, err = os.Stat(inputPcapName)
 	errs.CheckE(err)
+	errs.CheckE(os.MkdirAll(outDirName, 0777))
+	errs.CheckE(ioutil.WriteFile(filepath.Join(outDirName, "fail"), nil, 0666))
 	efhDumpName := filepath.Join(outDirName, "expout_orders")
 	errs.CheckE(os.Symlink(expoutName, efhDumpName))
 	errs.CheckE(os.Symlink(testDirName, filepath.Join(outDirName, "dump_dir")))
