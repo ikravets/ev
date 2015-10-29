@@ -272,14 +272,14 @@ func (m *TomMessageSeriesUpdate) DecodeFromBytes(data []byte, df gopacket.Decode
 		CallOrPut:          data[38],
 		OpeningTime:        string(data[39:47]),
 		ClosingTime:        string(data[47:55]),
-		Restricted:         data[56],
-		LongTerm:           data[57],
-		Active:             data[58],
-		MbboIncrement:      data[59],
-		LiquidityIncrement: data[60],
-		UnderlyingMarket:   data[61],
-		PriorityQuoteWidth: int(binary.LittleEndian.Uint32(data[62:66])),
-		//Reserved:           data[66:74],
+		Restricted:         data[55],
+		LongTerm:           data[56],
+		Active:             data[57],
+		MbboIncrement:      data[58],
+		LiquidityIncrement: data[59],
+		UnderlyingMarket:   data[60],
+		PriorityQuoteWidth: int(binary.LittleEndian.Uint32(data[61:65])),
+		//Reserved:           data[65:73],
 	}
 	return nil
 }
