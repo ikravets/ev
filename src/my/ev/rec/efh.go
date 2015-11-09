@@ -8,11 +8,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 	"my/ev/packet/bats"
+	"my/ev/packet/miax"
 	"my/ev/packet/nasdaq"
 	"my/ev/sim"
 )
@@ -24,6 +26,7 @@ const (
 	EFHM_ORDER           = 3
 	EFHM_DEFINITION_NOM  = 4
 	EFHM_DEFINITION_BATS = 5
+	EFHM_DEFINITION_MIAX = 6
 	EFHM_REFRESHED       = 100
 	EFHM_STOPPED         = 101
 
@@ -41,6 +44,7 @@ var efhmOutputNames = [...]string{
 	EFHM_ORDER:           "ORD",
 	EFHM_DEFINITION_NOM:  "DEF_NOM",
 	EFHM_DEFINITION_BATS: "DEF_BATS",
+	EFHM_DEFINITION_MIAX: "DEF_MIAX",
 }
 
 type efhm_header struct {
@@ -113,7 +117,7 @@ type efhm_definition_bats struct {
 
 func (m efhm_header) String() string {
 	switch m.Type {
-	case EFHM_QUOTE, EFHM_ORDER, EFHM_TRADE, EFHM_DEFINITION_NOM, EFHM_DEFINITION_BATS:
+	case EFHM_QUOTE, EFHM_ORDER, EFHM_TRADE, EFHM_DEFINITION_NOM, EFHM_DEFINITION_BATS, EFHM_DEFINITION_MIAX:
 		return fmt.Sprintf("HDR{T:%d, TC:%d, QP:%d, UId:%08x, SId:%016x, SN:%d, TS:%016x} %s",
 			m.Type,
 			m.TickCondition,
@@ -278,6 +282,8 @@ func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 		l.genUpdateDefinitionsNom(m)
 	case *bats.PitchMessageSymbolMapping:
 		l.genUpdateDefinitionsBats(m)
+	case *miax.TomMessageSeriesUpdate:
+		l.genUpdateDefinitionsMiax(m)
 	}
 }
 
@@ -352,6 +358,26 @@ func (l *EfhLogger) genUpdateDefinitionsNom(msg *nasdaq.IttoMessageOptionDirecto
 	copy(m.Symbol[:], msg.Symbol)
 	copy(m.UnderlyingSymbol[:], msg.UnderlyingSymbol)
 	switch msg.OType {
+	case 'C':
+		m.PutOrCall = EFH_SECURITY_CALL
+	case 'P':
+		m.PutOrCall = EFH_SECURITY_PUT
+	}
+	errs.CheckE(l.printer.PrintDefinitionNom(m))
+}
+// FIXME boilerplate code left until there's guarantee that output for MIAX should have exactly the same fields as for NASDAQ
+func (l *EfhLogger) genUpdateDefinitionsMiax(msg *miax.TomMessageSeriesUpdate) {
+	m := efhm_definition_nom{
+		efhm_header: l.genUpdateHeaderForOption(EFHM_DEFINITION_MIAX, msg.OptionId()),
+		StrikePrice: uint32(msg.StrikePrice),
+	}
+	t, ok := time.Parse("20060102", msg.Expiration)
+	errs.CheckE(ok)
+	year, month, day := t.Date()
+	m.MaturityDate = uint64(day<<16 + int(month)<<8 + year%100)
+	copy(m.Symbol[:], msg.SecuritySymbol)
+	copy(m.UnderlyingSymbol[:], msg.UnderlyingSymbol)
+	switch msg.CallOrPut {
 	case 'C':
 		m.PutOrCall = EFH_SECURITY_CALL
 	case 'P':
