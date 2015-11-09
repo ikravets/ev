@@ -34,6 +34,15 @@ const (
 	EFH_SECURITY_CALL = 1
 )
 
+var efhmOutputNames = [...]string{
+	EFHM_DEFINITION:      "",
+	EFHM_TRADE:           "TRD",
+	EFHM_QUOTE:           "QUO",
+	EFHM_ORDER:           "ORD",
+	EFHM_DEFINITION_NOM:  "DEF_NOM",
+	EFHM_DEFINITION_BATS: "DEF_BATS",
+}
+
 type efhm_header struct {
 	Type           uint8
 	TickCondition  uint8
@@ -105,7 +114,7 @@ type efhm_definition_bats struct {
 func (m efhm_header) String() string {
 	switch m.Type {
 	case EFHM_QUOTE, EFHM_ORDER, EFHM_TRADE, EFHM_DEFINITION_NOM, EFHM_DEFINITION_BATS:
-		return fmt.Sprintf("HDR{T:%d, TC:%d, QP:%d, UId:%08x, SId:%016x, SN:%d, TS:%016x}",
+		return fmt.Sprintf("HDR{T:%d, TC:%d, QP:%d, UId:%08x, SId:%016x, SN:%d, TS:%016x} %s",
 			m.Type,
 			m.TickCondition,
 			m.QueuePosition,
@@ -113,13 +122,14 @@ func (m efhm_header) String() string {
 			m.SecurityId,
 			m.SequenceNumber,
 			m.TimeStamp,
+			efhmOutputNames[m.Type],
 		)
 	default:
 		return fmt.Sprintf("HDR{T:%d}", m.Type)
 	}
 }
 func (m efhm_order) String() string {
-	return fmt.Sprintf("%s ORD{TS:%d, OT:%d, OS:%+d, P:%10d, S:%d, AS:%d, CS:%d, CAS:%d, BS:%d, BAS:%d}",
+	return fmt.Sprintf("%s{TS:%d, OT:%d, OS:%+d, P:%10d, S:%d, AS:%d, CS:%d, CAS:%d, BS:%d, BAS:%d}",
 		m.efhm_header,
 		m.TradeStatus,
 		m.OrderType,
@@ -134,7 +144,7 @@ func (m efhm_order) String() string {
 	)
 }
 func (m efhm_quote) String() string {
-	return fmt.Sprintf("%s QUO{TS:%d, "+
+	return fmt.Sprintf("%s{TS:%d, "+
 		"Bid{P:%10d, S:%d, OS:%d, AS:%d, CS:%d, CAS:%d, BS:%d, BAS:%d}, "+
 		"Ask{P:%10d, S:%d, OS:%d, AS:%d, CS:%d, CAS:%d, BS:%d, BAS:%d}"+
 		"}",
@@ -159,7 +169,7 @@ func (m efhm_quote) String() string {
 	)
 }
 func (m efhm_trade) String() string {
-	return fmt.Sprintf("%s TRD{P:%10d, S:%d, TC:%d}",
+	return fmt.Sprintf("%s{P:%10d, S:%d, TC:%d}",
 		m.efhm_header,
 		m.Price,
 		m.Size,
@@ -167,7 +177,7 @@ func (m efhm_trade) String() string {
 	)
 }
 func (m efhm_definition_nom) String() string {
-	return fmt.Sprintf("%s DEF_NOM{S:\"%s\" %016x, MD:%x, US:\"%s\" %016x, SP:%d, PC:%d}",
+	return fmt.Sprintf("%s{S:\"%s\" %016x, MD:%x, US:\"%s\" %016x, SP:%d, PC:%d}",
 		m.efhm_header,
 		trimAsciiz(m.Symbol[:]),
 		binary.LittleEndian.Uint64(m.Symbol[:]),
@@ -179,7 +189,7 @@ func (m efhm_definition_nom) String() string {
 	)
 }
 func (m efhm_definition_bats) String() string {
-	return fmt.Sprintf("%s DEF_BATS{OS:\"%s\"}",
+	return fmt.Sprintf("%s{OS:\"%s\"}",
 		m.efhm_header,
 		trimAsciiz(m.OsiSymbol[:]),
 	)
