@@ -113,6 +113,7 @@ func (e *efhReplay) startTestEfh() (err error) {
 	e.testEfhArgs = append(e.testEfhArgs,
 		"--loglevel", strconv.Itoa(e.EfhLoglevel),
 		"--logfile", "test_efh.log",
+		"--net-mcast", "10.101.107.97",
 	)
 	if e.EfhProf {
 		e.testEfhArgs = append(e.testEfhArgs, "--prof")
