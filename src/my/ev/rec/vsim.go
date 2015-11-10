@@ -235,26 +235,10 @@ func (s *SimLogger) accessedLevels(operation sim.SimOperation) (levels int) {
 	return s.supernodeLevels
 }
 
-func (s *SimLogger) PrintOrder(m efhm_order) error {
-	return s.genAppUpdate(m)
-}
-func (s *SimLogger) PrintQuote(m efhm_quote) error {
-	return s.genAppUpdate(m)
-}
-func (s *SimLogger) PrintTrade(m efhm_trade) error {
-	return s.genAppUpdate(m)
-}
-func (s *SimLogger) PrintDefinitionNom(m efhm_definition_nom) error {
-	return s.genAppUpdate(m)
-}
-func (s *SimLogger) PrintDefinitionBats(m efhm_definition_bats) error {
-	return s.genAppUpdate(m)
-}
-
-func (s *SimLogger) genAppUpdate(appMessage interface{}) (err error) {
+func (s *SimLogger) PrintMessage(m efhMessage) (err error) {
 	defer errs.PassE(&err)
 	var bb bytes.Buffer
-	errs.CheckE(binary.Write(&bb, binary.LittleEndian, appMessage))
+	errs.CheckE(binary.Write(&bb, binary.LittleEndian, m))
 	if r := bb.Len() % 8; r > 0 {
 		// pad to  multiple of 8 bytes
 		z := make([]byte, 8)
