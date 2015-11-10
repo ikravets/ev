@@ -64,9 +64,13 @@ func (e *efhReplay) Run() (err error) {
 	if e.EfhDump != "" {
 		e.testEfhDump = "test_efh.dump"
 	}
+	defaultTestEfh := "/usr/libexec/test_efh"
 	if e.Local {
-		e.TestEfh = os.ExpandEnv("$HOME/efh-install/bin/test_efh")
+		defaultTestEfh = os.ExpandEnv("$HOME/efh-install/bin/test_efh")
 		e.testEfhArgs = append(e.testEfhArgs, "--load-fw", "/usr/share/efh/firmware/fw.bin")
+	}
+	if e.TestEfh == "" {
+		e.TestEfh = defaultTestEfh
 	}
 	errs.CheckE(e.startTestEfh())
 	errs.CheckE(e.startDumpReplay())
