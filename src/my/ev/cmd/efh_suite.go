@@ -24,6 +24,7 @@ type cmdEfhSuite struct {
 	Tests       []string `long:"test"  short:"t" value-name:"TEST"`
 	Speed       int      `long:"speed" value-name:"NUM" default:"50000"`
 	Limit       int      `long:"limit" value-name:"NUM"`
+	TestEfh     string   `long:"test-efh (default: system-installed version)"`
 	Local       bool     `long:"local"`
 	EfhLoglevel int      `long:"efh-loglevel" default:"6"`
 	EfhProf     bool     `long:"efh-prof"`
@@ -157,7 +158,7 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 		EfhDump:         "expout_orders",
 		EfhChannel:      c.genEfhChannels(testDirName),
 		EfhProf:         c.EfhProf,
-		TestEfh:         "/usr/libexec/test_efh",
+		TestEfh:         c.TestEfh,
 		Local:           c.Local,
 	}
 	if suffix != nil {
