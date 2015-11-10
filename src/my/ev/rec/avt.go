@@ -97,10 +97,10 @@ func (l *AvtLogger) genUpdate() {
 			dateTime,
 			optName,
 			underlying,
-			l.bid.New.Size,
-			priceString(l.bid.New.Price),
-			l.ask.New.Size,
-			priceString(l.ask.New.Price),
+			l.bid.New.Size(sim.SizeKindDefault),
+			priceString(l.bid.New.Price()),
+			l.ask.New.Size(sim.SizeKindDefault),
+			priceString(l.ask.New.Price()),
 			avtTimestamp,
 		)
 		errs.CheckE(err)
@@ -113,10 +113,10 @@ func (l *AvtLogger) genUpdate() {
 			avtTimestamp,
 			dateTime[0:21],
 			optName,
-			l.bid.New.Size,
-			priceString(l.bid.New.Price),
-			l.ask.New.Size,
-			priceString(l.ask.New.Price),
+			l.bid.New.Size(sim.SizeKindDefault),
+			priceString(l.bid.New.Price()),
+			l.ask.New.Size(sim.SizeKindDefault),
+			priceString(l.ask.New.Price()),
 		)
 		errs.CheckE(err)
 	}

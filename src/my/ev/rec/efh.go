@@ -304,10 +304,13 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 		return
 	}
 	m := efhm_order{
-		efhm_header: l.genUpdateHeader(EFHM_ORDER),
-		Price:       uint32(tob.New.Price),
-		Size:        uint32(tob.New.Size),
-		OrderType:   1,
+		efhm_header:     l.genUpdateHeader(EFHM_ORDER),
+		Price:           uint32(tob.New.Price()),
+		Size:            uint32(tob.New.Size(sim.SizeKindDefault)),
+		AoNSize:         uint32(tob.New.Size(sim.SizeKindAON)),
+		CustomerSize:    uint32(tob.New.Size(sim.SizeKindCustomer)),
+		CustomerAoNSize: uint32(tob.New.Size(sim.SizeKindCustomerAON)),
+		OrderType:       1,
 	}
 	switch tob.Side {
 	case packet.MarketSideBid:
@@ -319,11 +322,17 @@ func (l *EfhLogger) genUpdateOrders(tob tob) {
 }
 func (l *EfhLogger) genUpdateQuotes(bid, ask tob) {
 	m := efhm_quote{
-		efhm_header: l.genUpdateHeader(EFHM_QUOTE),
-		BidPrice:    uint32(bid.New.Price),
-		BidSize:     uint32(bid.New.Size),
-		AskPrice:    uint32(ask.New.Price),
-		AskSize:     uint32(ask.New.Size),
+		efhm_header:        l.genUpdateHeader(EFHM_QUOTE),
+		BidPrice:           uint32(bid.New.Price()),
+		BidSize:            uint32(bid.New.Size(sim.SizeKindDefault)),
+		BidAoNSize:         uint32(bid.New.Size(sim.SizeKindAON)),
+		BidCustomerSize:    uint32(bid.New.Size(sim.SizeKindCustomer)),
+		BidCustomerAoNSize: uint32(bid.New.Size(sim.SizeKindCustomerAON)),
+		AskPrice:           uint32(ask.New.Price()),
+		AskSize:            uint32(ask.New.Size(sim.SizeKindDefault)),
+		AskAoNSize:         uint32(ask.New.Size(sim.SizeKindAON)),
+		AskCustomerSize:    uint32(ask.New.Size(sim.SizeKindCustomer)),
+		AskCustomerAoNSize: uint32(ask.New.Size(sim.SizeKindCustomerAON)),
 	}
 	errs.CheckE(l.printer.PrintMessage(m))
 }

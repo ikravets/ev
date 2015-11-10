@@ -150,7 +150,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 			orderId:  or.orderId,
 			optionId: op.GetOptionId(),
 			price:    op.GetPrice(),
-			size:     op.GetNewSize(),
+			size:     op.GetNewSize(sim.SizeKindDefault),
 		}
 		if op.GetSide() == packet.MarketSideAsk {
 			ou.side = 1
@@ -159,20 +159,21 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 		if operation.GetOptionId().Invalid() {
 			or = ordrespLogInfo{notFound: 1}
 		} else {
+			newSize := operation.GetNewSize(sim.SizeKindDefault)
 			or = ordrespLogInfo{
 				optionId: operation.GetOptionId(),
 				price:    operation.GetPrice(),
-				size:     operation.GetNewSize() - operation.GetSizeDelta(),
+				size:     newSize - operation.GetDefaultSizeDelta(),
 			}
 			if operation.GetSide() == packet.MarketSideAsk {
 				or.side = 1
 			}
-			if operation.GetNewSize() != 0 {
+			if newSize != 0 {
 				ou = orduLogInfo{
 					optionId: or.optionId,
 					side:     or.side,
 					price:    or.price,
-					size:     operation.GetNewSize(),
+					size:     newSize,
 				}
 			}
 		}
@@ -186,28 +187,33 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 	}
 }
 func (s *SimLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) {
-	s.tobOld = book.GetTop(operation.GetOptionId(), operation.GetSide(), s.supernodeLevels)
+	tobOld := book.GetTop(operation.GetOptionId(), operation.GetSide(), s.supernodeLevels)
+	s.tobOld = make([]sim.PriceLevel, len(tobOld))
+	for i, pl := range tobOld {
+		s.tobOld[i] = pl.Clone()
+	}
 	s.efhLogger.BeforeBookUpdate(book, operation)
 }
 func (s *SimLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
-	if operation.GetOptionId().Valid() {
-		empty := sim.PriceLevel{}
+	if operation.GetOptionId().Valid() && s.supernodeLevels > 1 {
+		var emptyPrice uint32
 		if operation.GetSide() == packet.MarketSideAsk {
-			empty.Price = -1
+			emptyPrice -= 1
 		}
-		printablePriceLevel := func(pls []sim.PriceLevel, pos int) sim.PriceLevel {
+		printablePriceLevel := func(pls []sim.PriceLevel, pos int) (price uint32, size int) {
 			if pos < len(pls) {
-				return pls[pos]
+				price = uint32(pls[pos].Price())
+				size = pls[pos].Size(sim.SizeKindDefault)
+			} else if operation.GetSide() == packet.MarketSideAsk {
+				price = emptyPrice
 			}
-			return empty
+			return
 		}
 		s.tobNew = book.GetTop(operation.GetOptionId(), operation.GetSide(), s.supernodeLevels)
 		for i := 0; i < s.accessedLevels(operation); i++ {
-			plo, pln := printablePriceLevel(s.tobOld, i), printablePriceLevel(s.tobNew, i)
-			s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i,
-				plo.Size, uint32(plo.Price),
-				pln.Size, uint32(pln.Price),
-			)
+			priceOld, sizeOld := printablePriceLevel(s.tobOld, i)
+			priceNew, sizeNew := printablePriceLevel(s.tobNew, i)
+			s.printfln("SN_OLD_NEW %02d %08x %08x  %08x %08x", i, sizeOld, priceOld, sizeNew, priceNew)
 		}
 	}
 	s.efhLogger.AfterBookUpdate(book, operation)
@@ -227,7 +233,7 @@ func (s *SimLogger) accessedLevels(operation sim.SimOperation) (levels int) {
 	}
 	if lenOld == lenNew {
 		for i := 0; i < levels; i++ {
-			if s.tobOld[i] != s.tobNew[i] {
+			if !s.tobOld[i].Equals(s.tobNew[i]) {
 				return
 			}
 		}

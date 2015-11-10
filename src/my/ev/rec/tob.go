@@ -103,14 +103,14 @@ func (tob *tob) update(book sim.Book, oid packet.OptionId, u TobUpdate) {
 	if u == TobUpdateOld {
 		pl = &tob.Old
 	}
-	*pl = sim.PriceLevel{}
+	*pl = sim.EmptyPriceLevel
 	if tob.Check || u == TobUpdateNewForce {
 		if pls := book.GetTop(oid, tob.Side, 1); len(pls) > 0 {
-			*pl = pls[0]
+			*pl = pls[0].Clone()
 		}
 	}
 }
 
 func (tob *tob) updated() bool {
-	return tob.Check && tob.Old != tob.New && (tob.Old.Price != 0 || tob.New.Price != 0)
+	return tob.Check && !tob.Old.Equals(tob.New) && (tob.Old.Price() != 0 || tob.New.Price() != 0)
 }
