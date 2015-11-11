@@ -13,41 +13,58 @@ import (
 	"github.com/ikravets/errs"
 )
 
-type Replay struct {
-	IfaceName  string
-	DumpName   string
-	Limit      int
-	Pps        int
-	Loop       int
-	StopCh     chan struct{}
-	DoneCh     chan struct{}
-	ProgressCh chan float64
+type Replay interface {
+	Run() error
+	Stop()
+	Progress() (done float64, ok bool)
 }
 
-func (r *Replay) Run() (err error) {
+type ReplayConfig struct {
+	IfaceName string
+	DumpName  string
+	Limit     int
+	Pps       int
+	Loop      int
+}
+
+type replay struct {
+	conf       ReplayConfig
+	stopCh     chan struct{}
+	progressCh chan float64
+}
+
+func NewReplay(c *ReplayConfig) Replay {
+	return &replay{
+		conf:       *c,
+		stopCh:     make(chan struct{}),
+		progressCh: make(chan float64, 1),
+	}
+}
+
+func (r *replay) Run() (err error) {
 	defer errs.PassE(&err)
-	defer close(r.DoneCh)
-	progress, err := newProgress(r.DumpName, r.Loop, r.Limit, r.ProgressCh)
+	defer close(r.progressCh)
+	progress, err := newProgress(r.conf.DumpName, r.conf.Loop, r.conf.Limit, r.progressCh)
 	errs.CheckE(err)
 
-	loop := r.Loop
+	loop := r.conf.Loop
 	if loop == 0 {
 		loop = 1
 	}
 	for j := 0; j < loop; j++ {
 		progress.startIteration()
-		in, err := pcap.OpenOffline(r.DumpName)
+		in, err := pcap.OpenOffline(r.conf.DumpName)
 		errs.CheckE(err)
 		defer in.Close()
 
-		out, err := pcap.OpenLive(r.IfaceName, 65536, false, pcap.BlockForever)
+		out, err := pcap.OpenLive(r.conf.IfaceName, 65536, false, pcap.BlockForever)
 		errs.CheckE(err)
 		defer out.Close()
 
 		start := time.Now()
-		for i := 0; i < r.Limit || r.Limit == 0; i++ {
+		for i := 0; i < r.conf.Limit || r.conf.Limit == 0; i++ {
 			select {
-			case <-r.StopCh:
+			case <-r.stopCh:
 				return nil
 			default:
 			}
@@ -58,9 +75,9 @@ func (r *Replay) Run() (err error) {
 			errs.CheckE(err)
 			errs.CheckE(out.WritePacketData(data))
 			progress.addPacket(ci)
-			if r.Pps != 0 {
+			if r.conf.Pps != 0 {
 				now := time.Now()
-				expected := time.Duration(i) * time.Second / time.Duration(r.Pps)
+				expected := time.Duration(i) * time.Second / time.Duration(r.conf.Pps)
 				actual := now.Sub(start)
 				diff := expected - actual
 				if diff > 0 {
@@ -68,6 +85,18 @@ func (r *Replay) Run() (err error) {
 				}
 			}
 		}
+	}
+	return
+}
+
+func (r *replay) Stop() {
+	close(r.stopCh)
+}
+
+func (r *replay) Progress() (done float64, ok bool) {
+	select {
+	case done, ok = <-r.progressCh:
+	default:
 	}
 	return
 }
