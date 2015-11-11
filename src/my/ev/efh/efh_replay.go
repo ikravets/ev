@@ -48,7 +48,8 @@ type efhReplay struct {
 	testEfhArgs   []string
 	testEfhExit   error
 	testEfhDoneCh chan struct{}
-	replay        *packet.Replay
+	replay        packet.Replay
+	replayDoneCh  chan struct{}
 }
 
 func NewEfhReplay(conf ReplayConfig) EfhReplay {
@@ -82,18 +83,13 @@ func (e *efhReplay) Run() (err error) {
 			case <-e.testEfhDoneCh:
 				fmt.Println()
 				return
-			case <-e.replay.DoneCh:
+			case <-e.replayDoneCh:
 				fmt.Printf("\rdone: 100%%   \n")
 				time.Sleep(100 * time.Millisecond)
 				return
 			case <-ticker.C:
-				select {
-				case done, ok := <-e.replay.ProgressCh:
-					if !ok {
-						done = 1
-					}
+				if done, ok := e.replay.Progress(); ok {
 					fmt.Printf("\rdone: %.1f%%", done*100)
-				default:
 				}
 			}
 		}
@@ -193,27 +189,27 @@ func (e *efhReplay) stopTestEfh() (err error) {
 }
 
 func (e *efhReplay) startDumpReplay() (err error) {
-	e.replay = &packet.Replay{
-		IfaceName:  e.OutputInterface,
-		DumpName:   e.InputFileName,
-		Limit:      e.Limit,
-		Pps:        e.Pps,
-		Loop:       e.Loop,
-		StopCh:     make(chan struct{}),
-		DoneCh:     make(chan struct{}),
-		ProgressCh: make(chan float64, 1),
+	conf := packet.ReplayConfig{
+		IfaceName: e.OutputInterface,
+		DumpName:  e.InputFileName,
+		Limit:     e.Limit,
+		Pps:       e.Pps,
+		Loop:      e.Loop,
 	}
+	e.replay = packet.NewReplay(&conf)
 	log.Printf("starting replay %v", e.replay)
+	e.replayDoneCh = make(chan struct{})
 	go func() {
 		errs.CheckE(e.replay.Run())
+		close(e.replayDoneCh)
 	}()
 	return
 }
 
 func (e *efhReplay) stopDumpReplay() (err error) {
 	log.Printf("stopping replay\n")
-	close(e.replay.StopCh)
-	<-e.replay.DoneCh
+	e.replay.Stop()
+	<-e.replayDoneCh
 	return
 }
 
