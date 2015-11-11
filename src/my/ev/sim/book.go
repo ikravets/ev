@@ -7,10 +7,16 @@ import (
 	"log"
 
 	"github.com/cznic/b"
-	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )
+
+type PriceLevel interface {
+	Price() int
+	Size(SizeKind) int
+	Equals(PriceLevel) bool
+	Clone() PriceLevel
+}
 
 type Book interface {
 	ApplyOperation(operation SimOperation)
@@ -46,7 +52,7 @@ func (b *book) ApplyOperation(operation SimOperation) {
 		os = NewOptionState(b.newOptionSideState)
 		b.options[oid] = os
 	}
-	os.Side(operation.GetSide()).updateLevel(operation.GetPrice(), operation.GetSizeDelta())
+	os.Side(operation.GetSide()).updateLevel(operation)
 }
 func (b *book) GetTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel {
 	os, ok := b.options[optionId]
@@ -54,23 +60,10 @@ func (b *book) GetTop(optionId packet.OptionId, side packet.MarketSide, levels i
 		return nil
 	}
 	s := os.Side(side)
-	return s.getTop(optionId, side, levels)
+	return s.getTop(levels)
 }
 func (b *book) NumOptions() int {
 	return len(b.options)
-}
-
-type PriceLevel struct {
-	Price int
-	Size  int
-}
-
-func (l *PriceLevel) UpdateSize(delta int) bool {
-	l.Size += delta
-	if l.Size < 0 {
-		log.Fatal("size becomes negative ", l, delta)
-	}
-	return l.Size != 0
 }
 
 type optionState struct {
@@ -98,8 +91,8 @@ func (os *optionState) Side(side packet.MarketSide) optionSideState {
 }
 
 type optionSideState interface {
-	updateLevel(price int, delta int)
-	getTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel
+	updateLevel(operation SimOperation)
+	getTop(levels int) []PriceLevel
 }
 
 type optionSideStateDeep struct {
@@ -131,25 +124,26 @@ func NewOptionSideStateDeep(side packet.MarketSide) optionSideState {
 	return s
 }
 
-func (s *optionSideStateDeep) updateLevel(price int, delta int) {
+func (s *optionSideStateDeep) updateLevel(operation SimOperation) {
+	price, delta := operation.GetPrice(), operation.GetDefaultSizeDelta()
 	if price == 0 {
 		return
 	}
 	upd := func(oldV interface{}, exists bool) (newV interface{}, write bool) {
-		var v PriceLevel
+		var v *priceLevelDefault
 		if exists {
-			v = oldV.(PriceLevel)
+			v = oldV.(*priceLevelDefault)
 		} else {
-			v = PriceLevel{Price: price}
+			v = newPriceLevelDefault(price)
 		}
-		write = v.UpdateSize(delta)
+		write = v.updateSize(delta)
 		return v, write
 	}
 	if _, written := s.levels.Put(price, upd); !written {
 		s.levels.Delete(price)
 	}
 }
-func (s *optionSideStateDeep) getTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel {
+func (s *optionSideStateDeep) getTop(levels int) []PriceLevel {
 	pl := make([]PriceLevel, 0, levels)
 	if it, err := s.levels.SeekFirst(); err == nil {
 		for i := 0; i < levels || levels == 0; i++ {
@@ -165,24 +159,105 @@ func (s *optionSideStateDeep) getTop(optionId packet.OptionId, side packet.Marke
 }
 
 type optionSideStateTop struct {
-	top PriceLevel
+	top priceLevelMulti
 }
 
 func NewOptionSideStateTop(side packet.MarketSide) optionSideState {
 	return &optionSideStateTop{}
 }
-func (s *optionSideStateTop) updateLevel(price int, delta int) {
-	errs.Check(price != 0 || delta == 0, price, delta)
-	errs.Check(delta >= 0)
-	s.top = PriceLevel{
-		Price: price,
-		Size:  delta,
+func (s *optionSideStateTop) updateLevel(operation SimOperation) {
+	s.top.price = operation.GetPrice()
+	for i := SizeKindDefault; i < SizeKinds; i++ {
+		s.top.sizes[i] = operation.GetNewSize(i)
 	}
 }
-func (s *optionSideStateTop) getTop(optionId packet.OptionId, side packet.MarketSide, levels int) []PriceLevel {
+func (s *optionSideStateTop) getTop(levels int) []PriceLevel {
 	pl := make([]PriceLevel, 0, 1)
-	if s.top.Price != 0 || s.top.Size != 0 {
-		pl = append(pl, s.top)
+	if s.top != (priceLevelMulti{}) {
+		pl = append(pl, &s.top)
 	}
 	return pl
 }
+
+var _ PriceLevel = &priceLevelDefault{}
+var _ PriceLevel = &priceLevelMulti{}
+
+type priceLevelDefault struct {
+	price int
+	size  int
+}
+
+func newPriceLevelDefault(price int) *priceLevelDefault {
+	return &priceLevelDefault{price: price}
+}
+func (l *priceLevelDefault) updateSize(delta int) bool {
+	l.size += delta
+	if l.size < 0 {
+		log.Fatal("size becomes negative ", l, delta)
+	}
+	return l.size != 0
+}
+func (l *priceLevelDefault) Price() int {
+	return l.price
+}
+func (l *priceLevelDefault) Size(sk SizeKind) int {
+	if sk == SizeKindDefault {
+		return l.size
+	} else {
+		return 0
+	}
+}
+func (l *priceLevelDefault) Equals(rhs PriceLevel) (eq bool) {
+	if r, ok := rhs.(*priceLevelDefault); ok {
+		eq = *l == *r
+	}
+	return
+}
+func (l *priceLevelDefault) Clone() PriceLevel {
+	return &priceLevelDefault{
+		price: l.price,
+		size:  l.size,
+	}
+}
+
+type priceLevelMulti struct {
+	price int
+	sizes [SizeKinds]int
+}
+
+func newPriceLevelMulti(price int) *priceLevelMulti {
+	return &priceLevelMulti{price: price}
+}
+func (l *priceLevelMulti) Price() int {
+	return l.price
+}
+func (l *priceLevelMulti) Size(sk SizeKind) int {
+	return l.sizes[sk]
+}
+func (l *priceLevelMulti) Equals(rhs PriceLevel) (eq bool) {
+	if r, ok := rhs.(*priceLevelMulti); ok {
+		eq = *l == *r
+	}
+	return
+}
+func (l *priceLevelMulti) Clone() PriceLevel {
+	return &priceLevelMulti{
+		price: l.price,
+		sizes: l.sizes,
+	}
+}
+
+type priceLevelEmpty struct{}
+
+func newpriceLevelEmpty(price int) *priceLevelEmpty {
+	return &priceLevelEmpty{}
+}
+func (l *priceLevelEmpty) Price() int          { return 0 }
+func (l *priceLevelEmpty) Size(_ SizeKind) int { return 0 }
+func (l *priceLevelEmpty) Clone() PriceLevel   { return l }
+func (l *priceLevelEmpty) Equals(rhs PriceLevel) (eq bool) {
+	_, eq = rhs.(*priceLevelEmpty)
+	return
+}
+
+var EmptyPriceLevel PriceLevel = &priceLevelEmpty{}
