@@ -32,19 +32,15 @@ func (c *cmdReplay) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
-	r := packet.Replay{
+	conf := packet.ReplayConfig{
 		IfaceName: c.OutputInterface,
 		DumpName:  c.InputFileName,
 		Limit:     c.Limit,
 		Pps:       c.Pps,
+		Loop:      c.Loop,
 	}
-	loop := c.Loop
-	if loop == 0 {
-		loop = 1
-	}
-	for i := 0; i < loop; i++ {
-		errs.CheckE(r.Run())
-	}
+	r := packet.NewReplay(&conf)
+	errs.CheckE(r.Run())
 	return
 }
 
