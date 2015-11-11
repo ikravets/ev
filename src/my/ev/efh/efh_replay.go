@@ -80,6 +80,7 @@ func (e *efhReplay) Run() (err error) {
 				return
 			case <-e.replay.DoneCh:
 				fmt.Printf("\rdone: 100%%   \n")
+				time.Sleep(100 * time.Millisecond)
 				return
 			case <-ticker.C:
 				select {
