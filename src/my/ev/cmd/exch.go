@@ -37,8 +37,8 @@ func (c *cmdExch) ParsingFinished() (err error) {
 	conf := exch.Config{
 		Protocol:     c.Type,
 		LocalAddr:    c.Laddr,
-		FeedAddr:   c.RTMCaddr,
-		GapAddr:   c.GRMCaddr,
+		FeedAddr:     c.RTMCaddr,
+		GapAddr:      c.GRMCaddr,
 		Interactive:  c.Interactive,
 		Gap:          c.Gap,
 		ConnNumLimit: c.ConnNumLimit,

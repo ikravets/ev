@@ -30,25 +30,25 @@ type exchangeBatsRegistry struct {
 	batsMessageSourceN []*batsMessageSource
 }
 
-func (e *exchangeBatsRegistry) NewBatsRegistry(c Config, src *batsMessageSource, num int)  (eb *exchangeBats){
+func (e *exchangeBatsRegistry) NewBatsRegistry(c Config, src *batsMessageSource, num int) (eb *exchangeBats) {
 	feed_mc, err := newBatsFeedMcastServer(c, src, num)
 	errs.CheckE(err)
-	gap_mc, err :=  newBatsGapMcastServer(c, src, num)
+	gap_mc, err := newBatsGapMcastServer(c, src, num)
 	errs.CheckE(err)
 	eb = &exchangeBats{
 		interactive: c.Interactive,
 		src:         src,
 		spin: &spinServer{
-			laddr: fmt.Sprintf(":%d", 16002 + num),
+			laddr: fmt.Sprintf(":%d", 16002+num),
 			src:   src,
 		},
 		feed_mc: feed_mc,
-		gap:  &gapProxy{
-			laddr: fmt.Sprintf(":%d", 17002 + num),
+		gap: &gapProxy{
+			laddr: fmt.Sprintf(":%d", 17002+num),
 			src:   src,
 			gmc:   gap_mc,
 		},
-		gap_mc:  gap_mc,
+		gap_mc: gap_mc,
 	}
 	return
 }
@@ -57,13 +57,13 @@ func InitBatsRegistry(c Config) (es ExchangeSimulator) {
 	for i := 0; i < c.ConnNumLimit; i++ {
 		src := NewBatsMessageSource(i)
 		esr.exchangeBatsN = append(esr.exchangeBatsN, esr.NewBatsRegistry(c, src, i))
-		esr.exchangeBatsN[i].num = i;
+		esr.exchangeBatsN[i].num = i
 	}
 	es = esr
 	return
 }
 func (e *exchangeBatsRegistry) Run() {
-	for _,r := range e.exchangeBatsN {
+	for _, r := range e.exchangeBatsN {
 		if r.interactive {
 			go r.src.RunInteractive()
 		} else {
@@ -73,8 +73,8 @@ func (e *exchangeBatsRegistry) Run() {
 		errs.CheckE(r.feed_mc.start(r.num))
 		go r.gap.run()
 		errs.CheckE(r.gap_mc.start(r.num))
-		log.Println(r.num,"started local", r.feed_mc.laddr.String(), "to feed mcast", r.feed_mc.mcaddr.String())
-		log.Println(r.num,"started local", r.gap_mc.laddr.String(), "to gap mcast", r.gap_mc.mcaddr.String())
+		log.Println(r.num, "started local", r.feed_mc.laddr.String(), "to feed mcast", r.feed_mc.mcaddr.String())
+		log.Println(r.num, "started local", r.gap_mc.laddr.String(), "to gap mcast", r.gap_mc.mcaddr.String())
 	}
 	select {}
 }
@@ -95,8 +95,8 @@ type exchangeBats struct {
 	num         int
 }
 type gapMessage struct {
-	start   int
-	end     int
+	start int
+	end   int
 }
 
 type batsGapMcastServer struct {
@@ -118,7 +118,7 @@ func newBatsGapMcastServer(c Config, src *batsMessageSource, i int) (gmc *batsGa
 	errs.CheckE(err)
 	laddr.Port += i + 1000
 	mcaddr.Port += i
-	mcaddr.IP[net.IPv6len - 1] += (byte)(i / 4)
+	mcaddr.IP[net.IPv6len-1] += (byte)(i / 4)
 	gmc = &batsGapMcastServer{
 		laddr:  laddr,
 		mcaddr: mcaddr,
@@ -173,7 +173,7 @@ func (g *gapProxy) run() {
 	l, err := net.Listen("tcp", g.laddr)
 	errs.CheckE(err)
 	defer l.Close()
-	log.Println(g.src.num,"started gap proxy", g.laddr)
+	log.Println(g.src.num, "started gap proxy", g.laddr)
 	for {
 		conn, err := l.Accept()
 		errs.CheckE(err)
@@ -184,16 +184,16 @@ func (g *gapProxy) run() {
 }
 
 type gapProxyConn struct {
-	conn            net.Conn
-	bconn           bats.Conn
-	gmc             *batsGapMcastServer
+	conn  net.Conn
+	bconn bats.Conn
+	gmc   *batsGapMcastServer
 }
 
 func NewGapProxyConn(conn net.Conn, gmc *batsGapMcastServer) *gapProxyConn {
 	return &gapProxyConn{
-		conn:      conn,
-		bconn:     bats.NewConn(conn),
-		gmc:       gmc,
+		conn:  conn,
+		bconn: bats.NewConn(conn),
+		gmc:   gmc,
 	}
 }
 func (gc *gapProxyConn) login() (err error) {
@@ -221,22 +221,21 @@ func (gc *gapProxyConn) run() {
 	req, ok := m.(*bats.MessageGapRequest)
 	errs.Check(ok)
 	res := bats.MessageGapResponse{
-		Unit:        req.Unit,
-		Sequence:    req.Sequence,
-		Count:       req.Count,
-		Status:      bats.GapStatusAccepted,
+		Unit:     req.Unit,
+		Sequence: req.Sequence,
+		Count:    req.Count,
+		Status:   bats.GapStatusAccepted,
 	}
 	errs.CheckE(gc.bconn.WriteMessageSimple(&res))
-	gc.noticeGapMultiCast(int(req.Sequence), int(req.Sequence + uint32(req.Count)))
-//	gc.noticeGapMultiCast(5, 12)
-
+	gc.noticeGapMultiCast(int(req.Sequence), int(req.Sequence+uint32(req.Count)))
+	//	gc.noticeGapMultiCast(5, 12)
 
 	log.Println("gap finished")
 }
 func (gc *gapProxyConn) noticeGapMultiCast(start, end int) {
-	gap := gapMessage {
-		start:  start,
-		end:    end,
+	gap := gapMessage{
+		start: start,
+		end:   end,
 	}
 	gc.gmc.gap <- gap
 }
@@ -250,7 +249,7 @@ func (s *spinServer) run() {
 	l, err := net.Listen("tcp", s.laddr)
 	errs.CheckE(err)
 	defer l.Close()
-	log.Println(s.src.num,"started tcp", s.laddr)
+	log.Println(s.src.num, "started tcp", s.laddr)
 	for {
 		conn, err := l.Accept()
 		errs.CheckE(err)
@@ -393,7 +392,7 @@ func newBatsFeedMcastServer(c Config, src *batsMessageSource, i int) (fmc *batsF
 	errs.CheckE(err)
 	laddr.Port += i
 	mcaddr.Port += i
-	mcaddr.IP[net.IPv6len - 1] += (byte)(i / 4)
+	mcaddr.IP[net.IPv6len-1] += (byte)(i / 4)
 	fmc = &batsFeedMcastServer{
 		laddr:  laddr,
 		mcaddr: mcaddr,
