@@ -49,7 +49,7 @@ edit:
 	cd $(BUILD_DIR)/src/my/ev; gvim
 
 
-DEPS := b go-flags struc gopacket errs
+DEPS := b go-flags struc gopacket yaml errs
 
 errs-url := https://github.com/ikravets/errs
 errs-dir := $(errs-url:https://%=%)
@@ -70,6 +70,10 @@ struc-cid := master
 gopacket-url := https://github.com/google/gopacket
 gopacket-dir := $(gopacket-url:https://%=%)
 gopacket-cid := master
+
+yaml-url := https://gopkg.in/yaml.v2
+yaml-dir := $(yaml-url:https://%=%)
+yaml-cid := v2
 
 .SECONDARY: $(DEPS:%=$(VENDOR_DIR)/.stamp.get-%)
 $(VENDOR_DIR)/.stamp.get-%:
