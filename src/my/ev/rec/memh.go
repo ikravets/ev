@@ -67,8 +67,7 @@ func (p *MemhRecorder) AddData(data []byte) (err error) {
 		errs.CheckE(p.outbuf.WriteByte('\n'))
 	}
 
-	packetLength := (len(data) + len(chunk) - 1) / len(chunk)
-	p.packetLengths = append(p.packetLengths, packetLength)
+	p.packetLengths = append(p.packetLengths, len(data))
 	dataFileName := filepath.Join(p.dir, fmt.Sprintf("packet.readmemh%d", p.packetNum))
 	errs.CheckE(ioutil.WriteFile(dataFileName, p.outbuf.Bytes(), 0644))
 	p.packetNum++
