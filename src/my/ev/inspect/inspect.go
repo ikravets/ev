@@ -96,17 +96,30 @@ func (c *Config) Dump() (yamlDoc string, err error) {
 	return
 }
 
-var blockNameFormat = `
-
----------------------------------
-**      %s     **
----------------------------------
-`
-
 func (c *Config) Report() string {
 	var buf bytes.Buffer
+	pref := map[bool]byte{false: ' ', true: '*'}
+	nd := func(name, desc string) string { return fmt.Sprintf("%-55.55s %s", name, desc) }
 	for _, block := range c.ast {
-		fmt.Fprintf(&buf, blockNameFormat, block.Name)
+		fmt.Fprintf(&buf, "  %s\n", nd(block.Name, block.Desc))
+		for _, reg := range block.Regs {
+			fmt.Fprintf(&buf, "%c%12c%0#16x %0#16x %s\n", pref[reg.isBad], ' ', reg.value, reg.Addr, nd(reg.Name, reg.Desc))
+			for _, f := range reg.Fields {
+				mid := fmt.Sprintf("-%-8d", f.Bits[1])
+				if f.Width == 1 {
+					mid = fmt.Sprintf("%9c", ' ')
+				}
+				fmt.Fprintf(&buf, "%c %-10d %0#-18.*[2]x %9[4]d%s %s\n", pref[f.isBad], f.value, int(f.Width+3)/4, f.Bits[0], mid, nd(f.Name, f.Desc))
+			}
+		}
+	}
+	return buf.String()
+}
+
+func (c *Config) ReportLegacy() string {
+	var buf bytes.Buffer
+	for _, block := range c.ast {
+		fmt.Fprintf(&buf, "\n**      %s      **\n", block.Name)
 		fmt.Fprintf(&buf, "%s\n", block.Desc)
 		for _, register := range block.Regs {
 			fmt.Fprintf(&buf, "\n%s %0#16x value: %0#16x", register.Name, register.Addr, register.value)
