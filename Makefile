@@ -71,7 +71,7 @@ gopacket-url := https://github.com/google/gopacket
 gopacket-dir := $(gopacket-url:https://%=%)
 gopacket-cid := master
 
-yaml-url := https://gopkg.in/yaml.v2
+yaml-url := https://github.com/go-yaml/yaml
 yaml-dir := $(yaml-url:https://%=%)
 yaml-cid := v2
 
