@@ -50,38 +50,38 @@ func (c *Config) Parse(yamlDoc string) (err error) {
 	defer errs.PassE(&err)
 	errs.CheckE(yaml.Unmarshal([]byte(yamlDoc), &c.ast))
 	for _, block := range c.ast {
-		for _, register := range block.Regs {
+		for _, reg := range block.Regs {
 			var currentLSB uint = 0
-			for _, field := range register.Fields {
+			for _, f := range reg.Fields {
 				check := func(cond bool, s string) {
 					if !cond {
-						errs.CheckE(fmt.Errorf("`%s`/`%s`/`%s`: %s", block.Name, register.Name, field.Name, s))
+						errs.CheckE(fmt.Errorf("`%s`/`%s`/`%s`: %s", block.Name, reg.Name, f.Name, s))
 					}
 				}
 
-				// the following ensures that field.Width == field.Bits[1] - field.Bits[0] + 1
-				l := len(field.Bits)
+				// the following ensures that f.Width == f.Bits[1] - f.Bits[0] + 1
+				l := len(f.Bits)
 				if l == 1 {
-					field.Bits = append(field.Bits, field.Bits[0])
+					f.Bits = append(f.Bits, f.Bits[0])
 				}
 				check(l <= 2, "too many bits specified")
 				if l == 0 {
-					check(field.Width != 0, "missing field location")
-					field.Bits = []uint{currentLSB, currentLSB + field.Width - 1}
+					check(f.Width != 0, "missing field location")
+					f.Bits = []uint{currentLSB, currentLSB + f.Width - 1}
 				} else {
-					if field.Bits[0] > field.Bits[1] {
-						field.Bits = []uint{field.Bits[1], field.Bits[0]}
+					if f.Bits[0] > f.Bits[1] {
+						f.Bits = []uint{f.Bits[1], f.Bits[0]}
 					}
-					width := field.Bits[1] - field.Bits[0] + 1
-					if field.Width == 0 {
-						field.Width = width
+					width := f.Bits[1] - f.Bits[0] + 1
+					if f.Width == 0 {
+						f.Width = width
 					}
-					check(field.Width == width, "field width inconsistent")
+					check(f.Width == width, "field width inconsistent")
 				}
 
-				check(currentLSB <= field.Bits[0], "field is out of order")
-				check(63 >= field.Bits[1], "field out of range")
-				currentLSB = field.Bits[1] + 1
+				check(currentLSB <= f.Bits[0], "field is out of order")
+				check(63 >= f.Bits[1], "field out of range")
+				currentLSB = f.Bits[1] + 1
 			}
 		}
 	}
@@ -121,19 +121,19 @@ func (c *Config) ReportLegacy() string {
 	for _, block := range c.ast {
 		fmt.Fprintf(&buf, "\n**      %s      **\n", block.Name)
 		fmt.Fprintf(&buf, "%s\n", block.Desc)
-		for _, register := range block.Regs {
-			fmt.Fprintf(&buf, "\n%s %0#16x value: %0#16x", register.Name, register.Addr, register.value)
-			if register.isBad {
-				fmt.Fprintf(&buf, " EXPECTED: %0#16x", *register.Good)
+		for _, reg := range block.Regs {
+			fmt.Fprintf(&buf, "\n%s %0#16x value: %0#16x", reg.Name, reg.Addr, reg.value)
+			if reg.isBad {
+				fmt.Fprintf(&buf, " EXPECTED: %0#16x", *reg.Good)
 			}
-			fmt.Fprintf(&buf, "     %s\n", register.Desc)
-			for _, field := range register.Fields {
-				width := int(field.Width+3) / 4
-				fmt.Fprintf(&buf, "%s: %0#[2]*x %[3]d", field.Name, width, field.value)
-				if field.isBad {
-					fmt.Fprintf(&buf, " EXPECTED: %0#[1]*x %[2]d", width, *field.Good)
+			fmt.Fprintf(&buf, "     %s\n", reg.Desc)
+			for _, f := range reg.Fields {
+				width := int(f.Width+3) / 4
+				fmt.Fprintf(&buf, "%s: %0#*x %[3]d", f.Name, width, f.value)
+				if f.isBad {
+					fmt.Fprintf(&buf, " EXPECTED: %0#*x %[2]d", width, *f.Good)
 				}
-				fmt.Fprintf(&buf, "     %s\n", field.Desc)
+				fmt.Fprintf(&buf, "     %s\n", f.Desc)
 			}
 		}
 	}
@@ -143,13 +143,13 @@ func (c *Config) ReportLegacy() string {
 func (c *Config) Probe(dev device.Device) (err error) {
 	defer errs.PassE(&err)
 	for _, block := range c.ast {
-		for _, register := range block.Regs {
-			register.value, err = dev.ReadRegister(4, register.Addr, 8)
+		for _, reg := range block.Regs {
+			reg.value, err = dev.ReadRegister(4, reg.Addr, 8)
 			errs.CheckE(err)
-			register.isBad = register.Good != nil && register.value != *register.Good
-			for _, field := range register.Fields {
-				field.value = register.value >> field.Bits[0] & (1<<field.Width - 1)
-				field.isBad = field.Good != nil && field.value != *field.Good
+			reg.isBad = reg.Good != nil && reg.value != *reg.Good
+			for _, f := range reg.Fields {
+				f.value = reg.value >> f.Bits[0] & (1<<f.Width - 1)
+				f.isBad = f.Good != nil && f.value != *f.Good
 			}
 		}
 	}
