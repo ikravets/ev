@@ -36,7 +36,6 @@ type field struct {
 	Good  *uint64 `yaml:",omitempty"`
 	value uint64
 	isBad bool
-	reg   *register
 }
 
 type Config struct {
