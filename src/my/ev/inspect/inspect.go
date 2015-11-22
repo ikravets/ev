@@ -39,11 +39,17 @@ type field struct {
 }
 
 type Config struct {
-	ast []*block
+	ast   []*block
+	isBad bool
 }
 
 func NewConfig() *Config {
 	return &Config{}
+}
+
+// check only valid after Probe
+func (c *Config) IsBad() bool {
+	return c.isBad
 }
 func (c *Config) Parse(yamlDoc string) (err error) {
 	defer errs.PassE(&err)
@@ -141,14 +147,17 @@ func (c *Config) ReportLegacy() string {
 
 func (c *Config) Probe(dev device.Device) (err error) {
 	defer errs.PassE(&err)
+	c.isBad = false
 	for _, block := range c.ast {
 		for _, reg := range block.Regs {
 			reg.value, err = dev.ReadRegister(4, reg.Addr, 8)
 			errs.CheckE(err)
 			reg.isBad = reg.Good != nil && reg.value != *reg.Good
+			c.isBad = c.isBad || reg.isBad
 			for _, f := range reg.Fields {
 				f.value = reg.value >> f.Bits[0] & (1<<f.Width - 1)
 				f.isBad = f.Good != nil && f.value != *f.Good
+				c.isBad = c.isBad || f.isBad
 			}
 		}
 	}
