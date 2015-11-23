@@ -41,10 +41,13 @@ type field struct {
 type Config struct {
 	ast   []*block
 	isBad bool
+	dev   device.Device
 }
 
-func NewConfig() *Config {
-	return &Config{}
+func NewConfig(dev device.Device) *Config {
+	return &Config{
+		dev: dev,
+	}
 }
 
 // check only valid after Probe
@@ -145,12 +148,12 @@ func (c *Config) ReportLegacy() string {
 	return buf.String()
 }
 
-func (c *Config) Probe(dev device.Device) (err error) {
+func (c *Config) Probe() (err error) {
 	defer errs.PassE(&err)
 	c.isBad = false
 	for _, block := range c.ast {
 		for _, reg := range block.Regs {
-			reg.value, err = dev.ReadRegister(4, reg.Addr, 8)
+			reg.value, err = c.dev.ReadRegister(4, reg.Addr, 8)
 			errs.CheckE(err)
 			reg.isBad = reg.Good != nil && reg.value != *reg.Good
 			c.isBad = c.isBad || reg.isBad
