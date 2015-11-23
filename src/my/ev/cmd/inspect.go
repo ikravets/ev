@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"my/ev/inspect"
 	"my/ev/inspect/device"
-	"os"
 
 	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
@@ -40,25 +39,17 @@ func (c *cmdInspect) ParsingFinished() (err error) {
 	}
 	buf, err := ioutil.ReadFile(c.ConfigFileName)
 	errs.CheckE(err)
-	outFile, err := os.OpenFile(c.OutputFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	errs.CheckE(err)
-	defer func() { errs.CheckE(outFile.Close()) }()
 	dev, err := device.NewEfh_toolDevice()
 	errs.CheckE(err)
 	conf := inspect.NewConfig(dev)
 	errs.CheckE(conf.Parse(string(buf)))
 	errs.CheckE(conf.Probe())
-	_, err = outFile.WriteString(conf.Report())
-	errs.CheckE(err)
+	errs.CheckE(ioutil.WriteFile(c.OutputFileName, []byte(conf.Report()), 0666))
 
 	if c.OutputConfigFileName != "" {
-		newCfg, err := os.OpenFile(c.OutputConfigFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-		errs.CheckE(err)
-		defer func() { errs.CheckE(newCfg.Close()) }()
 		dump, err := conf.Dump()
 		errs.CheckE(err)
-		_, err = newCfg.WriteString(dump)
-		errs.CheckE(err)
+		errs.CheckE(ioutil.WriteFile(c.OutputConfigFileName, []byte(dump), 0666))
 	}
 
 	return
