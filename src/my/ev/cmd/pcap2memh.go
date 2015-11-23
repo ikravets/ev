@@ -45,7 +45,7 @@ func (c *cmdPcap2memh) ParsingFinished() (err error) {
 	pp.LimitPacketNumber(c.PacketNumLimit)
 	pp.SetObtainer(handle)
 	pp.SetHandler(printer)
-	pp.ProcessAll()
+	errs.CheckE(pp.ProcessAll())
 	return
 }
 
