@@ -17,6 +17,8 @@ import (
 
 	"my/ev/channels"
 	"my/ev/efh"
+	"my/ev/inspect"
+	"my/ev/inspect/device"
 )
 
 type cmdEfhSuite struct {
@@ -29,9 +31,11 @@ type cmdEfhSuite struct {
 	Local       bool     `long:"local"`
 	EfhLoglevel int      `long:"efh-loglevel" default:"6"`
 	EfhProf     bool     `long:"efh-prof"`
+	Inspect     string   `long:"inspect" short:"c" value-name:"YML_FILE" description:"input register config file to read"`
 
 	shouldExecute bool
 	topOutDirName string
+	regConfig     *inspect.Config
 	testRunsTotal int
 	testRunsOk    int
 }
@@ -67,6 +71,15 @@ func (c *cmdEfhSuite) ParsingFinished() (err error) {
 			return
 		}
 		c.Suites = suites
+	}
+
+	if c.Inspect != "" {
+		buf, err := ioutil.ReadFile(c.Inspect)
+		errs.CheckE(err)
+		dev, err := device.NewEfh_toolDevice()
+		errs.CheckE(err)
+		c.regConfig = inspect.NewConfig(dev)
+		errs.CheckE(c.regConfig.Parse(string(buf)))
 	}
 
 	for _, suite := range c.Suites {
@@ -159,6 +172,7 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 		EfhDump:         "expout_orders",
 		EfhChannel:      c.genEfhChannels(testDirName),
 		EfhProf:         c.EfhProf,
+		RegConfig:       c.regConfig,
 		TestEfh:         c.TestEfh,
 		Local:           c.Local,
 	}
