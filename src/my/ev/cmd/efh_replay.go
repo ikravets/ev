@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"io/ioutil"
 	"log"
 
 	"github.com/ikravets/errs"
@@ -11,6 +12,8 @@ import (
 
 	"my/ev/channels"
 	"my/ev/efh"
+	"my/ev/inspect"
+	"my/ev/inspect/device"
 )
 
 type cmdEfhReplay struct {
@@ -27,8 +30,12 @@ type cmdEfhReplay struct {
 	EfhChannel   []string `long:"efh-channel"`
 	EfhProf      bool     `long:"efh-prof"`
 
+	Inspect string `long:"inspect" short:"c" value-name:"YML_FILE" description:"input register config file to read"`
+
 	TestEfh string `long:"test-efh" default:"/usr/libexec/test_efh"`
 	Local   bool   `long:"local"`
+
+	regConfig *inspect.Config
 
 	shouldExecute bool
 }
@@ -50,6 +57,16 @@ func (c *cmdEfhReplay) ParsingFinished() (err error) {
 	for _, s := range c.EfhChannel {
 		errs.CheckE(cc.LoadFromStr(s))
 	}
+
+	if c.Inspect != "" {
+		buf, err := ioutil.ReadFile(c.Inspect)
+		errs.CheckE(err)
+		dev, err := device.NewEfh_toolDevice()
+		errs.CheckE(err)
+		c.regConfig = inspect.NewConfig(dev)
+		errs.CheckE(c.regConfig.Parse(string(buf)))
+	}
+
 	conf := efh.ReplayConfig{
 		InputFileName:   c.InputFileName,
 		OutputInterface: c.OutputInterface,
@@ -62,6 +79,7 @@ func (c *cmdEfhReplay) ParsingFinished() (err error) {
 		EfhSubscribe:    c.EfhSubscribe,
 		EfhChannel:      cc,
 		EfhProf:         c.EfhProf,
+		RegConfig:       c.regConfig,
 		TestEfh:         c.TestEfh,
 		Local:           c.Local,
 	}
