@@ -6,6 +6,12 @@ package inspect
 import (
 	"bytes"
 	"fmt"
+	"go/ast"
+	"go/constant"
+	"go/parser"
+	"go/token"
+	"go/types"
+	"strings"
 
 	"github.com/go-yaml/yaml"
 	"github.com/ikravets/errs"
@@ -27,6 +33,8 @@ type register struct {
 	Fields []*field `yaml:",omitempty"`
 	value  uint64
 	isBad  bool
+
+	GoodExpr string `yaml:",omitempty"`
 }
 type field struct {
 	Bits  []uint  `yaml:",flow,omitempty"`
@@ -36,17 +44,23 @@ type field struct {
 	Good  *uint64 `yaml:",omitempty"`
 	value uint64
 	isBad bool
+
+	GoodExpr string `yaml:",omitempty"`
 }
 
 type Config struct {
 	ast   []*block
 	isBad bool
 	dev   device.Device
+
+	values map[string]uint64
 }
 
 func NewConfig(dev device.Device) *Config {
 	return &Config{
 		dev: dev,
+
+		values: make(map[string]uint64),
 	}
 }
 
@@ -54,27 +68,38 @@ func NewConfig(dev device.Device) *Config {
 func (c *Config) IsBad() bool {
 	return c.isBad
 }
+
+func checkC(cond bool, errloc, s string) {
+	if !cond {
+		errs.CheckE(fmt.Errorf("%s: %s", errloc, s))
+	}
+}
+func (c *Config) processGood(name string, expr *string, good *uint64, errloc string) {
+	c.values[name] = 0
+	if strings.Index(*expr, "%s") != -1 {
+		*expr = fmt.Sprintf(*expr, name)
+	}
+	checkC(good == nil || *expr == "", errloc, "both Good and GoodExpr specified")
+}
 func (c *Config) Parse(yamlDoc string) (err error) {
 	defer errs.PassE(&err)
 	errs.CheckE(yaml.Unmarshal([]byte(yamlDoc), &c.ast))
 	for _, block := range c.ast {
 		for _, reg := range block.Regs {
 			var currentLSB uint = 0
+			c.processGood(reg.Name, &reg.GoodExpr, reg.Good, fmt.Sprintf("`%s`/`%s`", block.Name, reg.Name))
 			for _, f := range reg.Fields {
-				check := func(cond bool, s string) {
-					if !cond {
-						errs.CheckE(fmt.Errorf("`%s`/`%s`/`%s`: %s", block.Name, reg.Name, f.Name, s))
-					}
-				}
+				loc := fmt.Sprintf("`%s`/`%s`/`%s`", block.Name, reg.Name, f.Name)
+				c.processGood(f.Name, &f.GoodExpr, f.Good, loc)
 
 				// the following ensures that f.Width == f.Bits[1] - f.Bits[0] + 1
 				l := len(f.Bits)
 				if l == 1 {
 					f.Bits = append(f.Bits, f.Bits[0])
 				}
-				check(l <= 2, "too many bits specified")
+				checkC(l <= 2, loc, "too many bits specified")
 				if l == 0 {
-					check(f.Width != 0, "missing field location")
+					checkC(f.Width != 0, loc, "missing field location")
 					f.Bits = []uint{currentLSB, currentLSB + f.Width - 1}
 				} else {
 					if f.Bits[0] > f.Bits[1] {
@@ -84,11 +109,11 @@ func (c *Config) Parse(yamlDoc string) (err error) {
 					if f.Width == 0 {
 						f.Width = width
 					}
-					check(f.Width == width, "field width inconsistent")
+					checkC(f.Width == width, loc, "field width inconsistent")
 				}
 
-				check(currentLSB <= f.Bits[0], "field is out of order")
-				check(63 >= f.Bits[1], "field out of range")
+				checkC(currentLSB <= f.Bits[0], loc, "field is out of order")
+				checkC(63 >= f.Bits[1], loc, "field out of range")
 				currentLSB = f.Bits[1] + 1
 			}
 		}
@@ -132,14 +157,20 @@ func (c *Config) ReportLegacy() string {
 		for _, reg := range block.Regs {
 			fmt.Fprintf(&buf, "\n%s %0#16x value: %0#16x", reg.Name, reg.Addr, reg.value)
 			if reg.isBad {
-				fmt.Fprintf(&buf, " EXPECTED: %0#16x", *reg.Good)
+				fmt.Fprintf(&buf, " EXPECTED: %s ", reg.GoodExpr)
+				if reg.Good != nil {
+					fmt.Fprintf(&buf, "%0#16x", *reg.Good)
+				}
 			}
 			fmt.Fprintf(&buf, "     %s\n", reg.Desc)
 			for _, f := range reg.Fields {
 				width := int(f.Width+3) / 4
 				fmt.Fprintf(&buf, "%s: %0#*x %[3]d", f.Name, width, f.value)
 				if f.isBad {
-					fmt.Fprintf(&buf, " EXPECTED: %0#*x %[2]d", width, *f.Good)
+					fmt.Fprintf(&buf, " EXPECTED: %s ", f.GoodExpr)
+					if f.Good != nil {
+						fmt.Fprintf(&buf, "%0#*x %[2]d", width, *f.Good)
+					}
 				}
 				fmt.Fprintf(&buf, "     %s\n", f.Desc)
 			}
@@ -148,6 +179,26 @@ func (c *Config) ReportLegacy() string {
 	return buf.String()
 }
 
+func (c *Config) checkValue(name, good string, value uint64) bool {
+	buf := bytes.NewBufferString("package config\nconst (\n")
+	length := 0
+	for name, value := range c.values {
+		fmt.Fprintf(buf, "\t%s = %d\n", name, value)
+		if len(name) > length {
+			length = len(name)
+		}
+	}
+	cname := strings.Repeat("_", length+1)
+	fmt.Fprintf(buf, "\t%s = %s\n)\n", cname, good)
+
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "config", buf.String(), 0)
+	errs.CheckE(err)
+	var conf types.Config
+	p, err := conf.Check(f.Name.Name, fset, []*ast.File{f}, &types.Info{})
+	errs.CheckE(err)
+	return constant.BoolVal(p.Scope().Lookup(cname).(*types.Const).Val())
+}
 func (c *Config) Probe() (err error) {
 	defer errs.PassE(&err)
 	c.isBad = false
@@ -155,11 +206,13 @@ func (c *Config) Probe() (err error) {
 		for _, reg := range block.Regs {
 			reg.value, err = c.dev.ReadRegister(4, reg.Addr, 8)
 			errs.CheckE(err)
-			reg.isBad = reg.Good != nil && reg.value != *reg.Good
+			c.values[reg.Name] = reg.value
+			reg.isBad = reg.Good != nil && reg.value != *reg.Good || reg.GoodExpr != "" && !c.checkValue(reg.Name, reg.GoodExpr, reg.value)
 			c.isBad = c.isBad || reg.isBad
 			for _, f := range reg.Fields {
 				f.value = reg.value >> f.Bits[0] & (1<<f.Width - 1)
-				f.isBad = f.Good != nil && f.value != *f.Good
+				c.values[f.Name] = f.value
+				f.isBad = f.Good != nil && f.value != *f.Good || f.GoodExpr != "" && !c.checkValue(f.Name, f.GoodExpr, f.value)
 				c.isBad = c.isBad || f.isBad
 			}
 		}
