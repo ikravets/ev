@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 	"github.com/ikravets/errs"
 
 	"my/ev/channels"
+	"my/ev/inspect"
 	"my/ev/packet"
 )
 
@@ -33,6 +35,8 @@ type ReplayConfig struct {
 	EfhSubscribe []string
 	EfhChannel   channels.Config
 	EfhProf      bool
+
+	RegConfig *inspect.Config
 
 	TestEfh string
 	Local   bool
@@ -59,7 +63,10 @@ func NewEfhReplay(conf ReplayConfig) EfhReplay {
 	}
 }
 
-var DumpsDifferError = errors.New("dumps differ")
+var (
+	DumpsDifferError = errors.New("dumps differ")
+	BadProbeError    = errors.New("register probe is bad")
+)
 
 func (e *efhReplay) Run() (err error) {
 	defer errs.PassE(&err)
@@ -104,6 +111,16 @@ func (e *efhReplay) Run() (err error) {
 		if !same {
 			log.Printf("dumps differ")
 			err = DumpsDifferError
+		}
+	}
+	if e.RegConfig != nil {
+		errs.CheckE(e.RegConfig.Probe())
+		errs.CheckE(ioutil.WriteFile("registers", []byte(e.RegConfig.Report()), 0666))
+		if e.RegConfig.IsBad() {
+			log.Printf("register probe is bad")
+			if err == nil {
+				err = BadProbeError
+			}
 		}
 	}
 	return
