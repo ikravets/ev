@@ -179,8 +179,12 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	return
 }
 func (c *cmdEfhSuite) genEfhChannels(testDirName string) (channels []string) {
-	// TODO support testDirName/channels
-	switch c.Exchange {
+	contents, err := ioutil.ReadFile(filepath.Join(testDirName, "channels"))
+	channelsID := c.Exchange
+	if err == nil {
+		channelsID = strings.TrimSpace(string(contents))
+	}
+	switch channelsID {
 	case "nasdaq":
 		for i := 0; i < 4; i++ {
 			channels = append(channels, fmt.Sprintf("233.54.12.%d:%d", 1+i, 18001+i))
@@ -188,6 +192,10 @@ func (c *cmdEfhSuite) genEfhChannels(testDirName string) (channels []string) {
 	case "bats":
 		for i := 0; i < 32; i++ {
 			channels = append(channels, fmt.Sprintf("224.0.131.%d:%d", i/4, 30101+i))
+		}
+	case "bats-b":
+		for i := 0; i < 32; i++ {
+			channels = append(channels, fmt.Sprintf("233.130.124.%d:%d", i/4, 30101+i))
 		}
 	default:
 		errs.Check(false)
