@@ -29,6 +29,8 @@ func NewExchangeSimulator(c Config) (es ExchangeSimulator, err error) {
 		es, err = NewNasdaqExchangeSimulatorServer(c)
 	case "bats":
 		es, err = NewBatsExchangeSimulatorServer(c)
+	case "miax":
+		es, err = NewMiaxExchangeSimulatorServer(c)
 	default:
 		err = IllegalProtocol
 	}
