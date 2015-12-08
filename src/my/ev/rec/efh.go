@@ -49,7 +49,7 @@ var efhmOutputNames = [...]string{
 
 type efhm_header struct {
 	Type           uint8
-	TickCondition  uint8
+	GroupId        uint8
 	QueuePosition  uint16
 	UnderlyingId   uint32
 	SecurityId     uint64
@@ -118,9 +118,9 @@ type efhm_definition_bats struct {
 func (m efhm_header) String() string {
 	switch m.Type {
 	case EFHM_QUOTE, EFHM_ORDER, EFHM_TRADE, EFHM_DEFINITION_NOM, EFHM_DEFINITION_BATS, EFHM_DEFINITION_MIAX:
-		return fmt.Sprintf("HDR{T:%d, TC:%d, QP:%d, UId:%08x, SId:%016x, SN:%d, TS:%016x} %s",
+		return fmt.Sprintf("HDR{T:%d, G:%d, QP:%d, UId:%08x, SId:%016x, SN:%d, TS:%016x} %s",
 			m.Type,
-			m.TickCondition,
+			m.GroupId,
 			m.QueuePosition,
 			m.UnderlyingId,
 			m.SecurityId,
