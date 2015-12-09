@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/ikravets/errs"
 )
@@ -30,6 +31,7 @@ func (r *Reporter) SetAnalyzer(a *Analyzer) {
 func (r *Reporter) SaveAll() {
 	r.SaveBookSizeHistogram()
 	r.SaveOrderCollisionsHistogram()
+	r.SaveSubscriptions()
 }
 func (r *Reporter) SaveBookSizeHistogram() {
 	errs.Check(r.analyzer != nil)
@@ -59,5 +61,28 @@ func (r *Reporter) SaveOrderCollisionsHistogram() {
 			_, err = fmt.Fprintf(file, "%d\t%d\n", h.Bin, h.Count)
 			errs.CheckE(err)
 		}
+	}
+}
+
+type uint64Slice []uint64
+
+func (a uint64Slice) Len() int           { return len(a) }
+func (a uint64Slice) Less(i, j int) bool { return a[i] < a[j] }
+func (a uint64Slice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+func (r *Reporter) SaveSubscriptions() {
+	fileName := filepath.Join(r.outDir, "subscription-all")
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	errs.CheckE(err)
+	defer file.Close()
+	errs.Check(r.analyzer != nil)
+	arr := make([]uint64, 0, len(r.analyzer.optionIds))
+	for oid := range r.analyzer.optionIds {
+		arr = append(arr, oid)
+	}
+	sort.Sort(uint64Slice(arr))
+	for _, oid := range arr {
+		_, err = fmt.Fprintf(file, "%0#16x\n", oid)
+		errs.CheckE(err)
 	}
 }

@@ -27,11 +27,13 @@ type Analyzer struct {
 	observer      observer
 	bookStats     map[OptionSide]*bookStat
 	orderHashStat []orderHashStat
+	optionIds     map[uint64]struct{}
 }
 
 func NewAnalyzer() *Analyzer {
 	a := &Analyzer{
 		bookStats: make(map[OptionSide]*bookStat),
+		optionIds: make(map[uint64]struct{}),
 	}
 	a.observer.analyzer = a
 	return a
@@ -74,6 +76,7 @@ func (o *observer) AfterBookUpdate(book sim.Book, op sim.SimOperation) {
 	if oid.Invalid() {
 		return
 	}
+	o.analyzer.optionIds[oid.ToUint64()] = struct{}{}
 	bs := o.analyzer.book(oid, op.GetSide())
 	//bookSize := len(book.GetTop(oid, op.GetSide(), 0))
 	b := book.GetTop(oid, op.GetSide(), 0)
