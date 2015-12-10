@@ -35,7 +35,7 @@ func NewMiaxExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) 
 			laddr: ":16002",
 			src:   src,
 		},
-		mcast: newMiaxMcastServer("10.2.0.5:0", "224.0.131.2:30110", src),
+		mcast: newMiaxMcastServer("10.2.0.5:0", "224.0.105.1:51001", src),
 	}
 	return
 }
@@ -141,10 +141,10 @@ func (s *SesMServerConn) login() (err error) {
 	defer errs.PassE(&err)
 	m, err := s.bconn.ReadMessage()
 	errs.CheckE(err)
-	_, ok := m.(*miax.MessageLogin)
+	_, ok := m.(*miax.SesMLoginRequest)
 	errs.Check(ok)
-	res := miax.MessageLoginResponse{
-		Status: miax.LoginAccepted,
+	res := miax.SesMLoginResponse{
+		LoginStatus: miax.LoginStatusSucscss,
 	}
 	errs.CheckE(s.bconn.WriteMessageSimple(&res))
 	log.Printf("login done")
@@ -342,4 +342,141 @@ func (c *miaxMessageSourceClient) run() {
 }
 func (c *miaxMessageSourceClient) Close() {
 	c.bc.Close()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+type MACHmcastPublisher struct {
+	laddr string
+	raddr string
+	seq   uint64
+	maxSeq   uint64
+	startSessionNum uint8
+	sessionNum uint8
+}
+
+func (s *MACHmcastPublisher) NewPublisher() {
+
+}
+
+func (s *MACHmcastPublisher) run() {
+	errs.Check(s.pps != 0)
+	laddr, err := net.ResolveUDPAddr("udp", s.laddr)
+	errs.CheckE(err)
+	raddr, err := net.ResolveUDPAddr("udp", s.raddr)
+	errs.CheckE(err)
+	conn, err := net.DialUDP("udp", laddr, raddr)
+	errs.CheckE(err)
+	if 0 == s.maxSeq {
+		s.maxSeq = 0xffffffff
+	}
+	s.SessionNum = s.startSessionNum
+	for {
+		s.seq = 0
+		start := MachMessageHeder {
+			Sequence: s.seq,
+			PackLength: MachPacketLength(TypeMachStartSession),
+			PackType: TypeMachStartSession,
+			SessionNum: s.sessionNum,
+		}
+		n, err := conn.Write(start)
+		errs.CheckE(err)
+		errs.Check(n == len(start), n, len(start))
+		for {
+			p, err := createHeartbeatsPacket(s.seq, s.sessionNum)
+			errs.CheckE(err)
+			log.Printf("send heartbeats: %v\n", p)
+			n, err := conn.Write(p)
+			errs.CheckE(err)
+			errs.Check(n == len(p), n, len(p))
+
+			delay := time.Duration(1000) * time.Millisecond
+			time.Sleep(delay)
+			if s.seq++ > s.maxSeq break;
+		}
+		end := MachMessageHeder {
+			Sequence: s.seq,
+			PackLength: MachPacketLength(TypeMachEndSession),
+			PackType: TypeMachEndSession,
+			SessionNum: s.sessionNum,
+		}
+		n, err := conn.Write(end)
+		errs.CheckE(err)
+		errs.Check(n == len(end), n, len(end))
+		s.sessionNum++
+	}
+	defer conn.Close()
+}
+
+func createHeartbeatsPacket(SeqNum, SessNum) (bs []byte, err error) {
+	defer errs.PassE(&err)
+	errs.Check(SeqNum >= 0)
+	hb := MachMessageHeder {
+		Sequence: SeqNum,
+		PackLength: MachPacketLength(TypeMachHeartbeat),
+		PackType: TypeMachHeartbeat,
+		SessionNum: SessNum,
+	}
+	var bb bytes.Buffer
+	errs.CheckE(struc.Pack(&bb, &hb))
+	bs = bb.Bytes()
+	return
+}
+
+
+type MACHmcastRetransmissionService struct {
+	pps int
+	c *conn
+}
+
+type SesMRetransmissionTCP struct {
+	laddr        string
+}
+
+func (s *SesMRetransmissionTCP) run() {
+	type moldudp64request struct {
+		Session        string
+		SequenceNumber uint64
+		MessageCount   uint16
+	}
+
+
+func (s *SesMRetransmissionTCP) run() {
+	l, err := net.Listen("tcp", s.laddr)
+	errs.CheckE(err)
+	defer l.Close()
+	for {
+		conn, err := l.Accept()
+		errs.CheckE(err)
+		log.Printf("accepted %s -> %s \n", conn.RemoteAddr(), conn.LocalAddr())
+		go s.handleClient(conn)
+	}
+}
+
+func (s *SesMRetransmissionTCP) handleClient(conn net.Conn) {
+	defer conn.Close()
+	m, err := miax.SesMReadMessage(conn)
+	errs.CheckE(err)
+	log.Printf("got %#v\n", m)
+	lr := m.(*miax.MessageLoginRequest)
+	errs.Check(lr != nil)
+
+	la := sbtcp.MessageLoginAccepted{
+		Session:        "00TestSess",
+		SequenceNumber: 1,
+	}
+	errs.CheckE(sbtcp.WriteMessage(conn, &la))
+	log.Printf("glimpse send: %v\n", la)
+
+	for i := 0; i < s.snapshotSeqNum; i++ {
+		s.sendSeqData(conn, generateIttoMessage(i))
+	}
+	snap := fmt.Sprintf("M%020d", s.snapshotSeqNum)
+	s.sendSeqData(conn, []byte(snap))
+}
+func (s *glimpseServer) sendSeqData(conn net.Conn, data []byte) {
+	sd := sbtcp.MessageSequencedData{}
+	sd.SetPayload(data)
+	errs.CheckE(sbtcp.WriteMessage(conn, &sd))
+	log.Printf("glimpse send: %v\n", sd)
 }

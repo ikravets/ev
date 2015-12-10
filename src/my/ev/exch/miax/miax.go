@@ -5,27 +5,12 @@ package miax
 
 import "github.com/ikravets/errs"
 
-type MachMessageType uint8
-
-type MachMessageHeder struct {
-	Sequence   uint64
-	PackLength uint16
-	PackType   MachMessageType
-	SessionNum uint8
+type SesMMessage interface {
+	getCommon() *MessageCommon
+	Type() MessageType
 }
 
-type MachMessageCommon struct {
-	Header MachMessageHeder
-}
-
-const (
-	TypeMachHeartbeat    = 0x00
-	TypeMachStartSession = 0x01
-	TypeMachEndSession   = 0x02
-	TypeMachAppData      = 0x03
-)
-
-type MessageType byte
+type SesMMessageType byte
 
 type SesMUnseqHeader struct {
 	Length uint16
@@ -34,12 +19,13 @@ type SesMUnseqHeader struct {
 
 type SesMUnseqCommon struct {
 	Header SesMUnseqHeader
+	Payload []byte
 }
 
 func (mc *SesMUnseqCommon) getCommon() *SesMUnseqCommon {
 	return mc
 }
-func (mc *SesMUnseqCommon) setHeader(Type MessageType) (err error) {
+func (mc *SesMUnseqCommon) setHeader(Type SesMMessageType) (err error) {
 	defer errs.PassE(&err)
 	mc.Header.Length = uint16(MessageLength[Type])
 	mc.Header.Type = Type // 'U' or 'S'
@@ -57,6 +43,87 @@ type SesMSeqCommon struct {
 }
 
 // Messages
+
+type SesMLoginRequest struct {
+	SesMUnseqCommon         // Type L
+	SesMVersion     [5]byte // 1.1 (right padded with spaces)
+	Username        [5]byte //Username issued by MIAX during initial setup
+	ComputerID      [8]byte //ID issued by MIAX during initial setup
+	ApplProtocol    [8]byte //Eg: MEI1.0 (right padded with spaces)
+	ReqSession      uint8   //Specifies the session the client would like to log into, or zero to log into the currently active session.
+	ReqSeqNum       uint64  //Specifies client requested sequence number
+	// - next sequence number the client wants to receive upon connection, or
+	// - 0 to start receiving only new messages without any replay of old messages
+}
+
+type SesMLoginResponse struct {
+	SesMUnseqCommon        // Type R
+	LoginStatus     byte   // “ “ – Login successful
+	SessionID       uint8  // The session ID of the session that is now logged into.
+	HighestSeqNum   uint64 // The highest sequence number that the server currently has for the client.
+}
+
+const (
+	LoginStatusSucscss       = ' ' // Login successful
+	LoginStatusRejected      = 'X' // Rejected: Invalid Username/Computer ID combination
+	LoginStatusNotAvail      = 'S' // Requested session is not available
+	LoginStatusInvalidSeqNum = 'N' // Invalid start sequence number requested
+	LoginStatusSessionIncomp = 'I' // Incompatible Session protocol version
+	LoginStatusApplIncomp    = 'A' // Incompatible Application protocol version
+	LoginStatusLogged        = 'L' // Request rejected because client already logged in
+)
+
+type SesMSynchrComplete struct {
+	SesMUnseqCommon // Type C
+}
+
+type SesMRetransmRequest struct {
+	SesMUnseqCommon        // Type A
+	StartSeqNumber  uint64 //Sequence number of the first packet to be retransmitted
+	EndSeqNumber    uint64 //Sequence number of the last packet to be retransmitted
+}
+
+type SesMSynchrComplete struct {
+	SesMUnseqCommon // Type X
+	Reason          byte
+	Text            []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
+}
+
+const (
+	LogoutReasonDone        = ' ' // “ “ – Graceful Logout (Done for now)
+	LogoutReasonBadPacket   = 'B' // “B“ – Bad SesM Packet
+	LogoutReasonTimedOut    = 'L' // “L” – Timed out waiting for Login Packet
+	LogoutReasonTerminating = 'A' // “A” – Application terminating connection
+)
+
+type SesMGoodBye struct {
+	SesMUnseqCommon // Type G
+	Reason          byte
+	Text            []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
+}
+
+const (
+	GoodByeReasonBadPacket   = 'B' // “B“ – Bad SesM Packet
+	GoodByeReasonTimedOut    = 'L' // “L” – Timed out waiting for Login Packet
+	GoodByeReasonTerminating = 'A' // “A” – Application terminating connection
+)
+
+type SesMEndOfSession struct {
+	SesMUnseqCommon // Type E
+}
+
+type SesMServerHeartbeat struct {
+	SesMUnseqCommon // Type 0
+}
+
+type SesMClientHeartbeat struct {
+	SesMUnseqCommon // Type 1
+}
+
+type SesMTestPacket struct {
+	SesMUnseqCommon        // Type T
+	Text            []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
+}
 
 type SesMRefreshRequest struct {
 	SesMUnseqCommon
@@ -83,6 +150,70 @@ type SesMEndRefreshNotif struct {
 	ResponseType byte //“E” – End of Request
 	RefreshType  byte //from Refresh Request
 }
+
+func SesMReadMessage(r io.Reader) (m SesMMessage, err error) {
+	defer errs.PassE(&err)
+	var mc SesMUnseqCommon
+	errs.CheckE(binary.Read(r, binary.BigEndian, &mc.Header))
+	mc.Payload = make([]byte, Length)
+	n, err := r.Read(mc.Payload)
+	errs.CheckE(err)
+	errs.Check(n == len(mc.Payload), n, len(mc.Payload))
+	switch mc.Header.Type {
+	case SesMLoginRequest
+		m = &SesMLoginRequest{}
+	case
+
+	case
+
+	}
+//	*m.getCommon() = mc
+//	errs.CheckE(m.decodePayload())
+	return
+}
+
+func SesMWriteMessage(w io.Writer, m SesMUnseqMessage) (err error) {
+	defer errs.PassE(&err)
+//	errs.CheckE(m.encodePayload())
+	var mt SesMMessageType
+	switch m.(type) {
+	var mt SesMMessageType
+	case *SesMLoginRequest:
+		mt = SesMLoginRequest
+	case
+
+	case
+
+	case
+
+	}
+	errs.CheckE(m.getCommon().setHeader(mt))
+//	errs.CheckE(binary.Write(w, binary.BigEndian, m.getHeader()))
+//	n, err := w.Write(m.getCommon().Payload)
+//	errs.CheckE(err)
+//	errs.Check(n == len(m.getCommon().Payload))
+	return
+}
+
+type MachMessageType uint8
+
+type MachMessageHeder struct {
+	Sequence   uint64
+	PackLength uint16
+	PackType   MachMessageType
+	SessionNum uint8
+}
+
+type MachMessageCommon struct {
+	Header MachMessageHeder
+}
+
+const (
+	TypeMachHeartbeat    = 0x00
+	TypeMachStartSession = 0x01
+	TypeMachEndSession   = 0x02
+	TypeMachAppData      = 0x03
+)
 
 type MachMessageType byte
 
