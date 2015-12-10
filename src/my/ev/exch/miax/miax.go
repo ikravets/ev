@@ -3,68 +3,157 @@
 
 package miax
 
-import "github.com/ikravets/errs"
+import (
+	"bytes"
+	"encoding/binary"
+	"io"
+	"log"
+
+	"github.com/ikravets/errs"
+)
+
+type Conn interface {
+	ReadMessage() (m SesMMessage, err error)
+	WriteMessageSimple(m SesMMessage) (err error)
+}
+
+type conn struct {
+	rw            io.ReadWriter
+	messageReader io.LimitedReader
+	rbuf          bytes.Buffer
+	nextSeqNum    uint32
+	mt            SesMMessageType
+	mb            bytes.Buffer
+}
+
+func NewConn(rw io.ReadWriter) Conn {
+	return &conn{
+		rw: rw,
+	}
+}
+
+func (c *conn) readSize() (err error) {
+	defer errs.PassE(&err)
+	errs.Check(c.messageReader.N == 0, c.messageReader.N)
+	var s uint16
+	errs.CheckE(binary.Read(c.rw, binary.LittleEndian, &s))
+	log.Printf("rcv SesM size %d\n", s)
+	c.messageReader = io.LimitedReader{R: c.rw, N: int64(s)}
+	return
+}
+
+func (c *conn) ReadMessage() (m SesMMessage, err error) {
+	defer errs.PassE(&err)
+	for c.messageReader.N == 0 {
+		errs.CheckE(c.readSize())
+	}
+
+	var t [1]byte
+	h := SesMHeader{Length: uint16(c.messageReader.N)}
+	_, err = io.ReadFull(&c.messageReader, t[:])
+	errs.CheckE(err)
+	log.Printf("rcv SesM type %c\n", t[0])
+	h.Type = SesMMessageType(t[0])
+	log.Printf("rcv header %#v\n", h)
+	f := SesMMessageFactory[h.Type]
+	errs.Check(f != nil)
+	m = f()
+	errs.CheckE(binary.Read(&c.messageReader, binary.LittleEndian, m))
+	log.Printf("rcv %#v\n", m)
+	return
+}
+func (c *conn) WriteMessageSimple(m SesMMessage) (err error) {
+	return binary.Write(c.rw, binary.LittleEndian, struct {
+		h   SesMHeader
+		msg SesMMessage
+	}{h: SesMHeader{Length: 0, Type: m.Type()}, msg: m})
+}
+
+const (
+	TypeSesMMessageCommon   SesMMessageType = 0
+	TypeSesMSeq             SesMMessageType = 'S'
+	TypeSesMUnseq           SesMMessageType = 'U'
+	TypeSesMLoginRequest    SesMMessageType = 'L'
+	TypeSesMLoginResponse   SesMMessageType = 'R'
+	TypeSesMSynchrComplete  SesMMessageType = 'C'
+	TypeSesMRetransmRequest SesMMessageType = 'A'
+	TypeSesMGoodBye         SesMMessageType = 'G'
+	TypeSesMEndOfSession    SesMMessageType = 'E'
+	TypeSesMServerHeartbeat SesMMessageType = '0'
+	TypeSesMClientHeartbeat SesMMessageType = '1'
+)
+
+var SesMMessageFactory = [256]func() SesMMessage{
+	TypeSesMMessageCommon:   func() SesMMessage { return &SesMMessageCommon{} },
+	TypeSesMSeq:             func() SesMMessage { return &SesMSeq{} },
+	TypeSesMUnseq:           func() SesMMessage { return &SesMRefreshRequest{} },
+	TypeSesMLoginRequest:    func() SesMMessage { return &SesMLoginRequest{} },
+	TypeSesMLoginResponse:   func() SesMMessage { return &SesMLoginResponse{} },
+	TypeSesMSynchrComplete:  func() SesMMessage { return &SesMSynchrComplete{} },
+	TypeSesMRetransmRequest: func() SesMMessage { return &SesMRetransmRequest{} },
+	TypeSesMGoodBye:         func() SesMMessage { return &SesMGoodBye{} },
+	TypeSesMEndOfSession:    func() SesMMessage { return &SesMEndOfSession{} },
+	TypeSesMServerHeartbeat: func() SesMMessage { return &SesMServerHeartbeat{} },
+	TypeSesMClientHeartbeat: func() SesMMessage { return &SesMClientHeartbeat{} },
+}
+
+func (_ *SesMMessageCommon) Type() SesMMessageType   { return TypeSesMMessageCommon }
+func (_ *SesMSeq) Type() SesMMessageType             { return TypeSesMSeq }
+func (_ *SesMUnseq) Type() SesMMessageType           { return TypeSesMUnseq }
+func (_ *SesMLoginRequest) Type() SesMMessageType    { return TypeSesMLoginRequest }
+func (_ *SesMLoginResponse) Type() SesMMessageType   { return TypeSesMLoginResponse }
+func (_ *SesMSynchrComplete) Type() SesMMessageType  { return TypeSesMSynchrComplete }
+func (_ *SesMRetransmRequest) Type() SesMMessageType { return TypeSesMRetransmRequest }
+func (_ *SesMGoodBye) Type() SesMMessageType         { return TypeSesMGoodBye }
+func (_ *SesMEndOfSession) Type() SesMMessageType    { return TypeSesMEndOfSession }
+func (_ *SesMServerHeartbeat) Type() SesMMessageType { return TypeSesMServerHeartbeat }
+func (_ *SesMClientHeartbeat) Type() SesMMessageType { return TypeSesMClientHeartbeat }
 
 type SesMMessage interface {
-	getCommon() *MessageCommon
-	Type() MessageType
+	Type() SesMMessageType
 }
 
 type SesMMessageType byte
 
-type SesMUnseqHeader struct {
+type SesMHeader struct {
 	Length uint16
-	Type   MessageType
+	Type   SesMMessageType
 }
 
-type SesMUnseqCommon struct {
-	Header SesMUnseqHeader
-	Payload []byte
-}
+type SesMMessageCommon struct{}
 
-func (mc *SesMUnseqCommon) getCommon() *SesMUnseqCommon {
-	return mc
-}
-func (mc *SesMUnseqCommon) setHeader(Type SesMMessageType) (err error) {
-	defer errs.PassE(&err)
-	mc.Header.Length = uint16(MessageLength[Type])
-	mc.Header.Type = Type // 'U' or 'S'
-	errs.Check(mc.Header.Length != 0)
-	return
-}
-
-type SesMSeqHeader struct {
-	SesMUnseqCommon
+type SesMSeq struct {
+	SesMMessageCommon
 	Sequence uint64
 }
 
-type SesMSeqCommon struct {
-	Header SesMSeqHeader
+type SesMUnseq struct {
+	SesMMessageCommon
 }
 
 // Messages
 
 type SesMLoginRequest struct {
-	SesMUnseqCommon         // Type L
-	SesMVersion     [5]byte // 1.1 (right padded with spaces)
-	Username        [5]byte //Username issued by MIAX during initial setup
-	ComputerID      [8]byte //ID issued by MIAX during initial setup
-	ApplProtocol    [8]byte //Eg: MEI1.0 (right padded with spaces)
-	ReqSession      uint8   //Specifies the session the client would like to log into, or zero to log into the currently active session.
-	ReqSeqNum       uint64  //Specifies client requested sequence number
+	SesMMessageCommon         // Type L
+	SesMVersion       [5]byte // 1.1 (right padded with spaces)
+	Username          [5]byte //Username issued by MIAX during initial setup
+	ComputerID        [8]byte //ID issued by MIAX during initial setup
+	ApplProtocol      [8]byte //Eg: MEI1.0 (right padded with spaces)
+	ReqSession        uint8   //Specifies the session the client would like to log into, or zero to log into the currently active session.
+	ReqSeqNum         uint64  //Specifies client requested sequence number
 	// - next sequence number the client wants to receive upon connection, or
 	// - 0 to start receiving only new messages without any replay of old messages
 }
 
 type SesMLoginResponse struct {
-	SesMUnseqCommon        // Type R
-	LoginStatus     byte   // “ “ – Login successful
-	SessionID       uint8  // The session ID of the session that is now logged into.
-	HighestSeqNum   uint64 // The highest sequence number that the server currently has for the client.
+	SesMMessageCommon        // Type R
+	LoginStatus       byte   // “ “ – Login successful
+	SessionID         uint8  // The session ID of the session that is now logged into.
+	HighestSeqNum     uint64 // The highest sequence number that the server currently has for the client.
 }
 
 const (
-	LoginStatusSucscss       = ' ' // Login successful
+	LoginStatusSuccess       = ' ' // Login successful
 	LoginStatusRejected      = 'X' // Rejected: Invalid Username/Computer ID combination
 	LoginStatusNotAvail      = 'S' // Requested session is not available
 	LoginStatusInvalidSeqNum = 'N' // Invalid start sequence number requested
@@ -74,19 +163,19 @@ const (
 )
 
 type SesMSynchrComplete struct {
-	SesMUnseqCommon // Type C
+	SesMMessageCommon // Type C
 }
 
 type SesMRetransmRequest struct {
-	SesMUnseqCommon        // Type A
-	StartSeqNumber  uint64 //Sequence number of the first packet to be retransmitted
-	EndSeqNumber    uint64 //Sequence number of the last packet to be retransmitted
+	SesMMessageCommon        // Type A
+	StartSeqNumber    uint64 //Sequence number of the first packet to be retransmitted
+	EndSeqNumber      uint64 //Sequence number of the last packet to be retransmitted
 }
 
-type SesMSynchrComplete struct {
-	SesMUnseqCommon // Type X
-	Reason          byte
-	Text            []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
+type SesMLogoutRequest struct {
+	SesMMessageCommon // Type X
+	Reason            byte
+	Text              []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
 }
 
 const (
@@ -97,9 +186,9 @@ const (
 )
 
 type SesMGoodBye struct {
-	SesMUnseqCommon // Type G
-	Reason          byte
-	Text            []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
+	SesMMessageCommon // Type G
+	Reason            byte
+	Text              []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
 }
 
 const (
@@ -109,24 +198,24 @@ const (
 )
 
 type SesMEndOfSession struct {
-	SesMUnseqCommon // Type E
+	SesMMessageCommon // Type E
 }
 
 type SesMServerHeartbeat struct {
-	SesMUnseqCommon // Type 0
+	SesMMessageCommon // Type 0
 }
 
 type SesMClientHeartbeat struct {
-	SesMUnseqCommon // Type 1
+	SesMMessageCommon // Type 1
 }
 
 type SesMTestPacket struct {
-	SesMUnseqCommon        // Type T
-	Text            []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
+	SesMMessageCommon        // Type T
+	Text              []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
 }
 
 type SesMRefreshRequest struct {
-	SesMUnseqCommon
+	SesMUnseq
 	RequestType byte //“R” – Refresh
 	RefreshType byte
 }
@@ -139,81 +228,25 @@ const (
 )
 
 type SesMRefreshResponse struct {
-	SesMUnseqCommon
+	SesMUnseq
 	ResponseType       byte //“R” – TOM Refresh
 	SequenceNumber     uint64
 	ApplicationMessage []byte //Based on the message type requested.
 }
 
 type SesMEndRefreshNotif struct {
-	SesMUnseqCommon
+	SesMUnseq
 	ResponseType byte //“E” – End of Request
 	RefreshType  byte //from Refresh Request
 }
 
-func SesMReadMessage(r io.Reader) (m SesMMessage, err error) {
-	defer errs.PassE(&err)
-	var mc SesMUnseqCommon
-	errs.CheckE(binary.Read(r, binary.BigEndian, &mc.Header))
-	mc.Payload = make([]byte, Length)
-	n, err := r.Read(mc.Payload)
-	errs.CheckE(err)
-	errs.Check(n == len(mc.Payload), n, len(mc.Payload))
-	switch mc.Header.Type {
-	case SesMLoginRequest
-		m = &SesMLoginRequest{}
-	case
+type MachMessageCommon struct{}
 
-	case
-
-	}
-//	*m.getCommon() = mc
-//	errs.CheckE(m.decodePayload())
-	return
+func (m *MachMessageCommon) write() []byte {
+	var b bytes.Buffer
+	binary.Write(&b, binary.LittleEndian, m)
+	return b.Bytes()
 }
-
-func SesMWriteMessage(w io.Writer, m SesMUnseqMessage) (err error) {
-	defer errs.PassE(&err)
-//	errs.CheckE(m.encodePayload())
-	var mt SesMMessageType
-	switch m.(type) {
-	var mt SesMMessageType
-	case *SesMLoginRequest:
-		mt = SesMLoginRequest
-	case
-
-	case
-
-	case
-
-	}
-	errs.CheckE(m.getCommon().setHeader(mt))
-//	errs.CheckE(binary.Write(w, binary.BigEndian, m.getHeader()))
-//	n, err := w.Write(m.getCommon().Payload)
-//	errs.CheckE(err)
-//	errs.Check(n == len(m.getCommon().Payload))
-	return
-}
-
-type MachMessageType uint8
-
-type MachMessageHeder struct {
-	Sequence   uint64
-	PackLength uint16
-	PackType   MachMessageType
-	SessionNum uint8
-}
-
-type MachMessageCommon struct {
-	Header MachMessageHeder
-}
-
-const (
-	TypeMachHeartbeat    = 0x00
-	TypeMachStartSession = 0x01
-	TypeMachEndSession   = 0x02
-	TypeMachAppData      = 0x03
-)
 
 type MachMessageType byte
 
@@ -276,11 +309,11 @@ type MachToMCompact struct {
 }
 
 const (
-	ConditionRegular           = 'A' //A Regular (Eligible for Automatic Execution)
-	ConditionPublic            = 'B' //Quote contains Public Customer
-	ConditionQuoteNotFirm      = 'C' //Quote is not firm on this side
-	ConditionReserved          = 'R' //Reserved for future use
-	ConditionTrading      Halt = 'T' //Trading Halt
+	ConditionRegular      = 'A' //A Regular (Eligible for Automatic Execution)
+	ConditionPublic       = 'B' //Quote contains Public Customer
+	ConditionQuoteNotFirm = 'C' //Quote is not firm on this side
+	ConditionReserved     = 'R' //Reserved for future use
+	ConditionTradingHalt  = 'T' //Trading Halt
 )
 
 type MachToMWide struct {
@@ -294,7 +327,7 @@ type MachToMWide struct {
 	MBBOCondition byte
 }
 
-type MachDobleSidedToMCompact struct {
+type MachDoubleSidedToMCompact struct {
 	MachMessageCommon
 	Type           MachMessageType //“d”
 	NanoTime       uint32          //Nanoseconds part of the timestamp
@@ -309,7 +342,7 @@ type MachDobleSidedToMCompact struct {
 	OfferCondition byte
 }
 
-type MachDobleSidedToMWide struct {
+type MachDoubleSidedToMWide struct {
 	MachMessageCommon
 	Type           MachMessageType //“D”
 	NanoTime       uint32          //Nanoseconds part of the timestamp
