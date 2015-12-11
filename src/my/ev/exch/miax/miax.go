@@ -15,6 +15,7 @@ import (
 type Conn interface {
 	ReadMessage() (m SesMMessage, err error)
 	WriteMessageSimple(m SesMMessage) (err error)
+	WriteMessage(m MachMessage) (err error)
 }
 
 type conn struct {
@@ -240,15 +241,58 @@ type SesMEndRefreshNotif struct {
 	RefreshType  byte //from Refresh Request
 }
 
-type MachMessageCommon struct{}
+type MachMessageType byte
+
+const (
+	TypeMachMessageCommon MachMessageType = 0
+	TypeMachSystemTime    MachMessageType = '1'
+	TypeMachToMWide       MachMessageType = 'W'
+	TypeMachSeriesUpdate  MachMessageType = 'P'
+)
+
+var MachMessageFactory = [256]func() MachMessage{
+	TypeMachMessageCommon: func() MachMessage { return &MachMessageCommon{} },
+	TypeMachSystemTime:    func() MachMessage { return &MachSystemTime{} },
+	TypeMachToMWide:       func() MachMessage { return &MachToMWide{} },
+	TypeMachSeriesUpdate:  func() MachMessage { return &MachSeriesUpdate{} },
+}
+
+func (_ *MachMessageCommon) Types() MachMessageType { return TypeMachMessageCommon }
+func (_ *MachSystemTime) Types() MachMessageType    { return TypeMachSystemTime }
+func (_ *MachToMWide) Types() MachMessageType       { return TypeMachToMWide }
+func (_ *MachSeriesUpdate) Types() MachMessageType  { return TypeMachSeriesUpdate }
+
+type MachMessage interface {
+	Types() MachMessageType
+}
+
+type MachMessageHeder struct {
+	Sequence   uint64
+	PackLength uint16
+	PackType   MachMessageType
+	SessionNum uint8
+}
+
+type MachMessageCommon struct {
+	MachHeader MachMessageHeder
+}
+
+func (c *conn) WriteMessage(m MachMessage) (err error) {
+	return binary.Write(c.rw, binary.LittleEndian, m)
+}
+
+const (
+	TypeMachHeartbeat    = 0x00
+	TypeMachStartSession = 0x01
+	TypeMachEndSession   = 0x02
+	TypeMachAppData      = 0x03
+)
 
 func (m *MachMessageCommon) write() []byte {
 	var b bytes.Buffer
 	binary.Write(&b, binary.LittleEndian, m)
 	return b.Bytes()
 }
-
-type MachMessageType byte
 
 type MachSystemTime struct {
 	MachMessageCommon

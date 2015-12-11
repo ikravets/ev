@@ -4,6 +4,7 @@
 package exch
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ikravets/errs"
+	"github.com/lunixbochs/struc"
 
 	"my/ev/bchan"
 	"my/ev/exch/miax"
@@ -19,7 +21,7 @@ import (
 type MiaxMessageSource interface {
 	SetSequence(int)
 	CurrentSequence() int
-	GetMessage(int) miax.Message
+	GetMessage(uint64) miax.MachMessage
 	Run()
 	RunInteractive()
 	Stop()
@@ -78,20 +80,16 @@ func (s *SesMServer) run() {
 }
 
 type SesMServerConn struct {
-	conn            net.Conn
-	bconn           miax.Conn
-	src             *miaxMessageSource
-	imageLag        int
-	mcastDuringSesM int
+	conn  net.Conn
+	mconn miax.Conn
+	src   *miaxMessageSource
 }
 
 func NewSesMServerConn(conn net.Conn, src *miaxMessageSource) *SesMServerConn {
 	return &SesMServerConn{
-		conn:            conn,
-		bconn:           miax.NewConn(conn),
-		src:             src,
-		imageLag:        10,
-		mcastDuringSesM: 10,
+		conn:  conn,
+		mconn: miax.NewConn(conn),
+		src:   src,
 	}
 }
 
@@ -101,56 +99,67 @@ func (s *SesMServerConn) run() {
 	})
 	defer s.conn.Close()
 	errs.CheckE(s.login())
-	cancelSendImageAvail := make(chan struct{})
+	cancelSendHeartbeat := make(chan struct{})
 	defer func() {
 		// close channel only if not already closed
 		select {
-		case _, ok := <-cancelSendImageAvail:
+		case _, ok := <-cancelSendHeartbeat:
 			if !ok {
 				return
 			}
 		default:
 		}
-		close(cancelSendImageAvail)
+		close(cancelSendHeartbeat)
 	}()
-	go s.sendImageAvail(cancelSendImageAvail)
+	go s.sendHeartbeat(cancelSendHeartbeat)
 
-	m, err := s.bconn.ReadMessage()
-	errs.CheckE(err)
-	req, ok := m.(*miax.MessageSesMRequest)
-	errs.Check(ok)
-	close(cancelSendImageAvail)
+	for {
+		m, err := s.mconn.ReadMessage()
+		errs.CheckE(err)
 
-	seq := s.src.CurrentSequence()
-	errs.Check(int(req.Sequence) <= seq, req.Sequence, seq)
-	res := miax.MessageSesMResponse{
-		Sequence: req.Sequence,
-		Count:    uint32(seq) - req.Sequence + 1,
-		Status:   miax.SesMStatusAccepted,
+		mtype := m.Type()
+		switch mtype {
+		case miax.TypeSesMRetransmRequest:
+			rt, ok := m.(*miax.SesMRetransmRequest)
+			errs.Check(ok)
+			errs.CheckE(s.sendAll(rt.StartSeqNumber, rt.EndSeqNumber))
+			bye := miax.SesMGoodBye{
+				Reason: miax.GoodByeReasonTerminating,
+			}
+			errs.CheckE(s.mconn.WriteMessageSimple(&bye))
+			return
+		case miax.TypeSesMUnseq:
+			rf, ok := m.(*miax.SesMRefreshRequest)
+			errs.Check(ok)
+			errs.Check(rf.RefreshType == miax.SesMRefreshToM || rf.RefreshType == miax.SesMRefreshSeriesUpdate)
+			resp := miax.SesMRefreshResponse{
+				ResponseType:       'R',
+				SequenceNumber:     uint64(s.src.CurrentSequence()),
+				ApplicationMessage: s.src.generateApplicationMessage(rf.RefreshType, 5),
+			}
+			errs.CheckE(s.mconn.WriteMessageSimple(&resp))
+		}
 	}
-	errs.CheckE(s.bconn.WriteMessageSimple(&res))
-	errs.CheckE(s.sendAll(int(req.Sequence), seq+1))
-	s.waitForMcast(seq)
-	res2 := miax.MessageSesMFinished{
-		Sequence: req.Sequence,
-	}
-	errs.CheckE(s.bconn.WriteMessageSimple(&res2))
 	log.Println("sesm finished")
 }
+
 func (s *SesMServerConn) login() (err error) {
 	defer errs.PassE(&err)
-	m, err := s.bconn.ReadMessage()
+	m, err := s.mconn.ReadMessage() //////// miax conn
 	errs.CheckE(err)
-	_, ok := m.(*miax.SesMLoginRequest)
+	lr, ok := m.(*miax.SesMLoginRequest)
 	errs.Check(ok)
+	// проверка, что мы не хотим рефреш
+	errs.Check(0 == lr.ReqSeqNum)
 	res := miax.SesMLoginResponse{
-		LoginStatus: miax.LoginStatusSucscss,
+		LoginStatus:   miax.LoginStatusSuccess,
+		HighestSeqNum: uint64(s.src.CurrentSequence()),
 	}
-	errs.CheckE(s.bconn.WriteMessageSimple(&res))
+	errs.CheckE(s.mconn.WriteMessageSimple(&res))
 	log.Printf("login done")
 	return
 }
-func (s *SesMServerConn) sendImageAvail(cancel <-chan struct{}) {
+func (s *SesMServerConn) sendHeartbeat(cancel <-chan struct{}) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -159,35 +168,22 @@ func (s *SesMServerConn) sendImageAvail(cancel <-chan struct{}) {
 			log.Printf("image avail cancelled")
 			return
 		case <-ticker.C:
-			seq := s.src.CurrentSequence() - s.imageLag
-			if seq > 0 {
-				log.Printf("image avail %d", seq)
-				sia := miax.MessageSesMImageAvail{
-					Sequence: uint32(seq),
-				}
-				errs.CheckE(s.bconn.WriteMessageSimple(&sia))
-			}
+			seq := s.src.CurrentSequence()
+			log.Printf("heartbeats %d", seq)
+			sia := miax.SesMServerHeartbeat{}
+			errs.CheckE(s.mconn.WriteMessageSimple(&sia))
 		}
 	}
 }
-func (s *SesMServerConn) sendAll(start, end int) (err error) {
+func (s *SesMServerConn) sendAll(start, end uint64) (err error) {
 	defer errs.PassE(&err)
-	log.Printf("sesm send %d .. %d", start, end)
+	log.Printf("sesm start retransm %d .. %d", start, end)
 	for i := start; i < end; i++ {
 		m := s.src.GetMessage(i)
-		errs.CheckE(s.bconn.WriteMessageSimple(m))
+		errs.CheckE(s.mconn.WriteMessage(m))
 	}
-	log.Printf("sesm send %d .. %d done", start, end)
+	log.Printf("sesm retransm %d .. %d done", start, end)
 	return
-}
-func (s *SesMServerConn) waitForMcast(startSeq int) {
-	waitSeq := startSeq + s.mcastDuringSesM
-	log.Printf("wait for mcast seq %d, current %d", waitSeq, s.src.CurrentSequence())
-	bmsc := s.src.NewClient()
-	defer bmsc.Close()
-	ch := bmsc.Chan()
-	for seq := s.src.CurrentSequence(); seq < waitSeq; seq = <-ch {
-	}
 }
 
 type miaxMcastServer struct {
@@ -196,8 +192,7 @@ type miaxMcastServer struct {
 	src   *miaxMessageSource
 
 	cancel chan struct{}
-	bmsc   *miaxMessageSourceClient
-	pw     miax.PacketWriter
+	mmsc   *miaxMessageSourceClient
 	conn   net.Conn
 }
 
@@ -217,16 +212,16 @@ func (s *miaxMcastServer) start() (err error) {
 	errs.CheckE(err)
 	s.conn, err = net.DialUDP("udp", laddr, raddr)
 	errs.CheckE(err)
-	bconn := miax.NewConn(s.conn)
-	s.pw = bconn.GetPacketWriterUnsync()
-	s.bmsc = s.src.NewClient()
+	//	mconn := miax.NewConn(s.conn)
+	s.mmsc = s.src.NewClient()
 	go s.run()
 	return
 }
 func (s *miaxMcastServer) run() {
+	var mb bytes.Buffer
 	defer s.conn.Close()
-	defer s.bmsc.Close()
-	ch := s.bmsc.Chan()
+	defer s.mmsc.Close()
+	ch := s.mmsc.Chan()
 
 	log.Printf("ready. source chan %v", ch)
 	for {
@@ -236,11 +231,10 @@ func (s *miaxMcastServer) run() {
 			return
 		case seq := <-ch:
 			log.Printf("mcast seq %d", seq)
-			m := s.src.GetMessage(seq)
-			s.pw.SyncStart()
-			errs.CheckE(s.pw.SetSequence(seq))
-			errs.CheckE(s.pw.WriteMessage(m))
-			errs.CheckE(s.pw.Flush())
+			msg := s.src.GetMessage(uint64(seq))
+			errs.CheckE(struc.Pack(&mb, &msg))
+			_, err := s.conn.Write(mb.Bytes())
+			errs.CheckE(err)
 		}
 	}
 }
@@ -257,72 +251,142 @@ func NewMiaxMessageSource() *miaxMessageSource {
 		cancel: make(chan struct{}),
 		bchan:  bchan.NewBchan(),
 		mps:    1,
-		curSeq: 1000000,
+		curSeq: 0,
 	}
 }
-func (bms *miaxMessageSource) Run() {
-	ticker := time.NewTicker(time.Duration(1000000000/bms.mps) * time.Nanosecond)
+func (mms *miaxMessageSource) Run() {
+	ticker := time.NewTicker(time.Duration(1000000000/mms.mps) * time.Nanosecond)
 	defer ticker.Stop()
-	defer bms.bchan.Close()
+	defer mms.bchan.Close()
 	for {
 		select {
-		case _, _ = <-bms.cancel:
+		case _, _ = <-mms.cancel:
 			return
 		case <-ticker.C:
-			bms.produceOne()
+			mms.produceOne()
 		}
 	}
 }
-func (bms *miaxMessageSource) RunInteractive() {
+func (mms *miaxMessageSource) RunInteractive() {
 	for {
 		fmt.Printf("enter source seq: ")
 		var seq int
 		_, err := fmt.Scan(&seq)
 		errs.CheckE(err)
-		bms.produce(seq)
+		mms.produce(seq)
 	}
 }
-func (bms *miaxMessageSource) publish(seq int) {
+func (mms *miaxMessageSource) publish(seq int) {
 	select {
-	case bms.bchan.ProducerChan() <- seq:
+	case mms.bchan.ProducerChan() <- seq:
 		log.Printf("publish source seq %d", seq)
 	default:
 	}
 }
-func (bms *miaxMessageSource) produceOne() {
-	seq := int(atomic.AddInt64(&bms.curSeq, int64(1)))
-	bms.publish(seq)
+func (mms *miaxMessageSource) produceOne() {
+	seq := int(atomic.AddInt64(&mms.curSeq, int64(1)))
+	mms.publish(seq)
 }
-func (bms *miaxMessageSource) produce(seq int) {
-	bms.SetSequence(seq)
-	bms.publish(seq)
+func (mms *miaxMessageSource) produce(seq int) {
+	mms.SetSequence(seq)
+	mms.publish(seq)
 }
-func (bms *miaxMessageSource) Stop() {
-	close(bms.cancel)
+func (mms *miaxMessageSource) Stop() {
+	close(mms.cancel)
 }
-func (bms *miaxMessageSource) SetSequence(seq int) {
-	atomic.StoreInt64(&bms.curSeq, int64(seq))
+func (mms *miaxMessageSource) SetSequence(seq int) {
+	atomic.StoreInt64(&mms.curSeq, int64(seq))
 }
-func (bms *miaxMessageSource) CurrentSequence() int {
-	return int(atomic.LoadInt64(&bms.curSeq))
+func (mms *miaxMessageSource) CurrentSequence() int {
+	return int(atomic.LoadInt64(&mms.curSeq))
 }
-func (bms *miaxMessageSource) NewClient() *miaxMessageSourceClient {
+func (mms *miaxMessageSource) NewClient() *miaxMessageSourceClient {
 	c := &miaxMessageSourceClient{
-		bc: bms.bchan.NewConsumer(),
+		bc: mms.bchan.NewConsumer(),
 		ch: make(chan int),
 	}
 	go c.run()
 	return c
 }
-func (bms *miaxMessageSource) GetMessage(seqNum int) miax.Message {
-	m := miax.MessageAddOrder{
-		TimeOffset: uint32(seqNum),
-		OrderId:    uint64(seqNum),
-		Price:      uint64(seqNum),
-		Side:       'B',
-		Quantity:   10,
+func (mms *miaxMessageSource) GetMessage(seqNum uint64) miax.MachMessage { //, mtype miax.SesMMessageType
+	var mtype miax.MachMessageType
+	if 0 == seqNum%2 {
+		mtype = 'B'
+	} else {
+		mtype = '0'
 	}
+	m := miax.MachToMWide{
+		Type:          mtype,                      //“B” = MIAX Top of Market on Bid side, “O” = MIAX Top of Market on Offer side
+		NanoTime:      uint32(seqNum),             //Nanoseconds part of the timestamp
+		ProductID:     uint32(seqNum),             //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+		MBBOPrice:     uint32(seqNum % 10 * 1000), //MIAX Best price at the time stated in Timestamp and side specified in Message Type
+		MBBOSize:      uint32(seqNum % 10),        //Aggregate size at MIAX Best Price at the time stated in Timestamp and side specified in Message Type
+		MBBOPriority:  uint32((seqNum % 10) / 2),  //Aggregate size of Priority Customer contracts at the MIAX Best Price
+		MBBOCondition: miax.ConditionRegular,
+	}
+	m.MachHeader.Sequence = seqNum
+	m.MachHeader.PackLength = 34
+	m.MachHeader.PackType = miax.TypeMachAppData
+	m.MachHeader.SessionNum = 0
 	return &m
+}
+
+func (mms *miaxMessageSource) generateApplicationMessage(RefreshType byte, seqNum int) []byte {
+	var bb bytes.Buffer
+	switch RefreshType {
+	case miax.SesMRefreshSeriesUpdate:
+		su1 := miax.MachSeriesUpdate{
+			Type:             'P',
+			NanoTime:         uint32(seqNum),                                  //Product Add/Update Time. Time at which this product is added/updated on MIAX system today.
+			ProductID:        uint32(seqNum),                                  //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+			UnderlyingSymbol: [11]byte{'q', 'w', 'e', 'r', 't', 'y'},          //Stock Symbol for the option
+			SecuritySymbol:   [6]byte{'q', 'w', 'e', 'r', 't', 'y'},           //Option Security Symbol
+			ExpirationDate:   [8]byte{'2', '0', '1', '5', '1', '2', '1', '2'}, //Expiration date of the option in YYYYMMDD format
+			StrikePrice:      uint32(seqNum % 10 * 1000),                      //Explicit strike price of the option. Refer to data types for field processing notes
+			CallPut:          'C',                                             //Option Type “C” = Call "P" = Put
+			OpeningTime:      [8]byte{'0', '9', ':', '3', '0', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 09:30:00
+			ClosingTime:      [8]byte{'1', '6', ':', '1', '5', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 16:15:00
+			RestrictedOption: 'Y',                                             //“Y” = MIAX will accept position closing orders only “N” = MIAX will accept open and close positions
+			LongTermOption:   'Y',                                             //“Y” = Far month expiration (as defined by MIAX rules) “N” = Near month expiration (as defined by MIAX rules)
+			Active:           'A',                                             //Indicates if this symbol is tradable on MIAX in the current session:“A” = Active “I” = Inactive (not tradable)
+			BBOIncrement:     'P',                                             //This is the Minimum Price Variation as agreed to by the Options industry (penny pilot program) and as published by MIAX
+			AcceptIncrement:  'P',
+		}
+		su1.MachHeader.Sequence = uint64(seqNum)
+		su1.MachHeader.PackLength = 72
+		su1.MachHeader.PackType = miax.TypeMachSeriesUpdate
+		su1.MachHeader.SessionNum = 0
+		errs.CheckE(struc.Pack(&bb, &su1))
+
+		su2 := miax.MachSeriesUpdate{
+			Type:             'P',
+			NanoTime:         uint32(seqNum),                                  //Product Add/Update Time. Time at which this product is added/updated on MIAX system today.
+			ProductID:        uint32(seqNum),                                  //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+			UnderlyingSymbol: [11]byte{'q', 'w', 'e', 'r', 't', 'y'},          //Stock Symbol for the option
+			SecuritySymbol:   [6]byte{'q', 'w', 'e', 'r', 't', 'y'},           //Option Security Symbol
+			ExpirationDate:   [8]byte{'2', '0', '1', '5', '1', '2', '1', '2'}, //Expiration date of the option in YYYYMMDD format
+			StrikePrice:      uint32(seqNum % 10 * 1000),                      //Explicit strike price of the option. Refer to data types for field processing notes
+			CallPut:          'P',                                             //Option Type “C” = Call "P" = Put
+			OpeningTime:      [8]byte{'0', '9', ':', '3', '0', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 09:30:00
+			ClosingTime:      [8]byte{'1', '6', ':', '1', '5', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 16:15:00
+			RestrictedOption: 'Y',                                             //“Y” = MIAX will accept position closing orders only “N” = MIAX will accept open and close positions
+			LongTermOption:   'Y',                                             //“Y” = Far month expiration (as defined by MIAX rules) “N” = Near month expiration (as defined by MIAX rules)
+			Active:           'A',                                             //Indicates if this symbol is tradable on MIAX in the current session:“A” = Active “I” = Inactive (not tradable)
+			BBOIncrement:     'P',                                             //This is the Minimum Price Variation as agreed to by the Options industry (penny pilot program) and as published by MIAX
+			AcceptIncrement:  'P',
+		}
+		su2.MachHeader.Sequence = uint64(seqNum)
+		su2.MachHeader.PackLength = 72
+		su2.MachHeader.PackType = miax.TypeMachSeriesUpdate
+		su2.MachHeader.SessionNum = 0
+		errs.CheckE(struc.Pack(&bb, &su2))
+	case miax.SesMRefreshToM:
+		tom1 := mms.GetMessage(uint64(seqNum))
+		errs.CheckE(struc.Pack(&bb, &tom1))
+		tom2 := mms.GetMessage(uint64(seqNum + 1))
+		errs.CheckE(struc.Pack(&bb, &tom2))
+	}
+	return bb.Bytes()
 }
 
 type miaxMessageSourceClient struct {
@@ -342,141 +406,4 @@ func (c *miaxMessageSourceClient) run() {
 }
 func (c *miaxMessageSourceClient) Close() {
 	c.bc.Close()
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-type MACHmcastPublisher struct {
-	laddr string
-	raddr string
-	seq   uint64
-	maxSeq   uint64
-	startSessionNum uint8
-	sessionNum uint8
-}
-
-func (s *MACHmcastPublisher) NewPublisher() {
-
-}
-
-func (s *MACHmcastPublisher) run() {
-	errs.Check(s.pps != 0)
-	laddr, err := net.ResolveUDPAddr("udp", s.laddr)
-	errs.CheckE(err)
-	raddr, err := net.ResolveUDPAddr("udp", s.raddr)
-	errs.CheckE(err)
-	conn, err := net.DialUDP("udp", laddr, raddr)
-	errs.CheckE(err)
-	if 0 == s.maxSeq {
-		s.maxSeq = 0xffffffff
-	}
-	s.SessionNum = s.startSessionNum
-	for {
-		s.seq = 0
-		start := MachMessageHeder {
-			Sequence: s.seq,
-			PackLength: MachPacketLength(TypeMachStartSession),
-			PackType: TypeMachStartSession,
-			SessionNum: s.sessionNum,
-		}
-		n, err := conn.Write(start)
-		errs.CheckE(err)
-		errs.Check(n == len(start), n, len(start))
-		for {
-			p, err := createHeartbeatsPacket(s.seq, s.sessionNum)
-			errs.CheckE(err)
-			log.Printf("send heartbeats: %v\n", p)
-			n, err := conn.Write(p)
-			errs.CheckE(err)
-			errs.Check(n == len(p), n, len(p))
-
-			delay := time.Duration(1000) * time.Millisecond
-			time.Sleep(delay)
-			if s.seq++ > s.maxSeq break;
-		}
-		end := MachMessageHeder {
-			Sequence: s.seq,
-			PackLength: MachPacketLength(TypeMachEndSession),
-			PackType: TypeMachEndSession,
-			SessionNum: s.sessionNum,
-		}
-		n, err := conn.Write(end)
-		errs.CheckE(err)
-		errs.Check(n == len(end), n, len(end))
-		s.sessionNum++
-	}
-	defer conn.Close()
-}
-
-func createHeartbeatsPacket(SeqNum, SessNum) (bs []byte, err error) {
-	defer errs.PassE(&err)
-	errs.Check(SeqNum >= 0)
-	hb := MachMessageHeder {
-		Sequence: SeqNum,
-		PackLength: MachPacketLength(TypeMachHeartbeat),
-		PackType: TypeMachHeartbeat,
-		SessionNum: SessNum,
-	}
-	var bb bytes.Buffer
-	errs.CheckE(struc.Pack(&bb, &hb))
-	bs = bb.Bytes()
-	return
-}
-
-
-type MACHmcastRetransmissionService struct {
-	pps int
-	c *conn
-}
-
-type SesMRetransmissionTCP struct {
-	laddr        string
-}
-
-func (s *SesMRetransmissionTCP) run() {
-	type moldudp64request struct {
-		Session        string
-		SequenceNumber uint64
-		MessageCount   uint16
-	}
-
-
-func (s *SesMRetransmissionTCP) run() {
-	l, err := net.Listen("tcp", s.laddr)
-	errs.CheckE(err)
-	defer l.Close()
-	for {
-		conn, err := l.Accept()
-		errs.CheckE(err)
-		log.Printf("accepted %s -> %s \n", conn.RemoteAddr(), conn.LocalAddr())
-		go s.handleClient(conn)
-	}
-}
-
-func (s *SesMRetransmissionTCP) handleClient(conn net.Conn) {
-	defer conn.Close()
-	m, err := miax.SesMReadMessage(conn)
-	errs.CheckE(err)
-	log.Printf("got %#v\n", m)
-	lr := m.(*miax.MessageLoginRequest)
-	errs.Check(lr != nil)
-
-	la := sbtcp.MessageLoginAccepted{
-		Session:        "00TestSess",
-		SequenceNumber: 1,
-	}
-	errs.CheckE(sbtcp.WriteMessage(conn, &la))
-	log.Printf("glimpse send: %v\n", la)
-
-	for i := 0; i < s.snapshotSeqNum; i++ {
-		s.sendSeqData(conn, generateIttoMessage(i))
-	}
-	snap := fmt.Sprintf("M%020d", s.snapshotSeqNum)
-	s.sendSeqData(conn, []byte(snap))
-}
-func (s *glimpseServer) sendSeqData(conn net.Conn, data []byte) {
-	sd := sbtcp.MessageSequencedData{}
-	sd.SetPayload(data)
-	errs.CheckE(sbtcp.WriteMessage(conn, &sd))
-	log.Printf("glimpse send: %v\n", sd)
 }
