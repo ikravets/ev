@@ -21,7 +21,7 @@ import (
 type MiaxMessageSource interface {
 	SetSequence(int)
 	CurrentSequence() int
-	GetMessage(uint64) miax.MachMessage
+	GetMessage(uint64) miax.MachPacket
 	Run()
 	RunInteractive()
 	Stop()
@@ -132,12 +132,9 @@ func (s *SesMServerConn) run() {
 			rf, ok := m.(*miax.SesMRefreshRequest)
 			errs.Check(ok)
 			errs.Check(rf.RefreshType == miax.SesMRefreshToM || rf.RefreshType == miax.SesMRefreshSeriesUpdate)
-			resp := miax.SesMRefreshResponse{
-				ResponseType:       'R',
-				SequenceNumber:     uint64(s.src.CurrentSequence()),
-				ApplicationMessage: s.src.generateApplicationMessage(rf.RefreshType, 5),
-			}
-			errs.CheckE(s.mconn.WriteMessageSimple(&resp))
+			// TODO send miax system time first! (ToM 1.8, 3.2.2.2 note)
+			errs.CheckE(s.mconn.WriteMachMessage(uint64(s.src.CurrentSequence())-1, s.src.generateRefreshResponse(rf.RefreshType, 5)))
+			errs.CheckE(s.mconn.WriteMachMessage(uint64(s.src.CurrentSequence()), s.src.generateRefreshResponse(rf.RefreshType, 6)))
 		}
 	}
 	log.Println("sesm finished")
@@ -165,7 +162,7 @@ func (s *SesMServerConn) sendHeartbeat(cancel <-chan struct{}) {
 	for {
 		select {
 		case _, _ = <-cancel:
-			log.Printf("image avail cancelled")
+			log.Printf("heartbeat cancelled")
 			return
 		case <-ticker.C:
 			seq := s.src.CurrentSequence()
@@ -178,9 +175,9 @@ func (s *SesMServerConn) sendHeartbeat(cancel <-chan struct{}) {
 func (s *SesMServerConn) sendAll(start, end uint64) (err error) {
 	defer errs.PassE(&err)
 	log.Printf("sesm start retransm %d .. %d", start, end)
-	for i := start; i < end; i++ {
+	for i := start; i <= end; i++ {
 		m := s.src.GetMessage(i)
-		errs.CheckE(s.mconn.WriteMessage(m))
+		errs.CheckE(s.mconn.WriteMachPacket(m))
 	}
 	log.Printf("sesm retransm %d .. %d done", start, end)
 	return
@@ -232,6 +229,7 @@ func (s *miaxMcastServer) run() {
 		case seq := <-ch:
 			log.Printf("mcast seq %d", seq)
 			msg := s.src.GetMessage(uint64(seq))
+			// FIXME this is big endian by default?
 			errs.CheckE(struc.Pack(&mb, &msg))
 			_, err := s.conn.Write(mb.Bytes())
 			errs.CheckE(err)
@@ -308,15 +306,8 @@ func (mms *miaxMessageSource) NewClient() *miaxMessageSourceClient {
 	go c.run()
 	return c
 }
-func (mms *miaxMessageSource) GetMessage(seqNum uint64) miax.MachMessage { //, mtype miax.SesMMessageType
-	var mtype miax.MachMessageType
-	if 0 == seqNum%2 {
-		mtype = 'B'
-	} else {
-		mtype = '0'
-	}
-	m := miax.MachToMWide{
-		Type:          mtype,                      //“B” = MIAX Top of Market on Bid side, “O” = MIAX Top of Market on Offer side
+func (mms *miaxMessageSource) GetMessage(seqNum uint64) miax.MachPacket { //, mtype miax.SesMMessageType
+	m := &miax.MachToMWide{
 		NanoTime:      uint32(seqNum),             //Nanoseconds part of the timestamp
 		ProductID:     uint32(seqNum),             //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
 		MBBOPrice:     uint32(seqNum % 10 * 1000), //MIAX Best price at the time stated in Timestamp and side specified in Message Type
@@ -324,25 +315,21 @@ func (mms *miaxMessageSource) GetMessage(seqNum uint64) miax.MachMessage { //, m
 		MBBOPriority:  uint32((seqNum % 10) / 2),  //Aggregate size of Priority Customer contracts at the MIAX Best Price
 		MBBOCondition: miax.ConditionRegular,
 	}
-	m.MachHeader.Sequence = seqNum
-	m.MachHeader.PackLength = 34
-	m.MachHeader.PackType = miax.TypeMachAppData
-	m.MachHeader.SessionNum = 0
-	return &m
+	m.Type = miax.MachMessageType('A' + ('W'-'A')*(byte(seqNum%2)))
+	return miax.MakeMachPacket(seqNum, m)
 }
 
-func (mms *miaxMessageSource) generateApplicationMessage(RefreshType byte, seqNum int) []byte {
-	var bb bytes.Buffer
+func (mms *miaxMessageSource) generateRefreshResponse(RefreshType byte, seqNum int) (m miax.MachMessage) {
+	u32, u16 := uint32(seqNum), uint16(seqNum)
 	switch RefreshType {
 	case miax.SesMRefreshSeriesUpdate:
-		su1 := miax.MachSeriesUpdate{
-			Type:             'P',
-			NanoTime:         uint32(seqNum),                                  //Product Add/Update Time. Time at which this product is added/updated on MIAX system today.
-			ProductID:        uint32(seqNum),                                  //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+		m = &miax.MachSeriesUpdate{
+			NanoTime:         u32,                                             //Product Add/Update Time. Time at which this product is added/updated on MIAX system today.
+			ProductID:        u32,                                             //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
 			UnderlyingSymbol: [11]byte{'q', 'w', 'e', 'r', 't', 'y'},          //Stock Symbol for the option
 			SecuritySymbol:   [6]byte{'q', 'w', 'e', 'r', 't', 'y'},           //Option Security Symbol
 			ExpirationDate:   [8]byte{'2', '0', '1', '5', '1', '2', '1', '2'}, //Expiration date of the option in YYYYMMDD format
-			StrikePrice:      uint32(seqNum % 10 * 1000),                      //Explicit strike price of the option. Refer to data types for field processing notes
+			StrikePrice:      u32 % 10 * 1000,                                 //Explicit strike price of the option. Refer to data types for field processing notes
 			CallPut:          'C',                                             //Option Type “C” = Call "P" = Put
 			OpeningTime:      [8]byte{'0', '9', ':', '3', '0', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 09:30:00
 			ClosingTime:      [8]byte{'1', '6', ':', '1', '5', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 16:15:00
@@ -352,41 +339,30 @@ func (mms *miaxMessageSource) generateApplicationMessage(RefreshType byte, seqNu
 			BBOIncrement:     'P',                                             //This is the Minimum Price Variation as agreed to by the Options industry (penny pilot program) and as published by MIAX
 			AcceptIncrement:  'P',
 		}
-		su1.MachHeader.Sequence = uint64(seqNum)
-		su1.MachHeader.PackLength = 72
-		su1.MachHeader.PackType = miax.TypeMachSeriesUpdate
-		su1.MachHeader.SessionNum = 0
-		errs.CheckE(struc.Pack(&bb, &su1))
-
-		su2 := miax.MachSeriesUpdate{
-			Type:             'P',
-			NanoTime:         uint32(seqNum),                                  //Product Add/Update Time. Time at which this product is added/updated on MIAX system today.
-			ProductID:        uint32(seqNum),                                  //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-			UnderlyingSymbol: [11]byte{'q', 'w', 'e', 'r', 't', 'y'},          //Stock Symbol for the option
-			SecuritySymbol:   [6]byte{'q', 'w', 'e', 'r', 't', 'y'},           //Option Security Symbol
-			ExpirationDate:   [8]byte{'2', '0', '1', '5', '1', '2', '1', '2'}, //Expiration date of the option in YYYYMMDD format
-			StrikePrice:      uint32(seqNum % 10 * 1000),                      //Explicit strike price of the option. Refer to data types for field processing notes
-			CallPut:          'P',                                             //Option Type “C” = Call "P" = Put
-			OpeningTime:      [8]byte{'0', '9', ':', '3', '0', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 09:30:00
-			ClosingTime:      [8]byte{'1', '6', ':', '1', '5', ':', '0', '0'}, //Expressed in HH:MM:SS format. Eg: 16:15:00
-			RestrictedOption: 'Y',                                             //“Y” = MIAX will accept position closing orders only “N” = MIAX will accept open and close positions
-			LongTermOption:   'Y',                                             //“Y” = Far month expiration (as defined by MIAX rules) “N” = Near month expiration (as defined by MIAX rules)
-			Active:           'A',                                             //Indicates if this symbol is tradable on MIAX in the current session:“A” = Active “I” = Inactive (not tradable)
-			BBOIncrement:     'P',                                             //This is the Minimum Price Variation as agreed to by the Options industry (penny pilot program) and as published by MIAX
-			AcceptIncrement:  'P',
-		}
-		su2.MachHeader.Sequence = uint64(seqNum)
-		su2.MachHeader.PackLength = 72
-		su2.MachHeader.PackType = miax.TypeMachSeriesUpdate
-		su2.MachHeader.SessionNum = 0
-		errs.CheckE(struc.Pack(&bb, &su2))
 	case miax.SesMRefreshToM:
-		tom1 := mms.GetMessage(uint64(seqNum))
-		errs.CheckE(struc.Pack(&bb, &tom1))
-		tom2 := mms.GetMessage(uint64(seqNum + 1))
-		errs.CheckE(struc.Pack(&bb, &tom2))
+		m = &miax.MachDoubleSidedToMCompact{
+			NanoTime:   u32,
+			ProductID:  u32,
+			BidPrice:   u16,
+			BidSize:    u16,
+			OfferPrice: u16,
+			OfferSize:  u16,
+		}
+		if 0 == seqNum%2 {
+			m = &miax.MachDoubleSidedToMWide{
+				NanoTime:   u32,
+				ProductID:  u32,
+				BidPrice:   u32,
+				BidSize:    u32,
+				OfferPrice: u32,
+				OfferSize:  u32,
+			}
+		}
+	default:
+		errs.Check(false)
 	}
-	return bb.Bytes()
+	m.SetType(m.GetType())
+	return
 }
 
 type miaxMessageSourceClient struct {

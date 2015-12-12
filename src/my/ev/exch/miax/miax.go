@@ -4,7 +4,6 @@
 package miax
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"log"
@@ -15,22 +14,17 @@ import (
 type Conn interface {
 	ReadMessage() (m SesMMessage, err error)
 	WriteMessageSimple(m SesMMessage) (err error)
-	WriteMessage(m MachMessage) (err error)
+	WriteMachMessage(sn uint64, m MachMessage) (err error)
+	WriteMachPacket(p MachPacket) (err error)
 }
 
 type conn struct {
 	rw            io.ReadWriter
 	messageReader io.LimitedReader
-	rbuf          bytes.Buffer
-	nextSeqNum    uint32
-	mt            SesMMessageType
-	mb            bytes.Buffer
 }
 
 func NewConn(rw io.ReadWriter) Conn {
-	return &conn{
-		rw: rw,
-	}
+	return &conn{rw: rw}
 }
 
 func (c *conn) readSize() (err error) {
@@ -64,10 +58,22 @@ func (c *conn) ReadMessage() (m SesMMessage, err error) {
 	return
 }
 func (c *conn) WriteMessageSimple(m SesMMessage) (err error) {
-	return binary.Write(c.rw, binary.LittleEndian, struct {
-		h   SesMHeader
-		msg SesMMessage
-	}{h: SesMHeader{Length: 0, Type: m.Type()}, msg: m})
+	return binary.Write(c.rw, binary.LittleEndian, SesMPacket{h: SesMHeader{Length: m.Size() + 1, Type: m.Type()}, m: m})
+}
+
+func (c *conn) WriteMachPacket(p MachPacket) (err error) {
+	sm := &SesMRetransmResponse{ApplicationMessage: p}
+	sm.Sequence = p.h.Sequence
+	return c.WriteMessageSimple(sm)
+}
+
+func (c *conn) WriteMachMessage(sn uint64, m MachMessage) (err error) {
+	um := &SesMRefreshResponse{
+		ResponseType:       'R',
+		SequenceNumber:     sn,
+		ApplicationMessage: m,
+	}
+	return c.WriteMessageSimple(um)
 }
 
 const (
@@ -110,8 +116,29 @@ func (_ *SesMEndOfSession) Type() SesMMessageType    { return TypeSesMEndOfSessi
 func (_ *SesMServerHeartbeat) Type() SesMMessageType { return TypeSesMServerHeartbeat }
 func (_ *SesMClientHeartbeat) Type() SesMMessageType { return TypeSesMClientHeartbeat }
 
+func (m *SesMMessageCommon) Size() uint16    { return 0 }
+func (m *SesMSeq) Size() uint16              { return 0 }
+func (m *SesMUnseq) Size() uint16            { return 0 }
+func (m *SesMLoginRequest) Size() uint16     { return 35 }
+func (m *SesMLoginResponse) Size() uint16    { return 10 }
+func (m *SesMSynchrComplete) Size() uint16   { return 0 }
+func (m *SesMRetransmRequest) Size() uint16  { return 16 }
+func (m *SesMGoodBye) Size() uint16          { return 1 }
+func (m *SesMEndOfSession) Size() uint16     { return 0 }
+func (m *SesMServerHeartbeat) Size() uint16  { return 0 }
+func (m *SesMClientHeartbeat) Size() uint16  { return 0 }
+func (m *SesMRefreshResponse) Size() uint16  { return 9 + m.ApplicationMessage.Size() }
+func (m *SesMEndRefreshNotif) Size() uint16  { return 2 }
+func (m *SesMRetransmResponse) Size() uint16 { return 8 + m.ApplicationMessage.h.PackLength }
+
+type SesMPacket struct {
+	h SesMHeader
+	m SesMMessage
+}
+
 type SesMMessage interface {
 	Type() SesMMessageType
+	Size() uint16
 }
 
 type SesMMessageType byte
@@ -189,7 +216,7 @@ const (
 type SesMGoodBye struct {
 	SesMMessageCommon // Type G
 	Reason            byte
-	Text              []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
+	//	Text              []byte // Free form human readable text to provide more details beyond the reasons mentioned above.
 }
 
 const (
@@ -232,7 +259,7 @@ type SesMRefreshResponse struct {
 	SesMUnseq
 	ResponseType       byte //“R” – TOM Refresh
 	SequenceNumber     uint64
-	ApplicationMessage []byte //Based on the message type requested.
+	ApplicationMessage MachMessage //Based on the message type requested.
 }
 
 type SesMEndRefreshNotif struct {
@@ -241,44 +268,64 @@ type SesMEndRefreshNotif struct {
 	RefreshType  byte //from Refresh Request
 }
 
+type SesMRetransmResponse struct {
+	SesMSeq
+	ApplicationMessage MachPacket
+}
+
 type MachMessageType byte
 
 const (
-	TypeMachMessageCommon MachMessageType = 0
-	TypeMachSystemTime    MachMessageType = '1'
-	TypeMachToMWide       MachMessageType = 'W'
-	TypeMachSeriesUpdate  MachMessageType = 'P'
+	TypeMachMessageCommon         MachMessageType = 0
+	TypeMachSystemTime            MachMessageType = '1'
+	TypeMachToMWide               MachMessageType = 'W'
+	TypeMachSeriesUpdate          MachMessageType = 'P'
+	TypeMachDoubleSidedToMCompact MachMessageType = 'd'
+	TypeMachDoubleSidedToMWide    MachMessageType = 'D'
 )
 
-var MachMessageFactory = [256]func() MachMessage{
-	TypeMachMessageCommon: func() MachMessage { return &MachMessageCommon{} },
-	TypeMachSystemTime:    func() MachMessage { return &MachSystemTime{} },
-	TypeMachToMWide:       func() MachMessage { return &MachToMWide{} },
-	TypeMachSeriesUpdate:  func() MachMessage { return &MachSeriesUpdate{} },
-}
+func (_ *MachMessageCommon) GetType() MachMessageType         { return TypeMachMessageCommon }
+func (_ *MachSystemTime) GetType() MachMessageType            { return TypeMachSystemTime }
+func (_ *MachToMWide) GetType() MachMessageType               { return TypeMachToMWide }
+func (_ *MachSeriesUpdate) GetType() MachMessageType          { return TypeMachSeriesUpdate }
+func (_ *MachDoubleSidedToMCompact) GetType() MachMessageType { return TypeMachDoubleSidedToMCompact }
+func (_ *MachDoubleSidedToMWide) GetType() MachMessageType    { return TypeMachDoubleSidedToMWide }
 
-func (_ *MachMessageCommon) Types() MachMessageType { return TypeMachMessageCommon }
-func (_ *MachSystemTime) Types() MachMessageType    { return TypeMachSystemTime }
-func (_ *MachToMWide) Types() MachMessageType       { return TypeMachToMWide }
-func (_ *MachSeriesUpdate) Types() MachMessageType  { return TypeMachSeriesUpdate }
+func (m *MachMessageCommon) Size() uint16         { return 0 }
+func (m *MachSystemTime) Size() uint16            { return 5 }
+func (m *MachToMWide) Size() uint16               { return 22 }
+func (m *MachSeriesUpdate) Size() uint16          { return 73 }
+func (m *MachDoubleSidedToMCompact) Size() uint16 { return 23 }
+func (m *MachDoubleSidedToMWide) Size() uint16    { return 35 }
+
+type MachPacket struct {
+	h MachMessageHeader
+	m MachMessage
+}
 
 type MachMessage interface {
-	Types() MachMessageType
+	GetType() MachMessageType
+	SetType(MachMessageType)
+	Size() uint16
 }
 
-type MachMessageHeder struct {
+func MakeMachPacket(sn uint64, m MachMessage) (p MachPacket) {
+	p.h = MachMessageHeader{
+		Sequence:   sn,
+		PackLength: 12 + m.Size(),
+		PackType:   TypeMachAppData,
+		SessionNum: 0,
+	}
+	p.m = m
+	return
+}
+
+// retransmission and multicast services have this attached, refresh service DOES NOT attach this
+type MachMessageHeader struct {
 	Sequence   uint64
 	PackLength uint16
-	PackType   MachMessageType
+	PackType   uint8
 	SessionNum uint8
-}
-
-type MachMessageCommon struct {
-	MachHeader MachMessageHeder
-}
-
-func (c *conn) WriteMessage(m MachMessage) (err error) {
-	return binary.Write(c.rw, binary.LittleEndian, m)
 }
 
 const (
@@ -288,35 +335,35 @@ const (
 	TypeMachAppData      = 0x03
 )
 
-func (m *MachMessageCommon) write() []byte {
-	var b bytes.Buffer
-	binary.Write(&b, binary.LittleEndian, m)
-	return b.Bytes()
+type MachMessageCommon struct {
+	Type MachMessageType
+}
+
+func (m *MachMessageCommon) SetType(t MachMessageType) {
+	m.Type = t
 }
 
 type MachSystemTime struct {
-	MachMessageCommon
-	Type      MachMessageType //“1”
-	TimeStamp uint32          //Seconds part of the time
+	MachMessageCommon        //“1”
+	TimeStamp         uint32 //Seconds part of the time
 }
 
 type MachSeriesUpdate struct {
-	MachMessageCommon
-	Type             MachMessageType //“P”
-	NanoTime         uint32          //Product Add/Update Time. Time at which this product is added/updated on MIAX system today.
-	ProductID        uint32          //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-	UnderlyingSymbol [11]byte        //Stock Symbol for the option
-	SecuritySymbol   [6]byte         //Option Security Symbol
-	ExpirationDate   [8]byte         //Expiration date of the option in YYYYMMDD format
-	StrikePrice      uint32          //Explicit strike price of the option. Refer to data types for field processing notes
-	CallPut          byte            //Option Type “C” = Call "P" = Put
-	OpeningTime      [8]byte         //Expressed in HH:MM:SS format. Eg: 09:30:00
-	ClosingTime      [8]byte         //Expressed in HH:MM:SS format. Eg: 16:15:00
-	RestrictedOption byte            //“Y” = MIAX will accept position closing orders only “N” = MIAX will accept open and close positions
-	LongTermOption   byte            //“Y” = Far month expiration (as defined by MIAX rules) “N” = Near month expiration (as defined by MIAX rules)
-	Active           byte            //Indicates if this symbol is tradable on MIAX in the current session:“A” = Active “I” = Inactive (not tradable) on MIAX
-	BBOIncrement     byte            //This is the Minimum Price Variation as agreed to by the Options industry (penny pilot program) and as published by MIAX
-	AcceptIncrement  byte            //This is the Minimum Price Variation for Quote/Order acceptance as per MIAX rules
+	MachMessageCommon          //“P”
+	NanoTime          uint32   //Product Add/Update Time. Time at which this product is added/updated on MIAX system today.
+	ProductID         uint32   //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+	UnderlyingSymbol  [11]byte //Stock Symbol for the option
+	SecuritySymbol    [6]byte  //Option Security Symbol
+	ExpirationDate    [8]byte  //Expiration date of the option in YYYYMMDD format
+	StrikePrice       uint32   //Explicit strike price of the option. Refer to data types for field processing notes
+	CallPut           byte     //Option Type “C” = Call "P" = Put
+	OpeningTime       [8]byte  //Expressed in HH:MM:SS format. Eg: 09:30:00
+	ClosingTime       [8]byte  //Expressed in HH:MM:SS format. Eg: 16:15:00
+	RestrictedOption  byte     //“Y” = MIAX will accept position closing orders only “N” = MIAX will accept open and close positions
+	LongTermOption    byte     //“Y” = Far month expiration (as defined by MIAX rules) “N” = Near month expiration (as defined by MIAX rules)
+	Active            byte     //Indicates if this symbol is tradable on MIAX in the current session:“A” = Active “I” = Inactive (not tradable) on MIAX
+	BBOIncrement      byte     //This is the Minimum Price Variation as agreed to by the Options industry (penny pilot program) and as published by MIAX
+	AcceptIncrement   byte     //This is the Minimum Price Variation for Quote/Order acceptance as per MIAX rules
 	//|---Price <= $3---|-- Price > $3
 	//|-----------------|---------------
 	//|“P” Penny (0.01)-|- Penny (0.01)
@@ -326,12 +373,11 @@ type MachSeriesUpdate struct {
 }
 
 type MachSystemState struct {
-	MachMessageCommon
-	Type         MachMessageType //“S”
-	NanoTime     uint32
-	ToMVersion   [8]byte //Eg: ToM01.01
-	SessionID    uint32
-	SystemStatus byte
+	MachMessageCommon //“S”
+	NanoTime          uint32
+	ToMVersion        [8]byte //Eg: ToM01.01
+	SessionID         uint32
+	SystemStatus      byte
 }
 
 const (
@@ -342,14 +388,13 @@ const (
 )
 
 type MachToMCompact struct {
-	MachMessageCommon
-	Type          MachMessageType //“B” = MIAX Top of Market on Bid side, “O” = MIAX Top of Market on Offer side
-	NanoTime      uint32          //Nanoseconds part of the timestamp
-	ProductID     uint32          //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-	MBBOPrice     uint16          //MIAX Best price at the time stated in Timestamp and side specified in Message Type
-	MBBOSize      uint16          //Aggregate size at MIAX Best Price at the time stated in Timestamp and side specified in Message Type
-	MBBOPriority  uint16          //Aggregate size of Priority Customer contracts at the MIAX Best Price
-	MBBOCondition byte
+	MachMessageCommon        //“B” = MIAX Top of Market on Bid side, “O” = MIAX Top of Market on Offer side
+	NanoTime          uint32 //Nanoseconds part of the timestamp
+	ProductID         uint32 //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+	MBBOPrice         uint16 //MIAX Best price at the time stated in Timestamp and side specified in Message Type
+	MBBOSize          uint16 //Aggregate size at MIAX Best Price at the time stated in Timestamp and side specified in Message Type
+	MBBOPriority      uint16 //Aggregate size of Priority Customer contracts at the MIAX Best Price
+	MBBOCondition     byte
 }
 
 const (
@@ -361,67 +406,62 @@ const (
 )
 
 type MachToMWide struct {
-	MachMessageCommon
-	Type          MachMessageType //“W” = MIAX Top of Market on Bid side, “A” = MIAX Top of Market on Offer side
-	NanoTime      uint32          //Nanoseconds part of the timestamp
-	ProductID     uint32          //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-	MBBOPrice     uint32          //MIAX Best price at the time stated in Timestamp and side specified in Message Type
-	MBBOSize      uint32          //Aggregate size at MIAX Best Price at the time stated in Timestamp and side specified in Message Type
-	MBBOPriority  uint32          //Aggregate size of Priority Customer contracts at the MIAX Best Price
-	MBBOCondition byte
+	MachMessageCommon        //“W” = MIAX Top of Market on Bid side, “A” = MIAX Top of Market on Offer side
+	NanoTime          uint32 //Nanoseconds part of the timestamp
+	ProductID         uint32 //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+	MBBOPrice         uint32 //MIAX Best price at the time stated in Timestamp and side specified in Message Type
+	MBBOSize          uint32 //Aggregate size at MIAX Best Price at the time stated in Timestamp and side specified in Message Type
+	MBBOPriority      uint32 //Aggregate size of Priority Customer contracts at the MIAX Best Price
+	MBBOCondition     byte
 }
 
 type MachDoubleSidedToMCompact struct {
-	MachMessageCommon
-	Type           MachMessageType //“d”
-	NanoTime       uint32          //Nanoseconds part of the timestamp
-	ProductID      uint32          //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-	BidPrice       uint16          //MIAX Best Bid price at the time stated in Timestamp and side specified in Message Type
-	BidSize        uint16          //Aggregate size at MIAX Best Bid Price at the time stated in Timestamp and side specified in Message Type
-	BidPriority    uint16          //Aggregate size of Priority Customer contracts at the MIAX Best Bid Price
-	BidCondition   byte
-	OfferPrice     uint16 //MIAX Best Offer price at the time stated in Timestamp and side specified in Message Type
-	OfferSize      uint16 //Aggregate size at MIAX Best Offer Price at the time stated in Timestamp and side specified in Message Type
-	OfferPriority  uint16 //Aggregate size of Priority Customer contracts at the MIAX Best Offer Price
-	OfferCondition byte
+	MachMessageCommon        //“d”
+	NanoTime          uint32 //Nanoseconds part of the timestamp
+	ProductID         uint32 //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+	BidPrice          uint16 //MIAX Best Bid price at the time stated in Timestamp and side specified in Message Type
+	BidSize           uint16 //Aggregate size at MIAX Best Bid Price at the time stated in Timestamp and side specified in Message Type
+	BidPriority       uint16 //Aggregate size of Priority Customer contracts at the MIAX Best Bid Price
+	BidCondition      byte
+	OfferPrice        uint16 //MIAX Best Offer price at the time stated in Timestamp and side specified in Message Type
+	OfferSize         uint16 //Aggregate size at MIAX Best Offer Price at the time stated in Timestamp and side specified in Message Type
+	OfferPriority     uint16 //Aggregate size of Priority Customer contracts at the MIAX Best Offer Price
+	OfferCondition    byte
 }
 
 type MachDoubleSidedToMWide struct {
-	MachMessageCommon
-	Type           MachMessageType //“D”
-	NanoTime       uint32          //Nanoseconds part of the timestamp
-	ProductID      uint32          //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-	BidPrice       uint32          //MIAX Best Bid price at the time stated in Timestamp and side specified in Message Type
-	BidSize        uint32          //Aggregate size at MIAX Best Bid Price at the time stated in Timestamp and side specified in Message Type
-	BidPriority    uint32          //Aggregate size of Priority Customer contracts at the MIAX Best Bid Price
-	BidCondition   byte
-	OfferPrice     uint32 //MIAX Best Offer price at the time stated in Timestamp and side specified in Message Type
-	OfferSize      uint32 //Aggregate size at MIAX Best Offer Price at the time stated in Timestamp and side specified in Message Type
-	OfferPriority  uint32 //Aggregate size of Priority Customer contracts at the MIAX Best Offer Price
-	OfferCondition byte
+	MachMessageCommon        //“D”
+	NanoTime          uint32 //Nanoseconds part of the timestamp
+	ProductID         uint32 //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+	BidPrice          uint32 //MIAX Best Bid price at the time stated in Timestamp and side specified in Message Type
+	BidSize           uint32 //Aggregate size at MIAX Best Bid Price at the time stated in Timestamp and side specified in Message Type
+	BidPriority       uint32 //Aggregate size of Priority Customer contracts at the MIAX Best Bid Price
+	BidCondition      byte
+	OfferPrice        uint32 //MIAX Best Offer price at the time stated in Timestamp and side specified in Message Type
+	OfferSize         uint32 //Aggregate size at MIAX Best Offer Price at the time stated in Timestamp and side specified in Message Type
+	OfferPriority     uint32 //Aggregate size of Priority Customer contracts at the MIAX Best Offer Price
+	OfferCondition    byte
 }
 
 type MachLastSale struct {
-	MachMessageCommon
-	Type           MachMessageType //“T”
-	NanoTime       uint32          //Nanoseconds part of the timestamp
-	ProductID      uint32          //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-	TradeID        uint32          //Unique Trade ID assigned to every Trade
-	CorrNumber     uint8           // Trade correction number. 0 for New trades. Greater than or equal to 0 for trades resulting from corrections/adjustments.
-	RefTradeID     uint32          //0 (zero) if new trade. Trade ID of the original trade if this trade originated as a correction of the original trade.
-	RefCorrNumber  uint8           //Correction Number of the trade that was just corrected/adjusted. 0 for new trades.
-	TradePrice     uint32          //Price at which this product traded
-	TradeSize      uint32          //Number of contracts executed in this trade
-	TradeCondition byte
+	MachMessageCommon        //“T”
+	NanoTime          uint32 //Nanoseconds part of the timestamp
+	ProductID         uint32 //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+	TradeID           uint32 //Unique Trade ID assigned to every Trade
+	CorrNumber        uint8  // Trade correction number. 0 for New trades. Greater than or equal to 0 for trades resulting from corrections/adjustments.
+	RefTradeID        uint32 //0 (zero) if new trade. Trade ID of the original trade if this trade originated as a correction of the original trade.
+	RefCorrNumber     uint8  //Correction Number of the trade that was just corrected/adjusted. 0 for new trades.
+	TradePrice        uint32 //Price at which this product traded
+	TradeSize         uint32 //Number of contracts executed in this trade
+	TradeCondition    byte
 }
 
 type MachTradeCancel struct {
-	MachMessageCommon
-	Type       MachMessageType //“X”
-	NanoTime   uint32          //Nanoseconds part of the timestamp
-	ProductID  uint32          //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
-	TradeID    uint32          //Trade ID of the Canceled Trade
-	CorrNumber uint8           //Trade correction number of the trade being canceled. 0 for New trades being canceled.
+	MachMessageCommon        //“X”
+	NanoTime          uint32 //Nanoseconds part of the timestamp
+	ProductID         uint32 //MIAX Product ID mapped to a given option. It is assigned per trading session and is valid for that session.
+	TradeID           uint32 //Trade ID of the Canceled Trade
+	CorrNumber        uint8  //Trade correction number of the trade being canceled. 0 for New trades being canceled.
 	// >=0 if this is cancel of a trade that resulted from corrections/adjustments.
 	TradePrice     uint32 //Trade price of the Canceled Trade
 	TradeSize      uint32 //Trade volume of the Canceled Trade
@@ -446,11 +486,10 @@ const (
 )
 
 type MachUnderlyingTdStatusNotif struct {
-	MachMessageCommon
-	Type             MachMessageType //“H”
-	NanoTime         uint32          //Nanoseconds part of the timestamp
-	UnderlyingSymbol [11]byte        //Underlying Symbol
-	TradingStatus    byte            //“H” = MIAX has halted trading for this Underlying Symbol
+	MachMessageCommon          //“H”
+	NanoTime          uint32   //Nanoseconds part of the timestamp
+	UnderlyingSymbol  [11]byte //Underlying Symbol
+	TradingStatus     byte     //“H” = MIAX has halted trading for this Underlying Symbol
 	//“R” = MIAX will resume trading (reopen) for this Underlying Symbol
 	//“O” = MIAX will open trading for this Underlying Symbol
 	EventReason          byte   //“A” = This event resulted from automatic/market driven event “M” = MIAX manually initiated this event
