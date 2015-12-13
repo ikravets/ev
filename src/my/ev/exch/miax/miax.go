@@ -4,6 +4,7 @@
 package miax
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"log"
@@ -57,23 +58,48 @@ func (c *conn) ReadMessage() (m SesMMessage, err error) {
 	log.Printf("rcv %#v\n", m)
 	return
 }
+func writeSesMHeader(w io.Writer, m SesMMessage) error {
+	return binary.Write(w, binary.LittleEndian, SesMHeader{Length: m.Size() + 1, Type: m.Type()})
+}
 func (c *conn) WriteMessageSimple(m SesMMessage) (err error) {
-	return binary.Write(c.rw, binary.LittleEndian, SesMPacket{h: SesMHeader{Length: m.Size() + 1, Type: m.Type()}, m: m})
+	defer errs.PassE(&err)
+	var b bytes.Buffer
+	errs.CheckE(writeSesMHeader(&b, m))
+	errs.CheckE(binary.Write(&b, binary.LittleEndian, m))
+	_, err = c.rw.Write(b.Bytes())
+	return
 }
 
 func (c *conn) WriteMachPacket(p MachPacket) (err error) {
-	sm := &SesMRetransmResponse{ApplicationMessage: p}
+	defer errs.PassE(&err)
+	var b, res bytes.Buffer
+	errs.CheckE(binary.Write(&b, binary.LittleEndian, p))
+
+	sm := &SesMRetransmResponse{ApplicationMessage: b.Bytes()}
 	sm.Sequence = p.h.Sequence
-	return c.WriteMessageSimple(sm)
+	writeSesMHeader(&res, sm)
+	errs.CheckE(binary.Write(&res, binary.LittleEndian, sm.Sequence))
+	errs.CheckE(binary.Write(&res, binary.LittleEndian, sm.ApplicationMessage))
+	_, err = c.rw.Write(res.Bytes())
+	return
 }
 
 func (c *conn) WriteMachMessage(sn uint64, m MachMessage) (err error) {
+	defer errs.PassE(&err)
+	var b, res bytes.Buffer
+	errs.CheckE(binary.Write(&b, binary.LittleEndian, m))
+
 	um := &SesMRefreshResponse{
 		ResponseType:       'R',
 		SequenceNumber:     sn,
-		ApplicationMessage: m,
+		ApplicationMessage: b.Bytes(),
 	}
-	return c.WriteMessageSimple(um)
+	writeSesMHeader(&res, um)
+	errs.CheckE(binary.Write(&res, binary.LittleEndian, um.ResponseType))
+	errs.CheckE(binary.Write(&res, binary.LittleEndian, um.SequenceNumber))
+	errs.CheckE(binary.Write(&res, binary.LittleEndian, um.ApplicationMessage))
+	_, err = c.rw.Write(res.Bytes())
+	return
 }
 
 const (
@@ -127,9 +153,9 @@ func (m *SesMGoodBye) Size() uint16          { return 1 }
 func (m *SesMEndOfSession) Size() uint16     { return 0 }
 func (m *SesMServerHeartbeat) Size() uint16  { return 0 }
 func (m *SesMClientHeartbeat) Size() uint16  { return 0 }
-func (m *SesMRefreshResponse) Size() uint16  { return 9 + m.ApplicationMessage.Size() }
+func (m *SesMRefreshResponse) Size() uint16  { return uint16(9 + len(m.ApplicationMessage)) }
 func (m *SesMEndRefreshNotif) Size() uint16  { return 2 }
-func (m *SesMRetransmResponse) Size() uint16 { return 8 + m.ApplicationMessage.h.PackLength }
+func (m *SesMRetransmResponse) Size() uint16 { return uint16(8 + len(m.ApplicationMessage)) }
 
 type SesMPacket struct {
 	h SesMHeader
@@ -259,7 +285,7 @@ type SesMRefreshResponse struct {
 	SesMUnseq
 	ResponseType       byte //“R” – TOM Refresh
 	SequenceNumber     uint64
-	ApplicationMessage MachMessage //Based on the message type requested.
+	ApplicationMessage []byte //Based on the message type requested.
 }
 
 type SesMEndRefreshNotif struct {
@@ -270,7 +296,7 @@ type SesMEndRefreshNotif struct {
 
 type SesMRetransmResponse struct {
 	SesMSeq
-	ApplicationMessage MachPacket
+	ApplicationMessage []byte
 }
 
 type MachMessageType byte
@@ -301,6 +327,16 @@ func (m *MachDoubleSidedToMWide) Size() uint16    { return 35 }
 type MachPacket struct {
 	h MachMessageHeader
 	m MachMessage
+}
+
+func (p MachPacket) Write(w io.Writer) (err error) {
+	defer errs.PassE(&err)
+	var b bytes.Buffer
+	errs.CheckE(binary.Write(&b, binary.LittleEndian, p.h))
+	errs.CheckE(binary.Write(&b, binary.LittleEndian, p.m))
+	_, err = w.Write(b.Bytes())
+	errs.CheckE(err)
+	return
 }
 
 type MachMessage interface {

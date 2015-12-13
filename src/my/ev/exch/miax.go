@@ -4,7 +4,6 @@
 package exch
 
 import (
-	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -231,7 +230,7 @@ func (s *miaxMcastServer) run() {
 		case seq := <-ch:
 			log.Printf("mcast seq %d", seq)
 			msg := s.src.GetMessage(uint64(seq))
-			errs.CheckE(binary.Write(s.conn, binary.LittleEndian, msg))
+			errs.CheckE(msg.Write(s.conn))
 		}
 	}
 }
