@@ -4,7 +4,7 @@
 package exch
 
 import (
-	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ikravets/errs"
-	"github.com/lunixbochs/struc"
 
 	"my/ev/bchan"
 	"my/ev/exch/miax"
@@ -132,9 +131,13 @@ func (s *SesMServerConn) run() {
 			rf, ok := m.(*miax.SesMRefreshRequest)
 			errs.Check(ok)
 			errs.Check(rf.RefreshType == miax.SesMRefreshToM || rf.RefreshType == miax.SesMRefreshSeriesUpdate)
-			// TODO send miax system time first! (ToM 1.8, 3.2.2.2 note)
-			errs.CheckE(s.mconn.WriteMachMessage(uint64(s.src.CurrentSequence())-1, s.src.generateRefreshResponse(rf.RefreshType, 5)))
-			errs.CheckE(s.mconn.WriteMachMessage(uint64(s.src.CurrentSequence()), s.src.generateRefreshResponse(rf.RefreshType, 6)))
+			// send miax system time first! (ToM 1.8, 3.2.2.2 note)
+			sn := uint64(s.src.CurrentSequence())
+			stime := &miax.MachSystemTime{TimeStamp: uint32(sn)}
+			stime.SetType(stime.GetType())
+			errs.CheckE(s.mconn.WriteMachMessage(sn-2, stime))
+			errs.CheckE(s.mconn.WriteMachMessage(sn-1, s.src.generateRefreshResponse(rf.RefreshType, 5)))
+			errs.CheckE(s.mconn.WriteMachMessage(sn, s.src.generateRefreshResponse(rf.RefreshType, 6)))
 		}
 	}
 	log.Println("sesm finished")
@@ -215,7 +218,6 @@ func (s *miaxMcastServer) start() (err error) {
 	return
 }
 func (s *miaxMcastServer) run() {
-	var mb bytes.Buffer
 	defer s.conn.Close()
 	defer s.mmsc.Close()
 	ch := s.mmsc.Chan()
@@ -229,10 +231,7 @@ func (s *miaxMcastServer) run() {
 		case seq := <-ch:
 			log.Printf("mcast seq %d", seq)
 			msg := s.src.GetMessage(uint64(seq))
-			// FIXME this is big endian by default?
-			errs.CheckE(struc.Pack(&mb, &msg))
-			_, err := s.conn.Write(mb.Bytes())
-			errs.CheckE(err)
+			errs.CheckE(binary.Write(s.conn, binary.LittleEndian, msg))
 		}
 	}
 }
