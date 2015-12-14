@@ -35,7 +35,7 @@ func NewMiaxExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) 
 			laddr: ":16002",
 			src:   src,
 		},
-		mcast: newMiaxMcastServer("10.2.0.5:0", "224.0.105.1:51001", src),
+		mcast: newMiaxMcastServer(c.LocalAddr, c.FeedAddr, src),
 	}
 	return
 }
@@ -137,6 +137,14 @@ func (s *SesMServerConn) run() {
 			errs.CheckE(s.mconn.WriteMachMessage(sn-2, stime))
 			errs.CheckE(s.mconn.WriteMachMessage(sn-1, s.src.generateRefreshResponse(rf.RefreshType, 5)))
 			errs.CheckE(s.mconn.WriteMachMessage(sn, s.src.generateRefreshResponse(rf.RefreshType, 6)))
+			eor := miax.SesMEndRefreshNotif{
+				RefreshType:  rf.RefreshType,
+				ResponseType: 'E',
+			}
+			errs.CheckE(s.mconn.WriteMessageSimple(&eor))
+		case miax.TypeSesMClientHeartbeat:
+		default:
+			return
 		}
 	}
 	log.Println("sesm finished")
