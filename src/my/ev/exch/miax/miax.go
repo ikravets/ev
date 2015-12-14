@@ -73,7 +73,7 @@ func (c *conn) WriteMessageSimple(m SesMMessage) (err error) {
 func (c *conn) WriteMachPacket(p MachPacket) (err error) {
 	defer errs.PassE(&err)
 	var b, res bytes.Buffer
-	errs.CheckE(binary.Write(&b, binary.LittleEndian, p))
+	errs.CheckE(binary.Write(&b, binary.LittleEndian, p.m)) // write just p to send Mach header also
 
 	sm := &SesMRetransmResponse{ApplicationMessage: b.Bytes()}
 	sm.Sequence = p.h.Sequence
@@ -87,6 +87,9 @@ func (c *conn) WriteMachPacket(p MachPacket) (err error) {
 func (c *conn) WriteMachMessage(sn uint64, m MachMessage) (err error) {
 	defer errs.PassE(&err)
 	var b, res bytes.Buffer
+	// uncomment to write Mach header
+	//p := MakeMachPacket(sn, m)
+	//errs.CheckE(binary.Write(&b, binary.LittleEndian, p.h))
 	errs.CheckE(binary.Write(&b, binary.LittleEndian, m))
 
 	um := &SesMRefreshResponse{
@@ -356,7 +359,6 @@ func MakeMachPacket(sn uint64, m MachMessage) (p MachPacket) {
 	return
 }
 
-// retransmission and multicast services have this attached, refresh service DOES NOT attach this
 type MachMessageHeader struct {
 	Sequence   uint64
 	PackLength uint16
