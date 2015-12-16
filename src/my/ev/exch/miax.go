@@ -25,18 +25,39 @@ type MiaxMessageSource interface {
 	Stop()
 }
 
+type exchangeMiaxRegistry struct {
+	exchangeMiaxN []*exchangeMiax
+}
+
+func (e *exchangeMiaxRegistry) NewMiaxRegistry(c Config, msrc *miaxMessageSource, num int) (em *exchangeMiax) {
+	mc := newMiaxMcastServer(c, msrc, num)
+	em = &exchangeMiax{
+		interactive: c.Interactive,
+		src:         msrc,
+		sesm: &SesMServer{
+			laddr: fmt.Sprintf(":%d", 16002+num),
+			src:   msrc,
+		},
+		mcast: mc,
+	}
+	return
+}
+
+func InitMiaxRegistry(c Config) (es ExchangeSimulator) {
+	esr := &exchangeMiaxRegistry{}
+	log.Printf("inited simulators %d\n", c.ConnNumLimit)
+	for i := 0; i < c.ConnNumLimit; i++ {
+		msrc := NewMiaxMessageSource(i)
+		esr.exchangeMiaxN = append(esr.exchangeMiaxN, esr.NewMiaxRegistry(c, msrc, i))
+		esr.exchangeMiaxN[i].num = i
+	}
+	es = esr
+	return
+}
+
 func NewMiaxExchangeSimulatorServer(c Config) (es ExchangeSimulator, err error) {
 	errs.Check(c.Protocol == "miax")
-	src := NewMiaxMessageSource()
-	es = &exchangeMiax{
-		interactive: c.Interactive,
-		src:         src,
-		sesm: &SesMServer{
-			laddr: ":16002",
-			src:   src,
-		},
-		mcast: newMiaxMcastServer(c.LocalAddr, c.FeedAddr, src),
-	}
+	es = InitMiaxRegistry(c)
 	return
 }
 
@@ -45,29 +66,34 @@ type exchangeMiax struct {
 	src         MiaxMessageSource
 	sesm        *SesMServer
 	mcast       *miaxMcastServer
+	num         int
 }
 
-func (e *exchangeMiax) Run() {
-	if e.interactive {
-		go e.src.RunInteractive()
-	} else {
-		go e.src.Run()
+func (e *exchangeMiaxRegistry) Run() {
+	for _, r := range e.exchangeMiaxN {
+		if r.interactive {
+			go r.src.RunInteractive()
+		} else {
+			go r.src.Run()
+		}
+		go r.sesm.run()
+		errs.CheckE(r.mcast.start())
+		log.Println(r.num, "started local", r.mcast.laddr.String(), "to ToM Real Time mcast", r.mcast.mcaddr.String())
 	}
-	go e.sesm.run()
-	errs.CheckE(e.mcast.start())
-	log.Println("started")
 	select {}
 }
 
 type SesMServer struct {
 	laddr string
 	src   *miaxMessageSource
+	num   int
 }
 
 func (s *SesMServer) run() {
 	l, err := net.Listen("tcp", s.laddr)
 	errs.CheckE(err)
 	defer l.Close()
+	log.Println(s.src.num, "started tcp", s.laddr)
 	for {
 		conn, err := l.Accept()
 		errs.CheckE(err)
@@ -81,6 +107,7 @@ type SesMServerConn struct {
 	conn  net.Conn
 	mconn miax.Conn
 	src   *miaxMessageSource
+	num   int
 }
 
 func NewSesMServerConn(conn net.Conn, src *miaxMessageSource) *SesMServerConn {
@@ -88,6 +115,7 @@ func NewSesMServerConn(conn net.Conn, src *miaxMessageSource) *SesMServerConn {
 		conn:  conn,
 		mconn: miax.NewConn(conn),
 		src:   src,
+		num:   src.num,
 	}
 }
 
@@ -194,30 +222,37 @@ func (s *SesMServerConn) sendAll(start, end uint64) (err error) {
 }
 
 type miaxMcastServer struct {
-	laddr string
-	raddr string
-	src   *miaxMessageSource
+	laddr  *net.UDPAddr
+	mcaddr *net.UDPAddr
+	src    *miaxMessageSource
 
 	cancel chan struct{}
 	mmsc   *miaxMessageSourceClient
 	conn   net.Conn
+	num    int
 }
 
-func newMiaxMcastServer(laddr, raddr string, src *miaxMessageSource) *miaxMcastServer {
-	return &miaxMcastServer{
+func newMiaxMcastServer(c Config, src *miaxMessageSource, i int) (mms *miaxMcastServer) {
+	laddr, err := net.ResolveUDPAddr("udp", c.LocalAddr)
+	errs.CheckE(err)
+	mcaddr, err := net.ResolveUDPAddr("udp", c.FeedAddr)
+	errs.CheckE(err)
+	laddr.Port += i
+	mcaddr.Port += i
+	mcaddr.IP[net.IPv6len-1] += (byte)(i)
+	mms = &miaxMcastServer{
 		laddr:  laddr,
-		raddr:  raddr,
+		mcaddr: mcaddr,
 		src:    src,
 		cancel: make(chan struct{}),
+		num:    i,
 	}
+	return
 }
+
 func (s *miaxMcastServer) start() (err error) {
 	defer errs.PassE(&err)
-	laddr, err := net.ResolveUDPAddr("udp", s.laddr)
-	errs.CheckE(err)
-	raddr, err := net.ResolveUDPAddr("udp", s.raddr)
-	errs.CheckE(err)
-	s.conn, err = net.DialUDP("udp", laddr, raddr)
+	s.conn, err = net.DialUDP("udp", s.laddr, s.mcaddr)
 	errs.CheckE(err)
 	//	mconn := miax.NewConn(s.conn)
 	s.mmsc = s.src.NewClient()
@@ -229,14 +264,14 @@ func (s *miaxMcastServer) run() {
 	defer s.mmsc.Close()
 	ch := s.mmsc.Chan()
 
-	log.Printf("ready. source chan %v", ch)
+	log.Printf("%d ready. source chan %v", s.num, ch)
 	for {
 		select {
 		case _, _ = <-s.cancel:
-			log.Printf("cancelled")
+			log.Printf("%d cancelled", s.num)
 			return
 		case seq := <-ch:
-			log.Printf("mcast seq %d", seq)
+			log.Printf("%d mcast seq %d", s.num, seq)
 			msg := s.src.GetMessage(uint64(seq))
 			errs.CheckE(msg.Write(s.conn))
 		}
@@ -248,14 +283,16 @@ type miaxMessageSource struct {
 	cancel chan struct{}
 	bchan  bchan.Bchan
 	mps    int
+	num    int
 }
 
-func NewMiaxMessageSource() *miaxMessageSource {
+func NewMiaxMessageSource(i int) *miaxMessageSource {
 	return &miaxMessageSource{
 		cancel: make(chan struct{}),
 		bchan:  bchan.NewBchan(),
 		mps:    1,
 		curSeq: 0,
+		num:    i,
 	}
 }
 func (mms *miaxMessageSource) Run() {
