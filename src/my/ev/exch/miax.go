@@ -124,8 +124,15 @@ func (s *SesMServerConn) run() {
 	defer errs.Catch(func(ce errs.CheckerError) {
 		log.Printf("caught %s\n", ce)
 	})
-	defer s.conn.Close()
+	defer func() {
+		errs.CheckE(s.mconn.WriteMessageSimple(&miax.SesMGoodBye{Reason: miax.GoodByeReasonTerminating}))
+		s.conn.Close()
+		log.Println("sesm finished")
+	}()
 	errs.CheckE(s.login())
+	defer func() {
+		errs.CheckE(s.mconn.WriteMessageSimple(&miax.SesMEndOfSession{}))
+	}()
 	cancelSendHeartbeat := make(chan struct{})
 	defer func() {
 		// close channel only if not already closed
@@ -153,10 +160,6 @@ func (s *SesMServerConn) run() {
 			rt, ok := m.(*miax.SesMRetransmRequest)
 			errs.Check(ok)
 			errs.CheckE(s.sendAll(rt.StartSeqNumber, rt.EndSeqNumber))
-			bye := miax.SesMGoodBye{
-				Reason: miax.GoodByeReasonTerminating,
-			}
-			errs.CheckE(s.mconn.WriteMessageSimple(&bye))
 			return
 		case miax.TypeSesMUnseq:
 			rf, ok := m.(*miax.SesMRefreshRequest)
@@ -179,7 +182,6 @@ func (s *SesMServerConn) run() {
 			return
 		}
 	}
-	log.Println("sesm finished")
 }
 
 func (s *SesMServerConn) login() (err error) {
