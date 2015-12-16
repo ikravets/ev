@@ -4,6 +4,7 @@
 package exch
 
 import (
+	"io"
 	"fmt"
 	"log"
 	"net"
@@ -141,6 +142,9 @@ func (s *SesMServerConn) run() {
 
 	for {
 		m, err := s.mconn.ReadMessage()
+		if err == io.EOF {
+			return
+		}
 		errs.CheckE(err)
 
 		mtype := m.Type()
