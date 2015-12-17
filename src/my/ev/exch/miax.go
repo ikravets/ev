@@ -30,13 +30,15 @@ type exchangeMiaxRegistry struct {
 	exchangeMiaxN []*exchangeMiax
 }
 
+const LocalPortShift = 100
+
 func (e *exchangeMiaxRegistry) NewMiaxRegistry(c Config, msrc *miaxMessageSource, num int) (em *exchangeMiax) {
 	mc := newMiaxMcastServer(c, msrc, num)
 	em = &exchangeMiax{
 		interactive: c.Interactive,
 		src:         msrc,
 		sesm: &SesMServer{
-			laddr: fmt.Sprintf(":%d", 16002+num),
+			laddr: fmt.Sprintf(":%d", mc.laddr.Port-LocalPortShift),
 			src:   msrc,
 		},
 		mcast: mc,
@@ -243,7 +245,7 @@ func newMiaxMcastServer(c Config, src *miaxMessageSource, i int) (mms *miaxMcast
 	errs.CheckE(err)
 	mcaddr, err := net.ResolveUDPAddr("udp", c.FeedAddr)
 	errs.CheckE(err)
-	laddr.Port += i
+	laddr.Port += i + LocalPortShift
 	mcaddr.Port += i
 	mcaddr.IP[net.IPv6len-1] += (byte)(i)
 	mms = &miaxMcastServer{
