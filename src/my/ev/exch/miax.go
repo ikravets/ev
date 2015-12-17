@@ -373,6 +373,11 @@ func (mms *miaxMessageSource) GetMessage(seqNum uint64) miax.MachPacket { //, mt
 		MBBOCondition: miax.ConditionRegular,
 	}
 	m.Type = miax.MachMessageType('A' + ('W'-'A')*(byte(seqNum%2)))
+	//	if seqNum%5 == 0 {
+	//		m := &miax.MachTradeCancel{}
+	//		m.SetType(m.GetType())
+	//		return miax.MakeMachPacket(seqNum, m)
+	//	}
 	return miax.MakeMachPacket(seqNum, m)
 }
 

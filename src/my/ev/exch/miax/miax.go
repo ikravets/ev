@@ -308,6 +308,7 @@ const (
 	TypeMachMessageCommon         MachMessageType = 0
 	TypeMachSystemTime            MachMessageType = '1'
 	TypeMachToMWide               MachMessageType = 'W'
+	TypeMachTradeCancel           MachMessageType = 'X'
 	TypeMachSeriesUpdate          MachMessageType = 'P'
 	TypeMachDoubleSidedToMCompact MachMessageType = 'd'
 	TypeMachDoubleSidedToMWide    MachMessageType = 'D'
@@ -316,6 +317,7 @@ const (
 func (_ *MachMessageCommon) GetType() MachMessageType         { return TypeMachMessageCommon }
 func (_ *MachSystemTime) GetType() MachMessageType            { return TypeMachSystemTime }
 func (_ *MachToMWide) GetType() MachMessageType               { return TypeMachToMWide }
+func (_ *MachTradeCancel) GetType() MachMessageType           { return TypeMachTradeCancel }
 func (_ *MachSeriesUpdate) GetType() MachMessageType          { return TypeMachSeriesUpdate }
 func (_ *MachDoubleSidedToMCompact) GetType() MachMessageType { return TypeMachDoubleSidedToMCompact }
 func (_ *MachDoubleSidedToMWide) GetType() MachMessageType    { return TypeMachDoubleSidedToMWide }
@@ -323,6 +325,7 @@ func (_ *MachDoubleSidedToMWide) GetType() MachMessageType    { return TypeMachD
 func (m *MachMessageCommon) Size() uint16         { return 0 }
 func (m *MachSystemTime) Size() uint16            { return 5 }
 func (m *MachToMWide) Size() uint16               { return 22 }
+func (m *MachTradeCancel) Size() uint16           { return 23 }
 func (m *MachSeriesUpdate) Size() uint16          { return 73 }
 func (m *MachDoubleSidedToMCompact) Size() uint16 { return 23 }
 func (m *MachDoubleSidedToMWide) Size() uint16    { return 35 }
@@ -337,6 +340,8 @@ func (p MachPacket) Write(w io.Writer) (err error) {
 	var b bytes.Buffer
 	errs.CheckE(binary.Write(&b, binary.LittleEndian, p.h))
 	errs.CheckE(binary.Write(&b, binary.LittleEndian, p.m))
+	//errs.CheckE(binary.Write(&b, binary.LittleEndian, p.h))
+	//errs.CheckE(binary.Write(&b, binary.LittleEndian, p.m))
 	_, err = w.Write(b.Bytes())
 	errs.CheckE(err)
 	return
