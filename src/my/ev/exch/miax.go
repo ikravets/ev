@@ -356,7 +356,7 @@ func (mms *miaxMessageSource) RunInteractive() {
 func (mms *miaxMessageSource) publish(seq uint64) {
 	select {
 	case mms.bchan.ProducerChan() <- seq:
-		log.Printf("publish source seq %d", seq)
+		log.Printf("%d publish source seq %d", mms.num, seq)
 	default:
 	}
 }
