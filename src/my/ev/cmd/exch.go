@@ -17,7 +17,8 @@ type cmdExch struct {
 	GRMCaddr      string `long:"gap-multicast" value-name:"IPADDR" default:"233.130.124.0:30101" description:"gap server mcast address"`
 	ConnNumLimit  int    `long:"count" short:"c" value-name:"NUM" default:"1" description:"limit number of connections"`
 	Interactive   bool   `long:"interactive" short:"i" description:"run interactively"`
-	Gap           bool   `long:"gap-message" short:"g" description:"simulate gap"`
+	GapPeriod     uint64 `long:"gap-period" short:"g" value-name:"NUM" default:"0xFFFFFFFFFFFFFF" description:"period simulate gap"`
+	GapSize       uint64 `long:"gap-limit" short:"s" value-name:"NUM" default:"0" description:"limit number of gap messages"`
 	shouldExecute bool
 }
 
@@ -40,7 +41,8 @@ func (c *cmdExch) ParsingFinished() (err error) {
 		FeedAddr:     c.RTMCaddr,
 		GapAddr:      c.GRMCaddr,
 		Interactive:  c.Interactive,
-		Gap:          c.Gap,
+		GapPeriod:    c.GapPeriod,
+		GapSize:      c.GapSize,
 		ConnNumLimit: c.ConnNumLimit,
 	}
 	es, err := exch.NewExchangeSimulator(conf)

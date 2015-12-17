@@ -234,11 +234,14 @@ type miaxMcastServer struct {
 	mcaddr *net.UDPAddr
 	src    *miaxMessageSource
 
-	cancel chan struct{}
-	mmsc   *miaxMessageSourceClient
-	conn   net.Conn
-	num    int
-	gap    bool
+	cancel    chan struct{}
+	mmsc      *miaxMessageSourceClient
+	conn      net.Conn
+	num       int
+	gap       bool
+	gapSize   uint64
+	gapPeriod uint64
+	gapCnt    uint64
 }
 
 func newMiaxMcastServer(c Config, src *miaxMessageSource, i int) (mms *miaxMcastServer) {
@@ -249,13 +252,20 @@ func newMiaxMcastServer(c Config, src *miaxMessageSource, i int) (mms *miaxMcast
 	laddr.Port += i + LocalPortShift
 	mcaddr.Port += i
 	mcaddr.IP[net.IPv6len-1] += (byte)(i)
+	gapP := c.GapPeriod
+	if 0 == gapP {
+		gapP = 0xFFFFFFFFFFFFFFFF
+	}
 	mms = &miaxMcastServer{
-		laddr:  laddr,
-		mcaddr: mcaddr,
-		src:    src,
-		cancel: make(chan struct{}),
-		num:    i,
-		gap:    c.Gap,
+		laddr:     laddr,
+		mcaddr:    mcaddr,
+		src:       src,
+		cancel:    make(chan struct{}),
+		num:       i,
+		gap:       0 != c.GapSize,
+		gapSize:   c.GapSize,
+		gapPeriod: gapP,
+		gapCnt:    0,
 	}
 	return
 }
@@ -281,7 +291,7 @@ func (s *miaxMcastServer) run() {
 			log.Printf("%d cancelled", s.num)
 			return
 		case seq := <-ch:
-			if s.gap && 0 == seq%27 {
+			if s.gapCheck(seq) {
 				log.Printf("%d mcast seq gap %d", s.num, seq)
 			} else {
 				log.Printf("%d mcast seq %d", s.num, seq)
@@ -290,6 +300,18 @@ func (s *miaxMcastServer) run() {
 			}
 		}
 	}
+}
+func (s *miaxMcastServer) gapCheck(seq uint64) (gap bool) {
+	if s.gap && 0 == seq%s.gapPeriod {
+		if 0 == s.gapCnt {
+			s.gapCnt = s.gapSize
+		}
+	}
+	if 0 != s.gapCnt {
+		s.gapCnt--
+		return true
+	}
+	return false
 }
 
 type miaxMessageSource struct {

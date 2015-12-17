@@ -17,7 +17,8 @@ type Config struct {
 	FeedAddr     string
 	GapAddr      string
 	Interactive  bool
-	Gap          bool
+	GapPeriod    uint64
+	GapSize      uint64
 	ConnNumLimit int
 }
 

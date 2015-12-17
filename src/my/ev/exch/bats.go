@@ -377,12 +377,15 @@ type batsFeedMcastServer struct {
 	mcaddr *net.UDPAddr
 	src    *batsMessageSource
 
-	cancel chan struct{}
-	bmsc   *batsMessageSourceClient
-	pw     bats.PacketWriter
-	conn   net.Conn
-	num    int
-	gap    bool
+	cancel    chan struct{}
+	bmsc      *batsMessageSourceClient
+	pw        bats.PacketWriter
+	conn      net.Conn
+	num       int
+	gap       bool
+	gapSize   int
+	gapPeriod int
+	gapCnt    int
 }
 
 func newBatsFeedMcastServer(c Config, src *batsMessageSource, i int) (fmc *batsFeedMcastServer, err error) {
@@ -393,13 +396,20 @@ func newBatsFeedMcastServer(c Config, src *batsMessageSource, i int) (fmc *batsF
 	laddr.Port += i
 	mcaddr.Port += i
 	mcaddr.IP[net.IPv6len-1] += (byte)(i / 4)
+	gapP := int(c.GapPeriod)
+	if 0 == gapP {
+		gapP = 0xFFFFFFFF
+	}
 	fmc = &batsFeedMcastServer{
-		laddr:  laddr,
-		mcaddr: mcaddr,
-		src:    src,
-		cancel: make(chan struct{}),
-		num:    i,
-		gap:    c.Gap,
+		laddr:     laddr,
+		mcaddr:    mcaddr,
+		src:       src,
+		cancel:    make(chan struct{}),
+		num:       i,
+		gap:       0 != c.GapSize,
+		gapSize:   int(c.GapSize),
+		gapPeriod: gapP,
+		gapCnt:    0,
 	}
 	return
 }
@@ -424,7 +434,7 @@ func (s *batsFeedMcastServer) run() {
 			log.Printf("%d cancelled", s.num)
 			return
 		case seq := <-ch:
-			if s.gap && 0 == seq%27 {
+			if s.gapCheck(seq) {
 				log.Printf("%d mcast seq gap %d", s.num, seq)
 			} else {
 				log.Printf("%d mcast seq %d", s.num, seq)
@@ -436,6 +446,18 @@ func (s *batsFeedMcastServer) run() {
 			}
 		}
 	}
+}
+func (s *batsFeedMcastServer) gapCheck(seq int) (gap bool) {
+	if s.gap && 0 == seq%s.gapPeriod {
+		if 0 == s.gapCnt {
+			s.gapCnt = s.gapSize
+		}
+	}
+	if 0 != s.gapCnt {
+		s.gapCnt--
+		return true
+	}
+	return false
 }
 
 type batsMessageSource struct {
