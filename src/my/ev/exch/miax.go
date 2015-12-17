@@ -238,6 +238,7 @@ type miaxMcastServer struct {
 	mmsc   *miaxMessageSourceClient
 	conn   net.Conn
 	num    int
+	gap    bool
 }
 
 func newMiaxMcastServer(c Config, src *miaxMessageSource, i int) (mms *miaxMcastServer) {
@@ -254,6 +255,7 @@ func newMiaxMcastServer(c Config, src *miaxMessageSource, i int) (mms *miaxMcast
 		src:    src,
 		cancel: make(chan struct{}),
 		num:    i,
+		gap:    c.Gap,
 	}
 	return
 }
@@ -279,9 +281,13 @@ func (s *miaxMcastServer) run() {
 			log.Printf("%d cancelled", s.num)
 			return
 		case seq := <-ch:
-			log.Printf("%d mcast seq %d", s.num, seq)
-			msg := s.src.GetMessage(uint64(seq))
-			errs.CheckE(msg.Write(s.conn))
+			if s.gap && 0 == seq%27 {
+				log.Printf("%d mcast seq gap %d", s.num, seq)
+			} else {
+				log.Printf("%d mcast seq %d", s.num, seq)
+				msg := s.src.GetMessage(uint64(seq))
+				errs.CheckE(msg.Write(s.conn))
+			}
 		}
 	}
 }
