@@ -4,8 +4,8 @@
 package exch
 
 import (
-	"io"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync/atomic"
@@ -18,8 +18,8 @@ import (
 )
 
 type MiaxMessageSource interface {
-	SetSequence(int)
-	CurrentSequence() int
+	SetSequence(uint64)
+	CurrentSequence() uint64
 	GetMessage(uint64) miax.MachPacket
 	Run()
 	RunInteractive()
@@ -285,7 +285,7 @@ func (s *miaxMcastServer) run() {
 }
 
 type miaxMessageSource struct {
-	curSeq int64
+	curSeq uint64
 	cancel chan struct{}
 	bchan  bchan.Bchan
 	mps    int
@@ -317,13 +317,13 @@ func (mms *miaxMessageSource) Run() {
 func (mms *miaxMessageSource) RunInteractive() {
 	for {
 		fmt.Printf("enter source seq: ")
-		var seq int
+		var seq uint64
 		_, err := fmt.Scan(&seq)
 		errs.CheckE(err)
 		mms.produce(seq)
 	}
 }
-func (mms *miaxMessageSource) publish(seq int) {
+func (mms *miaxMessageSource) publish(seq uint64) {
 	select {
 	case mms.bchan.ProducerChan() <- seq:
 		log.Printf("publish source seq %d", seq)
@@ -331,26 +331,26 @@ func (mms *miaxMessageSource) publish(seq int) {
 	}
 }
 func (mms *miaxMessageSource) produceOne() {
-	seq := int(atomic.AddInt64(&mms.curSeq, int64(1)))
+	seq := atomic.AddUint64(&mms.curSeq, uint64(1))
 	mms.publish(seq)
 }
-func (mms *miaxMessageSource) produce(seq int) {
+func (mms *miaxMessageSource) produce(seq uint64) {
 	mms.SetSequence(seq)
 	mms.publish(seq)
 }
 func (mms *miaxMessageSource) Stop() {
 	close(mms.cancel)
 }
-func (mms *miaxMessageSource) SetSequence(seq int) {
-	atomic.StoreInt64(&mms.curSeq, int64(seq))
+func (mms *miaxMessageSource) SetSequence(seq uint64) {
+	atomic.StoreUint64(&mms.curSeq, seq)
 }
-func (mms *miaxMessageSource) CurrentSequence() int {
-	return int(atomic.LoadInt64(&mms.curSeq))
+func (mms *miaxMessageSource) CurrentSequence() uint64 {
+	return atomic.LoadUint64(&mms.curSeq)
 }
 func (mms *miaxMessageSource) NewClient() *miaxMessageSourceClient {
 	c := &miaxMessageSourceClient{
 		bc: mms.bchan.NewConsumer(),
-		ch: make(chan int),
+		ch: make(chan uint64),
 	}
 	go c.run()
 	return c
@@ -416,16 +416,16 @@ func (mms *miaxMessageSource) generateRefreshResponse(RefreshType byte, seqNum i
 
 type miaxMessageSourceClient struct {
 	bc bchan.BchanConsumer
-	ch chan int
+	ch chan uint64
 }
 
-func (c *miaxMessageSourceClient) Chan() chan int {
+func (c *miaxMessageSourceClient) Chan() chan uint64 {
 	return c.ch
 }
 func (c *miaxMessageSourceClient) run() {
 	for val := range c.bc.Chan() {
 		//log.Printf("forwarding value %v to chan %v", val, c.ch)
-		c.ch <- val.(int)
+		c.ch <- val.(uint64)
 	}
 	close(c.ch)
 }
