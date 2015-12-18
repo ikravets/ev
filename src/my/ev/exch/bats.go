@@ -435,7 +435,7 @@ func (s *batsFeedMcastServer) run() {
 			return
 		case seq := <-ch:
 			if s.gapCheck(seq) {
-				log.Printf("%d mcast seq gap %d", s.num, seq)
+				log.Printf("%d gap !!! mcast seq %d", s.num, seq)
 			} else {
 				log.Printf("%d mcast seq %d", s.num, seq)
 				m := s.src.GetMessage(seq)

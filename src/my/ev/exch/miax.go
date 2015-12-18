@@ -285,6 +285,7 @@ func (s *miaxMcastServer) run() {
 	ch := s.mmsc.Chan()
 
 	log.Printf("%d ready. source chan %v", s.num, ch)
+	s.src.SetSequence(uint64(s.num) << 24)
 	for {
 		select {
 		case _, _ = <-s.cancel:
@@ -292,7 +293,7 @@ func (s *miaxMcastServer) run() {
 			return
 		case seq := <-ch:
 			if s.gapCheck(seq) {
-				log.Printf("%d mcast seq gap %d", s.num, seq)
+				log.Printf("%d gap !!! mcast seq %d", s.num, seq)
 			} else {
 				log.Printf("%d mcast seq %d", s.num, seq)
 				msg := s.src.GetMessage(uint64(seq))
