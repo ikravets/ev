@@ -19,7 +19,8 @@ type Config struct {
 	Interactive  bool
 	GapPeriod    uint64
 	GapSize      uint64
-	ConnNumLimit int
+	PartNumLimit int
+	Speed        int
 }
 
 var IllegalProtocol = errors.New("Illegal protocol")

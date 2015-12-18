@@ -48,9 +48,9 @@ func (e *exchangeMiaxRegistry) NewMiaxRegistry(c Config, msrc *miaxMessageSource
 
 func InitMiaxRegistry(c Config) (es ExchangeSimulator) {
 	esr := &exchangeMiaxRegistry{}
-	log.Printf("inited simulators %d\n", c.ConnNumLimit)
-	for i := 0; i < c.ConnNumLimit; i++ {
-		msrc := NewMiaxMessageSource(i)
+	log.Printf("inited simulators %d\n", c.PartNumLimit)
+	for i := 0; i < c.PartNumLimit; i++ {
+		msrc := NewMiaxMessageSource(i, c.Speed)
 		esr.exchangeMiaxN = append(esr.exchangeMiaxN, esr.NewMiaxRegistry(c, msrc, i))
 		esr.exchangeMiaxN[i].num = i
 	}
@@ -323,11 +323,11 @@ type miaxMessageSource struct {
 	num    int
 }
 
-func NewMiaxMessageSource(i int) *miaxMessageSource {
+func NewMiaxMessageSource(i int, speed int) *miaxMessageSource {
 	return &miaxMessageSource{
 		cancel: make(chan struct{}),
 		bchan:  bchan.NewBchan(),
-		mps:    1,
+		mps:    speed,
 		curSeq: 0,
 		num:    i,
 	}

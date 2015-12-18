@@ -15,7 +15,8 @@ type cmdExch struct {
 	Laddr         string `long:"local-addr" value-name:"IPADDR" default:"10.2.0.5:0" description:"local address"`
 	RTMCaddr      string `long:"feed-multicast" value-name:"IPADDR" default:"224.0.131.0:30101" description:"feed server mcast address"`
 	GRMCaddr      string `long:"gap-multicast" value-name:"IPADDR" default:"233.130.124.0:30101" description:"gap server mcast address"`
-	ConnNumLimit  int    `long:"count" short:"c" value-name:"NUM" default:"1" description:"limit number of partitions"`
+	Speed         int    `long:"speed" value-name:"NUM" default:"1" description:"speed message per second"`
+	PartNumLimit  int    `long:"count" short:"c" value-name:"NUM" default:"1" description:"limit number of partitions"`
 	Interactive   bool   `long:"interactive" short:"i" description:"run interactively"`
 	GapPeriod     uint64 `long:"gap-period" short:"g" value-name:"NUM" default:"0xFFFFFFFFFFFFFF" description:"period simulate gap"`
 	GapSize       uint64 `long:"gap-limit" short:"s" value-name:"NUM" default:"0" description:"limit number of gap messages"`
@@ -40,10 +41,11 @@ func (c *cmdExch) ParsingFinished() (err error) {
 		LocalAddr:    c.Laddr,
 		FeedAddr:     c.RTMCaddr,
 		GapAddr:      c.GRMCaddr,
+		Speed:        c.Speed,
 		Interactive:  c.Interactive,
 		GapPeriod:    c.GapPeriod,
 		GapSize:      c.GapSize,
-		ConnNumLimit: c.ConnNumLimit,
+		PartNumLimit: c.PartNumLimit,
 	}
 	es, err := exch.NewExchangeSimulator(conf)
 	errs.CheckE(err)

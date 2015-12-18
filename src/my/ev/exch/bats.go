@@ -54,8 +54,8 @@ func (e *exchangeBatsRegistry) NewBatsRegistry(c Config, src *batsMessageSource,
 }
 func InitBatsRegistry(c Config) (es ExchangeSimulator) {
 	esr := &exchangeBatsRegistry{}
-	for i := 0; i < c.ConnNumLimit; i++ {
-		src := NewBatsMessageSource(i)
+	for i := 0; i < c.PartNumLimit; i++ {
+		src := NewBatsMessageSource(i, c.Speed)
 		esr.exchangeBatsN = append(esr.exchangeBatsN, esr.NewBatsRegistry(c, src, i))
 		esr.exchangeBatsN[i].num = i
 	}
@@ -468,11 +468,11 @@ type batsMessageSource struct {
 	num    int
 }
 
-func NewBatsMessageSource(i int) *batsMessageSource {
+func NewBatsMessageSource(i int, speed int) *batsMessageSource {
 	return &batsMessageSource{
 		cancel: make(chan struct{}),
 		bchan:  bchan.NewBchan(),
-		mps:    1,
+		mps:    speed,
 		curSeq: 1000000,
 		num:    i,
 	}
