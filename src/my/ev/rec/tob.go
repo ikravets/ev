@@ -95,7 +95,7 @@ func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) b
 	l.bid.update(book, l.lastOptionId, tobUpdate)
 	l.ask.update(book, l.lastOptionId, tobUpdate)
 
-	return l.bid.updated() || l.ask.updated()
+	return tobUpdate&TobUpdateAssumeUpdated != 0 || l.bid.updated() || l.ask.updated()
 }
 
 type TobUpdate byte
@@ -104,6 +104,7 @@ const (
 	TobUpdateOld TobUpdate = 1 << iota
 	TobUpdateNew
 	TobUpdateBothSides
+	TobUpdateAssumeUpdated
 )
 
 func (tob *tob) update(book sim.Book, oid packet.OptionId, u TobUpdate) {
