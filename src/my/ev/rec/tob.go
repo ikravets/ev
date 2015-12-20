@@ -19,6 +19,7 @@ type TobLogger struct {
 	hasOldTob    bool
 	bid          tob
 	ask          tob
+	abuFlags     TobUpdate
 }
 type tob struct {
 	Check bool
@@ -33,6 +34,10 @@ func NewTobLogger() *TobLogger {
 		ask: tob{Side: packet.MarketSideAsk},
 	}
 	return l
+}
+
+func (l *TobLogger) SetAfterBookUpdateFlags(abuFlags TobUpdate) {
+	l.abuFlags = abuFlags
 }
 
 func (l *TobLogger) MessageArrived(idm *sim.SimMessage) {
@@ -73,7 +78,7 @@ func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) 
 	l.hasOldTob = true
 }
 
-func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation, tobUpdate TobUpdate) bool {
+func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) bool {
 	if l.consumeOps == 0 {
 		log.Fatal("book operation is not expected")
 	}
@@ -86,6 +91,7 @@ func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation, t
 	if l.lastOptionId.Invalid() {
 		return false
 	}
+	tobUpdate := l.abuFlags | TobUpdateNew
 	l.bid.update(book, l.lastOptionId, tobUpdate)
 	l.ask.update(book, l.lastOptionId, tobUpdate)
 

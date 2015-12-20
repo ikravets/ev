@@ -54,6 +54,9 @@ func NewEfhLogger(c EfhLoggerConfig) *EfhLogger {
 		errs.Check(c.Writer != nil)
 		l.printer = NewTestefhPrinter(c.Writer)
 	}
+	if l.mode == EfhLoggerOutputQuotes {
+		l.tobLogger.SetAfterBookUpdateFlags(TobUpdateBothSides)
+	}
 	return l
 }
 
@@ -78,15 +81,14 @@ func (l *EfhLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) 
 	l.tobLogger.BeforeBookUpdate(book, operation)
 }
 func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
+	if !l.tobLogger.AfterBookUpdate(book, operation) {
+		return
+	}
 	if l.mode == EfhLoggerOutputOrders {
-		if l.tobLogger.AfterBookUpdate(book, operation, TobUpdateNew) {
-			l.genUpdateOrders(l.tobLogger.bid)
-			l.genUpdateOrders(l.tobLogger.ask)
-		}
+		l.genUpdateOrders(l.tobLogger.bid)
+		l.genUpdateOrders(l.tobLogger.ask)
 	} else {
-		if l.tobLogger.AfterBookUpdate(book, operation, TobUpdateNew|TobUpdateBothSides) {
-			l.genUpdateQuotes(l.tobLogger.bid, l.tobLogger.ask)
-		}
+		l.genUpdateQuotes(l.tobLogger.bid, l.tobLogger.ask)
 	}
 }
 

@@ -36,7 +36,7 @@ func NewAvtLogger(w io.Writer, rDict io.Reader) *AvtLogger {
 	var err error
 	l.location, err = time.LoadLocation("EST")
 	errs.CheckE(err)
-
+	l.TobLogger.SetAfterBookUpdateFlags(TobUpdateBothSides)
 	if rDict != nil {
 		r := csv.NewReader(rDict)
 		records, err := r.ReadAll()
@@ -63,7 +63,7 @@ func (l *AvtLogger) MessageArrived(idm *sim.SimMessage) {
 }
 
 func (l *AvtLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
-	if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNew|TobUpdateBothSides) {
+	if l.TobLogger.AfterBookUpdate(book, operation) {
 		l.genUpdate()
 	}
 }
