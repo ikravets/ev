@@ -63,7 +63,7 @@ func (l *AvtLogger) MessageArrived(idm *sim.SimMessage) {
 }
 
 func (l *AvtLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
-	if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
+	if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNew|TobUpdateBothSides) {
 		l.genUpdate()
 	}
 }

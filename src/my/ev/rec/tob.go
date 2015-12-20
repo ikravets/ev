@@ -6,6 +6,8 @@ package rec
 import (
 	"log"
 
+	"github.com/ikravets/errs"
+
 	"my/ev/packet"
 	"my/ev/sim"
 )
@@ -93,18 +95,23 @@ func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation, t
 type TobUpdate byte
 
 const (
-	TobUpdateOld TobUpdate = iota
+	TobUpdateOld TobUpdate = 1 << iota
 	TobUpdateNew
-	TobUpdateNewForce
+	TobUpdateBothSides
 )
 
 func (tob *tob) update(book sim.Book, oid packet.OptionId, u TobUpdate) {
-	pl := &tob.New
-	if u == TobUpdateOld {
+	var pl *sim.PriceLevel
+	switch u & (TobUpdateNew | TobUpdateOld) {
+	case TobUpdateNew:
+		pl = &tob.New
+	case TobUpdateOld:
 		pl = &tob.Old
+	default:
+		errs.Check(false)
 	}
 	*pl = sim.EmptyPriceLevel
-	if tob.Check || u == TobUpdateNewForce {
+	if tob.Check || u&TobUpdateBothSides != 0 {
 		if pls := book.GetTop(oid, tob.Side, 1); len(pls) > 0 {
 			*pl = pls[0].Clone()
 		}

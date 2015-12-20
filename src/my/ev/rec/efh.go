@@ -84,7 +84,7 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 			l.genUpdateOrders(l.tobLogger.ask)
 		}
 	} else {
-		if l.tobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
+		if l.tobLogger.AfterBookUpdate(book, operation, TobUpdateNew|TobUpdateBothSides) {
 			l.genUpdateQuotes(l.tobLogger.bid, l.tobLogger.ask)
 		}
 	}
