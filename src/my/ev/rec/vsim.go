@@ -47,9 +47,6 @@ func NewSimLogger(c SimLoggerConfig) *SimLogger {
 	s.efhLogger = *NewEfhLogger(elc)
 	return s
 }
-func (s *SimLogger) SetOutputMode(mode EfhLoggerOutputMode) {
-	s.efhLogger.SetOutputMode(mode)
-}
 func (s *SimLogger) SetSupernodeLevels(levels int) {
 	errs.Check(levels > 0)
 	s.supernodeLevels = levels
