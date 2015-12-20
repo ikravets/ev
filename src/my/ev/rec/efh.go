@@ -21,19 +21,12 @@ type EfhLoggerPrinter interface {
 	PrintMessage(efhMessage) error
 }
 
-type testefhPrinter struct {
-	w io.Writer
-}
+type EfhLoggerOutputMode byte
 
-var _ EfhLoggerPrinter = &testefhPrinter{}
-
-func NewTestefhPrinter(w io.Writer) EfhLoggerPrinter {
-	return &testefhPrinter{w: w}
-}
-func (p *testefhPrinter) PrintMessage(m efhMessage) error {
-	_, err := fmt.Fprintln(p.w, m)
-	return err
-}
+const (
+	EfhLoggerOutputOrders EfhLoggerOutputMode = iota
+	EfhLoggerOutputQuotes
+)
 
 type EfhLogger struct {
 	tobLogger TobLogger
@@ -46,19 +39,12 @@ var _ sim.Observer = &EfhLogger{}
 
 func NewEfhLogger(p EfhLoggerPrinter) *EfhLogger {
 	l := &EfhLogger{
-		printer:   p,
 		tobLogger: *NewTobLogger(),
+		printer:   p,
 		stream:    *NewStream(),
 	}
 	return l
 }
-
-type EfhLoggerOutputMode byte
-
-const (
-	EfhLoggerOutputOrders EfhLoggerOutputMode = iota
-	EfhLoggerOutputQuotes
-)
 
 func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 	l.mode = mode
@@ -200,4 +186,18 @@ func (l *EfhLogger) genUpdateDefinitionsBats(msg *bats.PitchMessageSymbolMapping
 	m.efhm_header.TimeStamp = 0
 	copy(m.OsiSymbol[:], msg.OsiSymbol)
 	errs.CheckE(l.printer.PrintMessage(m))
+}
+
+type testefhPrinter struct {
+	w io.Writer
+}
+
+var _ EfhLoggerPrinter = &testefhPrinter{}
+
+func NewTestefhPrinter(w io.Writer) EfhLoggerPrinter {
+	return &testefhPrinter{w: w}
+}
+func (p *testefhPrinter) PrintMessage(m efhMessage) error {
+	_, err := fmt.Fprintln(p.w, m)
+	return err
 }
