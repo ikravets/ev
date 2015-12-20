@@ -29,9 +29,10 @@ const (
 )
 
 type EfhLoggerConfig struct {
-	Writer  io.Writer
-	Printer EfhLoggerPrinter
-	Mode    EfhLoggerOutputMode
+	Writer          io.Writer
+	Printer         EfhLoggerPrinter
+	Mode            EfhLoggerOutputMode
+	AssumeTobUpdate bool
 }
 
 type EfhLogger struct {
@@ -54,9 +55,14 @@ func NewEfhLogger(c EfhLoggerConfig) *EfhLogger {
 		errs.Check(c.Writer != nil)
 		l.printer = NewTestefhPrinter(c.Writer)
 	}
+	var abuFlags TobUpdate
 	if l.mode == EfhLoggerOutputQuotes {
-		l.tobLogger.SetAfterBookUpdateFlags(TobUpdateBothSides)
+		abuFlags |= TobUpdateBothSides
 	}
+	if c.AssumeTobUpdate {
+		abuFlags |= TobUpdateAssumeUpdated
+	}
+	l.tobLogger.SetAfterBookUpdateFlags(abuFlags)
 	return l
 }
 
