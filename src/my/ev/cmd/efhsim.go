@@ -73,6 +73,8 @@ func (c *cmdEfhsim) ParsingFinished() (err error) {
 	efhLoggerConfig := rec.EfhLoggerConfig{}
 	simLoggerConfig := rec.SimLoggerConfig{}
 	if c.TobBook {
+		efhLoggerConfig.AssumeTobUpdate = true
+		simLoggerConfig.AssumeTobUpdate = true
 		simLoggerConfig.SupernodeLevels = 1
 	}
 	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
