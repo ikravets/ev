@@ -52,6 +52,8 @@ const (
 	TomMessageTypeTomOfferCompact       TomMessageType = 'O'
 	TomMessageTypeTomBidWide            TomMessageType = 'W'
 	TomMessageTypeTomOfferWide          TomMessageType = 'A'
+	TomMessageTypeQuoteCompact          TomMessageType = 'd'
+	TomMessageTypeQuoteWide             TomMessageType = 'D'
 	TomMessageTypeTrade                 TomMessageType = 'T'
 	TomMessageTypeTradeCancel           TomMessageType = 'X'
 	TomMessageTypeLiquiditySeeking      TomMessageType = 'L'
@@ -67,6 +69,8 @@ var TomMessageTypeNames = [256]string{
 	TomMessageTypeTomOfferCompact:       "TomTomOfferCompact",
 	TomMessageTypeTomBidWide:            "TomTomBidWide",
 	TomMessageTypeTomOfferWide:          "TomTomOfferWide",
+	TomMessageTypeQuoteCompact:          "TomQuoteCompact",
+	TomMessageTypeQuoteWide:             "TomQuoteWide",
 	TomMessageTypeTrade:                 "TomTrade",
 	TomMessageTypeTradeCancel:           "TomTradeCancel",
 	TomMessageTypeLiquiditySeeking:      "TomLiquiditySeeking",
@@ -82,6 +86,8 @@ var TomMessageCreators = [256]func() TomMessage{
 	TomMessageTypeTomOfferCompact:       func() TomMessage { return &TomMessageTom{} },
 	TomMessageTypeTomBidWide:            func() TomMessage { return &TomMessageTom{} },
 	TomMessageTypeTomOfferWide:          func() TomMessage { return &TomMessageTom{} },
+	TomMessageTypeQuoteCompact:          func() TomMessage { return &TomMessageQuote{} },
+	TomMessageTypeQuoteWide:             func() TomMessage { return &TomMessageQuote{} },
 	TomMessageTypeTrade:                 func() TomMessage { return &TomMessageTrade{} },
 	TomMessageTypeTradeCancel:           func() TomMessage { return &TomMessageTradeCancel{} },
 	TomMessageTypeLiquiditySeeking:      func() TomMessage { return &TomMessageLiquiditySeeking{} },
@@ -343,6 +349,52 @@ func (m *TomMessageTom) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 	return nil
 }
 func (m *TomMessageTom) OptionId() packet.OptionId {
+	return m.ProductId
+}
+
+/************************************************************************/
+type TomMessageQuote struct {
+	TomMessageCommon
+	ProductId                 packet.OptionId
+	BidPrice                  packet.Price
+	BidSize                   int
+	BidPriorityCustomerSize   int
+	BidCondition              byte
+	OfferPrice                packet.Price
+	OfferSize                 int
+	OfferPriorityCustomerSize int
+	OfferCondition            byte
+}
+
+func (m *TomMessageQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	*m = TomMessageQuote{
+		TomMessageCommon: decodeTomMessage(data),
+		ProductId:        parseProductId(data[5:9]),
+	}
+	if m.Type == TomMessageTypeQuoteCompact {
+		m.BidPrice = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[9:11])))
+		m.BidSize = int(binary.LittleEndian.Uint16(data[11:13]))
+		m.BidPriorityCustomerSize = int(binary.LittleEndian.Uint16(data[13:15]))
+		m.BidCondition = data[15]
+		m.OfferPrice = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[16:18])))
+		m.OfferSize = int(binary.LittleEndian.Uint16(data[18:20]))
+		m.OfferPriorityCustomerSize = int(binary.LittleEndian.Uint16(data[20:22]))
+		m.OfferCondition = data[22]
+	} else if m.Type == TomMessageTypeQuoteWide {
+		m.BidPrice = packet.PriceFrom4Dec(int(binary.LittleEndian.Uint32(data[9:13])))
+		m.BidSize = int(binary.LittleEndian.Uint32(data[13:17]))
+		m.BidPriorityCustomerSize = int(binary.LittleEndian.Uint32(data[17:21]))
+		m.BidCondition = data[21]
+		m.OfferPrice = packet.PriceFrom4Dec(int(binary.LittleEndian.Uint32(data[22:26])))
+		m.OfferSize = int(binary.LittleEndian.Uint32(data[26:30]))
+		m.OfferPriorityCustomerSize = int(binary.LittleEndian.Uint32(data[30:34]))
+		m.OfferCondition = data[34]
+	} else {
+		panic("wrong message type")
+	}
+	return nil
+}
+func (m *TomMessageQuote) OptionId() packet.OptionId {
 	return m.ProductId
 }
 
