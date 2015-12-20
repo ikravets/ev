@@ -18,6 +18,11 @@ import (
 	"my/ev/sim"
 )
 
+type SimLoggerConfig struct {
+	EfhLoggerConfig
+	SupernodeLevels int
+}
+
 type SimLogger struct {
 	w               io.Writer
 	tobOld, tobNew  []sim.PriceLevel
@@ -28,12 +33,18 @@ type SimLogger struct {
 const SimLoggerDefaultSupernodeLevels = 256
 const SimLoggerUpperSupernodeLevels = 8
 
-func NewSimLogger(w io.Writer) *SimLogger {
+func NewSimLogger(c SimLoggerConfig) *SimLogger {
 	s := &SimLogger{
-		w:               w,
-		supernodeLevels: SimLoggerDefaultSupernodeLevels,
+		w:               c.Writer,
+		supernodeLevels: c.SupernodeLevels,
 	}
-	s.efhLogger = *NewEfhLogger(s)
+	if s.supernodeLevels == 0 {
+		s.supernodeLevels = SimLoggerDefaultSupernodeLevels
+	}
+	elc := c.EfhLoggerConfig
+	elc.Printer = s
+	elc.Writer = nil
+	s.efhLogger = *NewEfhLogger(elc)
 	return s
 }
 func (s *SimLogger) SetOutputMode(mode EfhLoggerOutputMode) {

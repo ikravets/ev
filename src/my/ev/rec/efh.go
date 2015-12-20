@@ -28,6 +28,12 @@ const (
 	EfhLoggerOutputQuotes
 )
 
+type EfhLoggerConfig struct {
+	Writer  io.Writer
+	Printer EfhLoggerPrinter
+	Mode    EfhLoggerOutputMode
+}
+
 type EfhLogger struct {
 	tobLogger TobLogger
 	printer   EfhLoggerPrinter
@@ -37,11 +43,16 @@ type EfhLogger struct {
 
 var _ sim.Observer = &EfhLogger{}
 
-func NewEfhLogger(p EfhLoggerPrinter) *EfhLogger {
+func NewEfhLogger(c EfhLoggerConfig) *EfhLogger {
 	l := &EfhLogger{
 		tobLogger: *NewTobLogger(),
-		printer:   p,
+		printer:   c.Printer,
+		mode:      c.Mode,
 		stream:    *NewStream(),
+	}
+	if l.printer == nil {
+		errs.Check(c.Writer != nil)
+		l.printer = NewTestefhPrinter(c.Writer)
 	}
 	return l
 }
