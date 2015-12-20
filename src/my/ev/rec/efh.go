@@ -36,10 +36,10 @@ func (p *testefhPrinter) PrintMessage(m efhMessage) error {
 }
 
 type EfhLogger struct {
-	TobLogger
-	printer EfhLoggerPrinter
-	mode    EfhLoggerOutputMode
-	stream  Stream
+	tobLogger TobLogger
+	printer   EfhLoggerPrinter
+	mode      EfhLoggerOutputMode
+	stream    Stream
 }
 
 var _ sim.Observer = &EfhLogger{}
@@ -47,7 +47,7 @@ var _ sim.Observer = &EfhLogger{}
 func NewEfhLogger(p EfhLoggerPrinter) *EfhLogger {
 	l := &EfhLogger{
 		printer:   p,
-		TobLogger: *NewTobLogger(),
+		tobLogger: *NewTobLogger(),
 		stream:    *NewStream(),
 	}
 	return l
@@ -66,7 +66,7 @@ func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
 
 func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
-	l.TobLogger.MessageArrived(idm)
+	l.tobLogger.MessageArrived(idm)
 	switch m := l.stream.getExchangeMessage().(type) {
 	case packet.TradeMessage:
 		l.genUpdateTrades(m)
@@ -78,16 +78,21 @@ func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 		l.genUpdateDefinitionsMiax(m)
 	}
 }
-
+func (l *EfhLogger) OperationAppliedToOrders(operation sim.SimOperation) {
+	l.tobLogger.OperationAppliedToOrders(operation)
+}
+func (l *EfhLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) {
+	l.tobLogger.BeforeBookUpdate(book, operation)
+}
 func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 	if l.mode == EfhLoggerOutputOrders {
-		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNew) {
-			l.genUpdateOrders(l.TobLogger.bid)
-			l.genUpdateOrders(l.TobLogger.ask)
+		if l.tobLogger.AfterBookUpdate(book, operation, TobUpdateNew) {
+			l.genUpdateOrders(l.tobLogger.bid)
+			l.genUpdateOrders(l.tobLogger.ask)
 		}
 	} else {
-		if l.TobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
-			l.genUpdateQuotes(l.TobLogger.bid, l.TobLogger.ask)
+		if l.tobLogger.AfterBookUpdate(book, operation, TobUpdateNewForce) {
+			l.genUpdateQuotes(l.tobLogger.bid, l.tobLogger.ask)
 		}
 	}
 }
@@ -101,7 +106,7 @@ func (l *EfhLogger) genUpdateHeaderForOption(messageType uint8, oid packet.Optio
 	}
 }
 func (l *EfhLogger) genUpdateHeader(messageType uint8) efhm_header {
-	return l.genUpdateHeaderForOption(messageType, l.TobLogger.lastOptionId)
+	return l.genUpdateHeaderForOption(messageType, l.tobLogger.lastOptionId)
 }
 func (l *EfhLogger) genUpdateOrders(tob tob) {
 	if !tob.updated() {
