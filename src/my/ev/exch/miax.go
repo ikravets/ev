@@ -426,21 +426,25 @@ func (mms *miaxMessageSource) generateRefreshResponse(RefreshType byte, seqNum i
 		}
 	case miax.SesMRefreshToM:
 		m = &miax.MachDoubleSidedToMCompact{
-			NanoTime:   u32,
-			ProductID:  u32,
-			BidPrice:   u16,
-			BidSize:    u16,
-			OfferPrice: u16,
-			OfferSize:  u16,
+			NanoTime:      u32,
+			ProductID:     u32,
+			BidPrice:      u16,
+			BidSize:       u16,
+			BidPriority:   u16,
+			OfferPrice:    u16,
+			OfferSize:     u16,
+			OfferPriority: u16,
 		}
 		if 0 == seqNum%2 {
 			m = &miax.MachDoubleSidedToMWide{
-				NanoTime:   u32,
-				ProductID:  u32,
-				BidPrice:   u32,
-				BidSize:    u32,
-				OfferPrice: u32,
-				OfferSize:  u32,
+				NanoTime:      u32,
+				ProductID:     u32,
+				BidPrice:      u32,
+				BidSize:       u32,
+				BidPriority:   u32,
+				OfferPrice:    u32,
+				OfferSize:     u32,
+				OfferPriority: u32,
 			}
 		}
 	default:
