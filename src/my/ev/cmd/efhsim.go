@@ -70,31 +70,34 @@ func (c *cmdEfhsim) ParsingFinished() (err error) {
 			efh.AddLogger(rec.NewHwLimChecker())
 		}
 	}
-	supernodeLevels := rec.SimLoggerDefaultSupernodeLevels
+	efhLoggerConfig := rec.EfhLoggerConfig{}
+	simLoggerConfig := rec.SimLoggerConfig{}
 	if c.TobBook {
-		supernodeLevels = 1
+		simLoggerConfig.SupernodeLevels = 1
 	}
 	c.addOut(c.OutputFileNameSimOrders, func(w io.Writer) error {
-		logger := rec.NewSimLogger(w)
-		logger.SetSupernodeLevels(supernodeLevels)
-		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
-		return efh.AddLogger(logger)
+		lc := simLoggerConfig
+		lc.Writer = w
+		lc.Mode = rec.EfhLoggerOutputOrders
+		return efh.AddLogger(rec.NewSimLogger(lc))
 	})
 	c.addOut(c.OutputFileNameSimQuotes, func(w io.Writer) error {
-		logger := rec.NewSimLogger(w)
-		logger.SetSupernodeLevels(supernodeLevels)
-		logger.SetOutputMode(rec.EfhLoggerOutputQuotes)
-		return efh.AddLogger(logger)
+		lc := simLoggerConfig
+		lc.Writer = w
+		lc.Mode = rec.EfhLoggerOutputQuotes
+		return efh.AddLogger(rec.NewSimLogger(lc))
 	})
 	c.addOut(c.OutputFileNameEfhOrders, func(w io.Writer) error {
-		logger := rec.NewEfhLogger(rec.NewTestefhPrinter(w))
-		logger.SetOutputMode(rec.EfhLoggerOutputOrders)
-		return efh.AddLogger(logger)
+		lc := efhLoggerConfig
+		lc.Writer = w
+		lc.Mode = rec.EfhLoggerOutputOrders
+		return efh.AddLogger(rec.NewEfhLogger(lc))
 	})
 	c.addOut(c.OutputFileNameEfhQuotes, func(w io.Writer) error {
-		logger := rec.NewEfhLogger(rec.NewTestefhPrinter(w))
-		logger.SetOutputMode(rec.EfhLoggerOutputQuotes)
-		return efh.AddLogger(logger)
+		lc := efhLoggerConfig
+		lc.Writer = w
+		lc.Mode = rec.EfhLoggerOutputQuotes
+		return efh.AddLogger(rec.NewEfhLogger(lc))
 	})
 	c.addOut(c.OutputFileNameAvt, func(w io.Writer) (err error) {
 		defer errs.PassE(&err)
