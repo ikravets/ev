@@ -57,10 +57,6 @@ func NewEfhLogger(c EfhLoggerConfig) *EfhLogger {
 	return l
 }
 
-func (l *EfhLogger) SetOutputMode(mode EfhLoggerOutputMode) {
-	l.mode = mode
-}
-
 func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
 	l.tobLogger.MessageArrived(idm)
