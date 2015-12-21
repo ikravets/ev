@@ -127,6 +127,28 @@ func (m *SimMessage) populateOps() {
 			},
 		}
 		addOperation(packet.OrderIdUnknown, &op)
+	case *miax.TomMessageQuote:
+		opBid := OperationTop{
+			optionId: m.subscribedOptionId(),
+			side:     packet.MarketSideBid,
+			price:    im.BidPrice,
+			sizes: [SizeKinds]int{
+				SizeKindDefault:  im.BidSize,
+				SizeKindCustomer: im.BidPriorityCustomerSize,
+			},
+		}
+		addOperation(packet.OrderIdUnknown, &opBid)
+		opOffer := OperationTop{
+			optionId: m.subscribedOptionId(),
+			side:     packet.MarketSideAsk,
+			price:    im.OfferPrice,
+			sizes: [SizeKinds]int{
+				SizeKindDefault:  im.OfferSize,
+				SizeKindCustomer: im.OfferPriorityCustomerSize,
+			},
+		}
+		addOperation(packet.OrderIdUnknown, &opOffer)
+		m.sides = 2
 	case
 		*nasdaq.IttoMessageNoii,
 		*nasdaq.IttoMessageOptionsTrade,
