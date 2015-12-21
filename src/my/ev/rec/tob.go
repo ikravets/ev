@@ -6,8 +6,6 @@ package rec
 import (
 	"log"
 
-	"github.com/ikravets/errs"
-
 	"my/ev/packet"
 	"my/ev/sim"
 )
@@ -19,13 +17,13 @@ type TobLogger struct {
 	hasOldTob    bool
 	bid          tob
 	ask          tob
-	abuFlags     TobUpdate
 }
 type tob struct {
 	Check bool
 	Side  packet.MarketSide
 	Old   sim.PriceLevel
 	New   sim.PriceLevel
+	Flags TobUpdate
 }
 
 func NewTobLogger() *TobLogger {
@@ -36,8 +34,9 @@ func NewTobLogger() *TobLogger {
 	return l
 }
 
-func (l *TobLogger) SetAfterBookUpdateFlags(abuFlags TobUpdate) {
-	l.abuFlags = abuFlags
+func (l *TobLogger) SetUpdateFlags(flags TobUpdate) {
+	l.bid.Flags = flags
+	l.ask.Flags = flags
 }
 
 func (l *TobLogger) MessageArrived(idm *sim.SimMessage) {
@@ -73,8 +72,8 @@ func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) 
 	default:
 		log.Fatalln("wrong operation side")
 	}
-	l.bid.update(book, l.lastOptionId, TobUpdateOld)
-	l.ask.update(book, l.lastOptionId, TobUpdateOld)
+	l.bid.update(book, l.lastOptionId, false)
+	l.ask.update(book, l.lastOptionId, false)
 	l.hasOldTob = true
 }
 
@@ -91,34 +90,26 @@ func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) b
 	if l.lastOptionId.Invalid() {
 		return false
 	}
-	tobUpdate := l.abuFlags | TobUpdateNew
-	l.bid.update(book, l.lastOptionId, tobUpdate)
-	l.ask.update(book, l.lastOptionId, tobUpdate)
+	l.bid.update(book, l.lastOptionId, true)
+	l.ask.update(book, l.lastOptionId, true)
 
-	return tobUpdate&TobUpdateAssumeUpdated != 0 || l.bid.updated() || l.ask.updated()
+	return l.bid.updated() || l.ask.updated()
 }
 
 type TobUpdate byte
 
 const (
-	TobUpdateOld TobUpdate = 1 << iota
-	TobUpdateNew
-	TobUpdateBothSides
+	TobUpdateBothSides TobUpdate = 1 << iota
 	TobUpdateAssumeUpdated
 )
 
-func (tob *tob) update(book sim.Book, oid packet.OptionId, u TobUpdate) {
-	var pl *sim.PriceLevel
-	switch u & (TobUpdateNew | TobUpdateOld) {
-	case TobUpdateNew:
+func (tob *tob) update(book sim.Book, oid packet.OptionId, updateNew bool) {
+	pl := &tob.Old
+	if updateNew {
 		pl = &tob.New
-	case TobUpdateOld:
-		pl = &tob.Old
-	default:
-		errs.Check(false)
 	}
 	*pl = sim.EmptyPriceLevel
-	if tob.Check || u&TobUpdateBothSides != 0 {
+	if tob.Check || tob.Flags&TobUpdateBothSides != 0 && updateNew {
 		if pls := book.GetTop(oid, tob.Side, 1); len(pls) > 0 {
 			*pl = pls[0].Clone()
 		}
@@ -126,5 +117,5 @@ func (tob *tob) update(book sim.Book, oid packet.OptionId, u TobUpdate) {
 }
 
 func (tob *tob) updated() bool {
-	return tob.Check && !tob.Old.Equals(tob.New) && (tob.Old.Price() != 0 || tob.New.Price() != 0)
+	return tob.Check && (tob.Flags&TobUpdateAssumeUpdated != 0 || !tob.Old.Equals(tob.New) && (tob.Old.Price() != 0 || tob.New.Price() != 0))
 }

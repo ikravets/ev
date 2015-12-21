@@ -55,14 +55,14 @@ func NewEfhLogger(c EfhLoggerConfig) *EfhLogger {
 		errs.Check(c.Writer != nil)
 		l.printer = NewTestefhPrinter(c.Writer)
 	}
-	var abuFlags TobUpdate
+	var updateFlags TobUpdate
 	if l.mode == EfhLoggerOutputQuotes {
-		abuFlags |= TobUpdateBothSides
+		updateFlags |= TobUpdateBothSides
 	}
 	if c.AssumeTobUpdate {
-		abuFlags |= TobUpdateAssumeUpdated
+		updateFlags |= TobUpdateAssumeUpdated
 	}
-	l.tobLogger.SetAfterBookUpdateFlags(abuFlags)
+	l.tobLogger.SetUpdateFlags(updateFlags)
 	return l
 }
 

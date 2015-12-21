@@ -36,7 +36,7 @@ func NewAvtLogger(w io.Writer, rDict io.Reader) *AvtLogger {
 	var err error
 	l.location, err = time.LoadLocation("EST")
 	errs.CheckE(err)
-	l.TobLogger.SetAfterBookUpdateFlags(TobUpdateBothSides)
+	l.TobLogger.SetUpdateFlags(TobUpdateBothSides)
 	if rDict != nil {
 		r := csv.NewReader(rDict)
 		records, err := r.ReadAll()
