@@ -98,6 +98,7 @@ func (c *conn) WriteMachMessage(sn uint64, m MachMessage) (err error) {
 		ApplicationMessage: b.Bytes(),
 	}
 	writeSesMHeader(&res, um)
+	log.Printf("snd %#v\n", um)
 	errs.CheckE(binary.Write(&res, binary.LittleEndian, um.ResponseType))
 	errs.CheckE(binary.Write(&res, binary.LittleEndian, um.SequenceNumber))
 	errs.CheckE(binary.Write(&res, binary.LittleEndian, um.ApplicationMessage))
