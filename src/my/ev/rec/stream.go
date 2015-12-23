@@ -7,48 +7,46 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/gopacket"
-
 	"my/ev/packet"
 	"my/ev/sim"
 )
 
 type Stream struct {
 	message *sim.SimMessage
-	seconds map[gopacket.Flow]int
-	seqNum  map[gopacket.Flow]uint64
+	seconds map[int]int
+	seqNum  map[int]uint64
 }
 
 func NewStream() *Stream {
 	l := &Stream{
-		seconds: make(map[gopacket.Flow]int),
-		seqNum:  make(map[gopacket.Flow]uint64),
+		seconds: make(map[int]int),
+		seqNum:  make(map[int]uint64),
 	}
 	return l
 }
 func (l *Stream) MessageArrived(idm *sim.SimMessage) {
 	l.message = idm
 
-	flow := l.message.Pam.Flow()
+	idx := l.message.Session.Index()
 	seq := l.message.Pam.SequenceNumber()
 	if seq != 0 {
-		if prevSeq, ok := l.seqNum[flow]; ok && prevSeq+1 != seq {
+		if prevSeq, ok := l.seqNum[idx]; ok && prevSeq+1 != seq {
 			log.Printf("seqNum gap; expected %d actual %d\n", prevSeq+1, seq)
 		}
-		l.seqNum[flow] = seq
+		l.seqNum[idx] = seq
 	}
 
 	if m, ok := l.message.Pam.Layer().(packet.SecondsMessage); ok {
-		l.seconds[flow] = m.Seconds()
+		l.seconds[idx] = m.Seconds()
 	}
 }
 func (l *Stream) getSeqNum() uint64 {
-	flow := l.message.Pam.Flow()
-	return l.seqNum[flow]
+	idx := l.message.Session.Index()
+	return l.seqNum[idx]
 }
 func (l *Stream) getTimestamp() uint64 {
-	flow := l.message.Pam.Flow()
-	return uint64(l.seconds[flow])*1e9 + uint64(l.message.Pam.Layer().(packet.ExchangeMessage).Nanoseconds())
+	idx := l.message.Session.Index()
+	return uint64(l.seconds[idx])*1e9 + uint64(l.message.Pam.Layer().(packet.ExchangeMessage).Nanoseconds())
 }
 func (l *Stream) getExchangeMessage() packet.ExchangeMessage {
 	return l.message.Pam.Layer().(packet.ExchangeMessage)
