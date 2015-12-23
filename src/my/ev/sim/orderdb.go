@@ -7,15 +7,13 @@ import (
 	"errors"
 	"log"
 
-	"github.com/google/gopacket"
-
 	"my/ev/packet"
 )
 
 type OrderDb interface {
 	Stats() OrderDbStats
 	ApplyOperation(operation SimOperation)
-	findOrder(flow gopacket.Flow, orderId packet.OrderId) (order order, err error) // TODO refactor
+	findOrder(session *Session, orderId packet.OrderId) (order order, err error)
 }
 type OrderDbStats struct {
 	Orders     int
@@ -43,9 +41,8 @@ type orderIndex struct {
 	sessionIndex int
 }
 
-func newOrderIndex(sim Sim, flow gopacket.Flow, orderId packet.OrderId) orderIndex {
-	s := sim.Session(flow)
-	return orderIndex{orderId: orderId, sessionIndex: s.index}
+func newOrderIndex(sim Sim, session *Session, orderId packet.OrderId) orderIndex {
+	return orderIndex{orderId: orderId, sessionIndex: session.index}
 }
 
 type order struct {
@@ -58,8 +55,8 @@ type order struct {
 
 var orderNotFoundError = errors.New("order not found")
 
-func (d *orderDb) findOrder(flow gopacket.Flow, orderId packet.OrderId) (order order, err error) {
-	order, ok := d.orders[newOrderIndex(d.sim, flow, orderId)]
+func (d *orderDb) findOrder(session *Session, orderId packet.OrderId) (order order, err error) {
+	order, ok := d.orders[newOrderIndex(d.sim, session, orderId)]
 	if !ok {
 		err = orderNotFoundError
 	}

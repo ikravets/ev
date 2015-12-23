@@ -42,13 +42,13 @@ func (op *Operation) populate() {
 		op.sibling.getOperation().populate()
 		op.origOrder = op.sibling.getOperation().origOrder
 	} else if op.origOrderId != packet.OrderIdUnknown {
-		if ord, err := op.sim.OrderDb().findOrder(op.m.Pam.Flow(), op.origOrderId); err == nil {
+		if ord, err := op.sim.OrderDb().findOrder(op.m.Session, op.origOrderId); err == nil {
 			op.origOrder = &ord
 		}
 	}
 }
 func (op *Operation) origOrderIndex() orderIndex {
-	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.origOrderId)
+	return newOrderIndex(op.sim, op.m.Session, op.origOrderId)
 }
 func (o *Operation) getOptionId() (oid packet.OptionId) {
 	o.populate()
@@ -102,7 +102,7 @@ func (o *OperationAdd) GetNewSize(sk SizeKind) int {
 	return o.Size
 }
 func (op *OperationAdd) orderIndex() orderIndex {
-	return newOrderIndex(op.sim, op.m.Pam.Flow(), op.OrderId)
+	return newOrderIndex(op.sim, op.m.Session, op.OrderId)
 }
 
 type OperationRemove struct {
