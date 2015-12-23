@@ -7,6 +7,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/ikravets/errs"
+
 	"my/ev/packet"
 	"my/ev/sim"
 )
@@ -43,6 +45,11 @@ func (l *Stream) MessageArrived(idm *sim.SimMessage) {
 	if m, ok := l.message.Pam.Layer().(packet.SecondsMessage); ok {
 		l.seconds[idx] = m.Seconds()
 	}
+}
+func (l *Stream) getGroup() uint8 {
+	idx := l.message.Session.Index()
+	errs.Check(idx >= 0 && idx < 256)
+	return uint8(idx)
 }
 func (l *Stream) getSeqNum() uint64 {
 	idx := l.message.Session.Index()
