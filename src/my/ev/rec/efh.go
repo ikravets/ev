@@ -101,6 +101,7 @@ func (l *EfhLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) {
 func (l *EfhLogger) genUpdateHeaderForOption(messageType uint8, oid packet.OptionId) efhm_header {
 	return efhm_header{
 		Type:           messageType,
+		GroupId:        l.stream.getGroup(),
 		SecurityId:     oid.ToUint64(),
 		SequenceNumber: l.stream.getSeqNum(),
 		TimeStamp:      l.stream.getTimestamp(),
