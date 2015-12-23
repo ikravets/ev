@@ -13,24 +13,28 @@ import (
 
 type Stream struct {
 	message *sim.SimMessage
-	seconds map[int]int
-	seqNum  map[int]uint64
+	seconds []int
+	seqNum  []uint64
 }
 
 func NewStream() *Stream {
-	l := &Stream{
-		seconds: make(map[int]int),
-		seqNum:  make(map[int]uint64),
-	}
-	return l
+	return &Stream{}
 }
 func (l *Stream) MessageArrived(idm *sim.SimMessage) {
 	l.message = idm
 
 	idx := l.message.Session.Index()
+	if idx >= len(l.seconds) {
+		secondsOld := l.seconds
+		l.seconds = make([]int, idx+1)
+		copy(l.seconds, secondsOld)
+		seqNumOld := l.seqNum
+		l.seqNum = make([]uint64, idx+1)
+		copy(l.seqNum, seqNumOld)
+	}
 	seq := l.message.Pam.SequenceNumber()
 	if seq != 0 {
-		if prevSeq, ok := l.seqNum[idx]; ok && prevSeq+1 != seq {
+		if prevSeq := l.seqNum[idx]; prevSeq != 0 && prevSeq+1 != seq {
 			log.Printf("seqNum gap; expected %d actual %d\n", prevSeq+1, seq)
 		}
 		l.seqNum[idx] = seq
