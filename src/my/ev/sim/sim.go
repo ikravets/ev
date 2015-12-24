@@ -15,14 +15,16 @@ type Sim interface {
 	OrderDb() OrderDb
 	Book() Book
 	Sessions() []Session
+	SessionsIgnoreSrc(ignore bool)
 	NewMessage(packet.ApplicationMessage) *SimMessage
 }
 
 type simu struct {
-	subscr   *Subscr
-	orderDb  OrderDb
-	book     Book
-	sessions []Session
+	subscr    *Subscr
+	orderDb   OrderDb
+	book      Book
+	sessions  []Session
+	ignoreSrc bool
 }
 
 func NewSim(shallow bool) Sim {
@@ -46,6 +48,9 @@ func (sim *simu) Book() Book {
 func (sim *simu) OrderDb() OrderDb {
 	return sim.orderDb
 }
+func (sim *simu) SessionsIgnoreSrc(ignore bool) {
+	sim.ignoreSrc = ignore
+}
 func (sim *simu) Sessions() []Session {
 	return sim.sessions
 }
@@ -54,17 +59,24 @@ func (sim *simu) NewMessage(pam packet.ApplicationMessage) *SimMessage {
 }
 
 func (sim *simu) Session(flows []gopacket.Flow) Session {
-Loop:
 	for _, s := range sim.sessions {
 		if len(s.flows) != len(flows) {
 			continue
 		}
+		match := true
 		for i := range s.flows {
-			if s.flows[i] != flows[i] {
-				continue Loop
+			if sim.ignoreSrc {
+				match = match && s.flows[i].Dst() == flows[i].Dst()
+			} else {
+				match = match && s.flows[i] == flows[i]
+			}
+			if !match {
+				break
 			}
 		}
-		return s
+		if match {
+			return s
+		}
 	}
 	s := Session{
 		flows: make([]gopacket.Flow, len(flows)),
