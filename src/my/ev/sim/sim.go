@@ -10,7 +10,7 @@ import (
 )
 
 type Sim interface {
-	Session(flow gopacket.Flow) Session
+	Session(flows []gopacket.Flow) Session
 	Subscr() *Subscr
 	OrderDb() OrderDb
 	Book() Book
@@ -53,22 +53,30 @@ func (sim *simu) NewMessage(pam packet.ApplicationMessage) *SimMessage {
 	return NewSimMessage(sim, pam)
 }
 
-func (sim *simu) Session(flow gopacket.Flow) Session {
+func (sim *simu) Session(flows []gopacket.Flow) Session {
+Loop:
 	for _, s := range sim.sessions {
-		if s.flow == flow {
-			return s
+		if len(s.flows) != len(flows) {
+			continue
 		}
+		for i := range s.flows {
+			if s.flows[i] != flows[i] {
+				continue Loop
+			}
+		}
+		return s
 	}
 	s := Session{
-		flow:  flow,
+		flows: make([]gopacket.Flow, len(flows)),
 		index: len(sim.sessions),
 	}
+	copy(s.flows, flows)
 	sim.sessions = append(sim.sessions, s)
 	return s
 }
 
 type Session struct {
-	flow  gopacket.Flow
+	flows []gopacket.Flow
 	index int
 }
 

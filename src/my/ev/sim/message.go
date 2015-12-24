@@ -22,7 +22,7 @@ type SimMessage struct {
 }
 
 func NewSimMessage(sim Sim, pam packet.ApplicationMessage) *SimMessage {
-	s := sim.Session(pam.Flow())
+	s := sim.Session(pam.Flows())
 	m := &SimMessage{
 		Pam:     pam,
 		Session: &s,
