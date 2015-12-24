@@ -16,6 +16,7 @@ import (
 
 	"github.com/ikravets/errs"
 
+	"my/ev/channels"
 	"my/ev/packet"
 )
 
@@ -30,7 +31,7 @@ type ReplayConfig struct {
 	EfhIgnoreGap bool
 	EfhDump      string
 	EfhSubscribe []string
-	EfhChannel   []string
+	EfhChannel   channels.Config
 	EfhProf      bool
 
 	TestEfh string
@@ -118,7 +119,7 @@ func (e *efhReplay) startTestEfh() (err error) {
 	if e.EfhProf {
 		e.testEfhArgs = append(e.testEfhArgs, "--prof")
 	}
-	for _, ch := range e.EfhChannel {
+	for _, ch := range e.EfhChannel.Addrs() {
 		e.testEfhArgs = append(e.testEfhArgs, "--channel", ch)
 	}
 	if len(e.EfhSubscribe) == 0 {

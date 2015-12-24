@@ -179,15 +179,15 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	c.testRunsOk++
 	return
 }
-func (c *cmdEfhSuite) genEfhChannels(testDirName string) []string {
-	cc := channels.NewConfig()
+func (c *cmdEfhSuite) genEfhChannels(testDirName string) (cc channels.Config) {
+	cc = channels.NewConfig()
 	if file, err := os.Open(filepath.Join(testDirName, "channels")); err == nil {
 		defer file.Close()
 		errs.CheckE(cc.LoadFromReader(file))
 	} else {
 		errs.CheckE(cc.LoadFromStr(c.Exchange))
 	}
-	return cc.Addrs()
+	return
 }
 
 func listDirs(parent string) (children []string, err error) {

@@ -6,8 +6,10 @@ package cmd
 import (
 	"log"
 
+	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
 
+	"my/ev/channels"
 	"my/ev/efh"
 )
 
@@ -44,6 +46,10 @@ func (c *cmdEfhReplay) ParsingFinished() (err error) {
 	if !c.shouldExecute {
 		return
 	}
+	cc := channels.NewConfig()
+	for _, s := range c.EfhChannel {
+		errs.CheckE(cc.LoadFromStr(s))
+	}
 	conf := efh.ReplayConfig{
 		InputFileName:   c.InputFileName,
 		OutputInterface: c.OutputInterface,
@@ -54,7 +60,7 @@ func (c *cmdEfhReplay) ParsingFinished() (err error) {
 		EfhIgnoreGap:    c.EfhIgnoreGap,
 		EfhDump:         c.EfhDump,
 		EfhSubscribe:    c.EfhSubscribe,
-		EfhChannel:      c.EfhChannel,
+		EfhChannel:      cc,
 		EfhProf:         c.EfhProf,
 		TestEfh:         c.TestEfh,
 		Local:           c.Local,
