@@ -6,10 +6,14 @@ package efhsim
 import (
 	"io"
 	"log"
+	"net"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/ikravets/errs"
 
+	"my/ev/channels"
 	"my/ev/packet"
 	"my/ev/packet/processor"
 	"my/ev/sim"
@@ -40,6 +44,19 @@ func (s *EfhSim) SubscribeFromReader(r io.Reader) error {
 }
 func (s *EfhSim) SubscriptionsNum() int {
 	return s.simu.Subscr().Num()
+}
+func (s *EfhSim) RegisterChannels(cc channels.Config) (err error) {
+	defer errs.PassE(&err)
+	s.simu.SessionsIgnoreSrc(true)
+	for _, c := range cc.Addrs() {
+		a, err := net.ResolveUDPAddr("udp", c)
+		errs.CheckE(err)
+		ipFlow := gopacket.NewFlow(layers.EndpointIPv4, nil, a.IP.To4())
+		portBytes := []byte{byte(a.Port >> 8), byte(a.Port)}
+		udpFlow := gopacket.NewFlow(layers.EndpointUDPPort, nil, portBytes)
+		s.simu.Session([]gopacket.Flow{ipFlow, udpFlow})
+	}
+	return
 }
 
 func (s *EfhSim) AddLogger(logger sim.Observer) error {
