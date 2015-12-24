@@ -17,24 +17,26 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"my/ev/anal"
+	"my/ev/channels"
 	"my/ev/efhsim"
 	"my/ev/rec"
 )
 
 type cmdEfhsim struct {
-	InputFileName           string `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
-	TobBook                 bool   `long:"tob" short:"t" description:"use 1-level-deep book (for exchange disseminating ToB only)"`
-	SubscriptionFileName    string `long:"subscribe" short:"s" value-name:"SUBSCRIPTION_FILE" description:"read subscriptions from file"`
-	OutputFileNameSimOrders string `long:"output-sim-orders" value-name:"FILE" description:"output file for hw simulator"`
-	OutputFileNameSimQuotes string `long:"output-sim-quotes" value-name:"FILE" description:"output file for hw simulator"`
-	OutputFileNameEfhOrders string `long:"output-efh-orders" value-name:"FILE" description:"output file for EFH order messages"`
-	OutputFileNameEfhQuotes string `long:"output-efh-quotes" value-name:"FILE" description:"output file for EFH quote messages"`
-	OutputFileNameAvt       string `long:"output-avt" value-name:"FILE" description:"output file for AVT CSV"`
-	InputFileNameAvtDict    string `long:"avt-dict" value-name:"DICT" description:"read dictionary for AVT CSV output"`
-	OutputDirStats          string `long:"output-stats" value-name:"DIR" description:"output dir for stats"`
-	PacketNumLimit          int    `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
-	NoHwLim                 bool   `long:"no-hw-lim" description:"do not enforce HW limits"`
-	Md5sum                  bool   `long:"md5sum" description:"compute md5sum on output file(s)"`
+	InputFileName           string   `long:"input" short:"i" required:"y" value-name:"PCAP_FILE" description:"input pcap file to read"`
+	TobBook                 bool     `long:"tob" short:"t" description:"use 1-level-deep book (for exchange disseminating ToB only)"`
+	SubscriptionFileName    string   `long:"subscribe" short:"s" value-name:"SUBSCRIPTION_FILE" description:"read subscriptions from file"`
+	Channels                []string `long:"channel"`
+	OutputFileNameSimOrders string   `long:"output-sim-orders" value-name:"FILE" description:"output file for hw simulator"`
+	OutputFileNameSimQuotes string   `long:"output-sim-quotes" value-name:"FILE" description:"output file for hw simulator"`
+	OutputFileNameEfhOrders string   `long:"output-efh-orders" value-name:"FILE" description:"output file for EFH order messages"`
+	OutputFileNameEfhQuotes string   `long:"output-efh-quotes" value-name:"FILE" description:"output file for EFH quote messages"`
+	OutputFileNameAvt       string   `long:"output-avt" value-name:"FILE" description:"output file for AVT CSV"`
+	InputFileNameAvtDict    string   `long:"avt-dict" value-name:"DICT" description:"read dictionary for AVT CSV output"`
+	OutputDirStats          string   `long:"output-stats" value-name:"DIR" description:"output dir for stats"`
+	PacketNumLimit          int      `long:"count" short:"c" value-name:"NUM" description:"limit number of input packets"`
+	NoHwLim                 bool     `long:"no-hw-lim" description:"do not enforce HW limits"`
+	Md5sum                  bool     `long:"md5sum" description:"compute md5sum on output file(s)"`
 	shouldExecute           bool
 	closers                 []io.Closer
 }
@@ -55,6 +57,13 @@ func (c *cmdEfhsim) ParsingFinished() (err error) {
 	}
 	efh := efhsim.NewEfhSim(c.TobBook)
 	efh.SetInput(c.InputFileName, c.PacketNumLimit)
+	if len(c.Channels) > 0 {
+		cc := channels.NewConfig()
+		for _, s := range c.Channels {
+			errs.CheckE(cc.LoadFromStr(s))
+		}
+		errs.CheckE(efh.RegisterChannels(cc))
+	}
 	if c.SubscriptionFileName != "" {
 		file, err := os.Open(c.SubscriptionFileName)
 		errs.CheckE(err)
