@@ -6,7 +6,6 @@ package processor
 import (
 	"bytes"
 	"io"
-	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -14,26 +13,6 @@ import (
 	"my/ev/packet"
 	"my/ev/packet/nasdaq"
 )
-
-type applicationMessage struct {
-	layer     gopacket.Layer
-	flow      gopacket.Flow
-	seqNum    uint64
-	timestamp time.Time
-}
-
-func (am *applicationMessage) Layer() gopacket.Layer {
-	return am.layer
-}
-func (am *applicationMessage) Flow() gopacket.Flow {
-	return am.flow
-}
-func (am *applicationMessage) SequenceNumber() uint64 {
-	return am.seqNum
-}
-func (am *applicationMessage) Timestamp() time.Time {
-	return am.timestamp
-}
 
 type processor struct {
 	obtainer       packet.Obtainer
