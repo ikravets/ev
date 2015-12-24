@@ -24,8 +24,6 @@ type reusingProcessor struct {
 	obtainer       packet.Obtainer
 	handler        packet.Handler
 	packetNumLimit int
-	flowBufSrc     bytes.Buffer
-	flowBufDst     bytes.Buffer
 	pkt            reusingPacket
 	m              applicationMessage
 	nextSeqNums    []uint64
@@ -118,19 +116,14 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 		timestamp: p.pkt.Timestamp(),
 	}
 	p.handler.HandlePacket(&p.pkt)
-	p.flowBufSrc.Reset()
-	p.flowBufDst.Reset()
 	for _, layer := range decoded {
 		//log.Printf("%#v", layer)
 		switch l := layer.(type) {
 		case gopacket.NetworkLayer:
-			p.flowBufSrc.Write(l.NetworkFlow().Src().Raw())
-			p.flowBufDst.Write(l.NetworkFlow().Dst().Raw())
+			p.m.flows = append(p.m.flows, l.NetworkFlow())
 		case *layers.UDP:
-			p.flowBufSrc.Write(l.TransportFlow().Src().Raw())
-			p.flowBufDst.Write(l.TransportFlow().Dst().Raw())
+			p.m.flows = append(p.m.flows, l.TransportFlow())
 		case *miax.MachTop:
-			p.m.flows = append(p.m.flows, gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes()))
 			p.messageNum = l.MachPackets
 			p.messageIndex = 0
 			p.nextSeqNums = p.nextSeqNums[:0]
@@ -144,14 +137,12 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 			p.messageIndex++
 			p.handler.HandleMessage(&p.m)
 		case *bats.BSU:
-			p.m.flows = append(p.m.flows, gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes()))
 			p.m.seqNum = uint64(l.Sequence)
 		case bats.PitchMessage:
 			p.m.layer = l
 			p.handler.HandleMessage(&p.m)
 			p.m.seqNum++
 		case *nasdaq.MoldUDP64:
-			p.m.flows = append(p.m.flows, gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes()))
 			p.m.seqNum = l.SequenceNumber
 		case nasdaq.IttoMessage:
 			p.m.layer = l
