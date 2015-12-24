@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/ikravets/errs"
 	"github.com/jessevdk/go-flags"
 
+	"my/ev/channels"
 	"my/ev/efh"
 )
 
@@ -179,37 +179,15 @@ func (c *cmdEfhSuite) RunTest(testDirName string, suffix *string) (err error) {
 	c.testRunsOk++
 	return
 }
-func (c *cmdEfhSuite) genEfhChannels(testDirName string) (channels []string) {
-	inChannels := []string{c.Exchange}
-	if contents, err := ioutil.ReadFile(filepath.Join(testDirName, "channels")); err == nil {
-		errs.Check(len(contents) > 0, "channels file must not be empty")
-		inChannels = strings.Fields(string(contents))
+func (c *cmdEfhSuite) genEfhChannels(testDirName string) []string {
+	cc := channels.NewConfig()
+	if file, err := os.Open(filepath.Join(testDirName, "channels")); err == nil {
+		defer file.Close()
+		errs.CheckE(cc.LoadFromReader(file))
+	} else {
+		errs.CheckE(cc.LoadFromStr(c.Exchange))
 	}
-	for _, c := range inChannels {
-		switch c {
-		case "nasdaq":
-			for i := 0; i < 4; i++ {
-				channels = append(channels, fmt.Sprintf("233.54.12.%d:%d", 1+i, 18001+i))
-			}
-		case "bats":
-			for i := 0; i < 32; i++ {
-				channels = append(channels, fmt.Sprintf("224.0.131.%d:%d", i/4, 30101+i))
-			}
-		case "bats-b":
-			for i := 0; i < 32; i++ {
-				channels = append(channels, fmt.Sprintf("233.130.124.%d:%d", i/4, 30101+i))
-			}
-		case "miax":
-			for i := 0; i < 24; i++ {
-				channels = append(channels, fmt.Sprintf("224.0.105.%d:%d", 1+i, 51001+i))
-			}
-		default:
-			_, err := net.ResolveUDPAddr("udp", c)
-			errs.CheckE(err)
-			channels = append(channels, c)
-		}
-	}
-	return
+	return cc.Addrs()
 }
 
 func listDirs(parent string) (children []string, err error) {
