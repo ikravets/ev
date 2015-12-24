@@ -69,8 +69,8 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 		s.printf("NORM ORDER %02x ", idm.Pam.Layer().(bats.PitchMessage).Base().Type.ToInt())
 		s.printfln(f, vs...)
 	}
-	outMiax := func(f string, vs ...interface{}) {
-		s.printf("NORM TOM %02x ", idm.Pam.Layer().(miax.TomMessage).Base().Type.ToInt())
+	outMiax := func(name string, f string, vs ...interface{}) {
+		s.printf("NORM %s %02x ", name, idm.Pam.Layer().(miax.TomMessage).Base().Type.ToInt())
 		s.printfln(f, vs...)
 	}
 	sideChar := func(s packet.MarketSide) byte {
@@ -121,7 +121,10 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 	case *bats.PitchMessageModifyOrder:
 		outBats("%016x %08x %08x", im.OrderId.ToUint64(), im.Size, packet.PriceTo4Dec(im.Price))
 	case *miax.TomMessageTom:
-		outMiax("%c %08x %08x %08x %08x", sideChar(im.Side), im.ProductId.ToUint32(), packet.PriceTo4Dec(im.Price), im.Size, im.PriorityCustomerSize)
+		outMiax("TOM", "%c %08x %08x %08x %08x", sideChar(im.Side), im.ProductId.ToUint32(), packet.PriceTo4Dec(im.Price), im.Size, im.PriorityCustomerSize)
+	case *miax.TomMessageQuote:
+		outMiax("QBID", "%08x %08x %08x %08x", im.ProductId.ToUint32(), packet.PriceTo4Dec(im.BidPrice), im.BidSize, im.BidPriorityCustomerSize)
+		outMiax("QASK", "%08x %08x %08x %08x", im.ProductId.ToUint32(), packet.PriceTo4Dec(im.OfferPrice), im.OfferSize, im.OfferPriorityCustomerSize)
 	}
 	s.efhLogger.MessageArrived(idm)
 }
