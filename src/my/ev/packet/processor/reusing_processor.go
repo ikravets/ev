@@ -114,6 +114,7 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 		layers: decoded,
 	}
 	p.m = applicationMessage{
+		flows:     p.m.flows[:0],
 		timestamp: p.pkt.Timestamp(),
 	}
 	p.handler.HandlePacket(&p.pkt)
@@ -129,7 +130,7 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 			p.flowBufSrc.Write(l.TransportFlow().Src().Raw())
 			p.flowBufDst.Write(l.TransportFlow().Dst().Raw())
 		case *miax.MachTop:
-			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
+			p.m.flows = append(p.m.flows, gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes()))
 			p.messageNum = l.MachPackets
 			p.messageIndex = 0
 			p.nextSeqNums = p.nextSeqNums[:0]
@@ -143,14 +144,14 @@ func (p *reusingProcessor) ProcessPacket(data []byte, ci gopacket.CaptureInfo, d
 			p.messageIndex++
 			p.handler.HandleMessage(&p.m)
 		case *bats.BSU:
-			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
+			p.m.flows = append(p.m.flows, gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes()))
 			p.m.seqNum = uint64(l.Sequence)
 		case bats.PitchMessage:
 			p.m.layer = l
 			p.handler.HandleMessage(&p.m)
 			p.m.seqNum++
 		case *nasdaq.MoldUDP64:
-			p.m.flow = gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes())
+			p.m.flows = append(p.m.flows, gopacket.NewFlow(packet.EndpointCombinedSession, p.flowBufSrc.Bytes(), p.flowBufDst.Bytes()))
 			p.m.seqNum = l.SequenceNumber
 		case nasdaq.IttoMessage:
 			p.m.layer = l

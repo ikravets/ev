@@ -70,7 +70,7 @@ func (p *processor) ProcessAll() error {
 			if nasdaq.LayerClassItto.Contains(l.LayerType()) {
 				m = applicationMessage{
 					layer:     l,
-					flow:      flow,
+					flows:     []gopacket.Flow{flow},
 					seqNum:    seqNum,
 					timestamp: pkt.Metadata().Timestamp,
 				}

@@ -11,7 +11,7 @@ import (
 
 type applicationMessage struct {
 	layer     gopacket.Layer
-	flow      gopacket.Flow
+	flows     []gopacket.Flow
 	seqNum    uint64
 	timestamp time.Time
 }
@@ -20,7 +20,7 @@ func (am *applicationMessage) Layer() gopacket.Layer {
 	return am.layer
 }
 func (am *applicationMessage) Flow() gopacket.Flow {
-	return am.flow
+	return am.flows[0]
 }
 func (am *applicationMessage) SequenceNumber() uint64 {
 	return am.seqNum
