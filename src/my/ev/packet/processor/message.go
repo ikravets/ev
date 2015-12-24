@@ -22,6 +22,9 @@ func (am *applicationMessage) Layer() gopacket.Layer {
 func (am *applicationMessage) Flow() gopacket.Flow {
 	return am.flows[0]
 }
+func (am *applicationMessage) Flows() []gopacket.Flow {
+	return am.flows
+}
 func (am *applicationMessage) SequenceNumber() uint64 {
 	return am.seqNum
 }

@@ -19,6 +19,7 @@ type Obtainer interface {
 
 type ApplicationMessage interface {
 	Flow() gopacket.Flow
+	Flows() []gopacket.Flow
 	Layer() gopacket.Layer
 	SequenceNumber() uint64
 	Timestamp() time.Time
