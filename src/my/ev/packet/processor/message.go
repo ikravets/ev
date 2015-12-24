@@ -19,9 +19,6 @@ type applicationMessage struct {
 func (am *applicationMessage) Layer() gopacket.Layer {
 	return am.layer
 }
-func (am *applicationMessage) Flow() gopacket.Flow {
-	return am.flows[0]
-}
 func (am *applicationMessage) Flows() []gopacket.Flow {
 	return am.flows
 }
