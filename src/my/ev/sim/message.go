@@ -60,6 +60,18 @@ func (m *SimMessage) populateOps() {
 		addOperation(origOrderId, opRemove)
 		addOperation(packet.OrderIdUnknown, opAdd)
 	}
+	addTom := func(s miax.TomSide) {
+		op := OperationTop{
+			optionId: m.subscribedOptionId(),
+			side:     s.Side,
+			price:    s.Price,
+			sizes: [SizeKinds]int{
+				SizeKindDefault:  s.Size,
+				SizeKindCustomer: s.PriorityCustomerSize,
+			},
+		}
+		addOperation(packet.OrderIdUnknown, &op)
+	}
 	switch im := m.Pam.Layer().(type) {
 	case *nasdaq.IttoMessageAddOrder:
 		addOperation(packet.OrderIdUnknown, &OperationAdd{order: orderFromItto(m.subscribedOptionId(), im.OrderSide)})
@@ -117,37 +129,10 @@ func (m *SimMessage) populateOps() {
 		}
 		addOperationReplace(im.OrderId, ord)
 	case *miax.TomMessageTom:
-		op := OperationTop{
-			optionId: m.subscribedOptionId(),
-			side:     im.Side,
-			price:    im.Price,
-			sizes: [SizeKinds]int{
-				SizeKindDefault:  im.Size,
-				SizeKindCustomer: im.PriorityCustomerSize,
-			},
-		}
-		addOperation(packet.OrderIdUnknown, &op)
+		addTom(im.TomSide)
 	case *miax.TomMessageQuote:
-		opBid := OperationTop{
-			optionId: m.subscribedOptionId(),
-			side:     packet.MarketSideBid,
-			price:    im.BidPrice,
-			sizes: [SizeKinds]int{
-				SizeKindDefault:  im.BidSize,
-				SizeKindCustomer: im.BidPriorityCustomerSize,
-			},
-		}
-		addOperation(packet.OrderIdUnknown, &opBid)
-		opOffer := OperationTop{
-			optionId: m.subscribedOptionId(),
-			side:     packet.MarketSideAsk,
-			price:    im.OfferPrice,
-			sizes: [SizeKinds]int{
-				SizeKindDefault:  im.OfferSize,
-				SizeKindCustomer: im.OfferPriorityCustomerSize,
-			},
-		}
-		addOperation(packet.OrderIdUnknown, &opOffer)
+		addTom(im.Bid)
+		addTom(im.Ask)
 		m.sides = 2
 	case
 		*nasdaq.IttoMessageNoii,

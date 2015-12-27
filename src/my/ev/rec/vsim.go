@@ -123,8 +123,8 @@ func (s *SimLogger) MessageArrived(idm *sim.SimMessage) {
 	case *miax.TomMessageTom:
 		outMiax("TOM", "%c %08x %08x %08x %08x", sideChar(im.Side), im.ProductId.ToUint32(), packet.PriceTo4Dec(im.Price), im.Size, im.PriorityCustomerSize)
 	case *miax.TomMessageQuote:
-		outMiax("QBID", "%08x %08x %08x %08x", im.ProductId.ToUint32(), packet.PriceTo4Dec(im.BidPrice), im.BidSize, im.BidPriorityCustomerSize)
-		outMiax("QASK", "%08x %08x %08x %08x", im.ProductId.ToUint32(), packet.PriceTo4Dec(im.OfferPrice), im.OfferSize, im.OfferPriorityCustomerSize)
+		outMiax("QBID", "%08x %08x %08x %08x", im.ProductId.ToUint32(), packet.PriceTo4Dec(im.Bid.Price), im.Bid.Size, im.Bid.PriorityCustomerSize)
+		outMiax("QASK", "%08x %08x %08x %08x", im.ProductId.ToUint32(), packet.PriceTo4Dec(im.Ask.Price), im.Ask.Size, im.Ask.PriorityCustomerSize)
 	}
 	s.efhLogger.MessageArrived(idm)
 }

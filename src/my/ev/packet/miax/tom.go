@@ -22,6 +22,30 @@ func decodeTom(data []byte, p gopacket.PacketBuilder) error {
 
 /************************************************************************/
 
+type TomSide struct {
+	Price                packet.Price
+	Size                 int
+	PriorityCustomerSize int
+	Condition            byte
+	Side                 packet.MarketSide // inferred from message type
+}
+
+func (s *TomSide) parseTomSideCompact(data []byte) {
+	s.Price = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[0:2])))
+	s.Size = int(binary.LittleEndian.Uint16(data[2:4]))
+	s.PriorityCustomerSize = int(binary.LittleEndian.Uint16(data[4:6]))
+	s.Condition = data[6]
+}
+
+func (s *TomSide) parseTomSideWide(data []byte) {
+	s.Price = packet.PriceFrom4Dec(int(binary.LittleEndian.Uint32(data[0:4])))
+	s.Size = int(binary.LittleEndian.Uint32(data[4:8]))
+	s.PriorityCustomerSize = int(binary.LittleEndian.Uint32(data[8:12]))
+	s.Condition = data[12]
+}
+
+/************************************************************************/
+
 type TomMessageType uint8
 
 func (a TomMessageType) Decode(data []byte, p gopacket.PacketBuilder) error {
@@ -314,12 +338,8 @@ func (m *TomMessageSystemState) DecodeFromBytes(data []byte, df gopacket.DecodeF
 /************************************************************************/
 type TomMessageTom struct {
 	TomMessageCommon
-	ProductId            packet.OptionId
-	Price                packet.Price
-	Size                 int
-	PriorityCustomerSize int
-	Condition            byte
-	Side                 packet.MarketSide // inferred from message type
+	ProductId packet.OptionId
+	TomSide
 }
 
 func (m *TomMessageTom) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
@@ -329,15 +349,9 @@ func (m *TomMessageTom) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 	}
 	//log.Printf("m.Type %c %d %v\n", m.Type, len(data), data)
 	if m.Type == TomMessageTypeTomBidCompact || m.Type == TomMessageTypeTomOfferCompact {
-		m.Price = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[9:11])))
-		m.Size = int(binary.LittleEndian.Uint16(data[11:13]))
-		m.PriorityCustomerSize = int(binary.LittleEndian.Uint16(data[13:15]))
-		m.Condition = data[15]
+		m.TomSide.parseTomSideCompact(data[9:16])
 	} else if m.Type == TomMessageTypeTomBidWide || m.Type == TomMessageTypeTomOfferWide {
-		m.Price = packet.PriceFrom4Dec(int(binary.LittleEndian.Uint32(data[9:13])))
-		m.Size = int(binary.LittleEndian.Uint32(data[13:17]))
-		m.PriorityCustomerSize = int(binary.LittleEndian.Uint32(data[17:21]))
-		m.Condition = data[21]
+		m.TomSide.parseTomSideWide(data[9:22])
 	} else {
 		panic("wrong message type")
 	}
@@ -355,15 +369,9 @@ func (m *TomMessageTom) OptionId() packet.OptionId {
 /************************************************************************/
 type TomMessageQuote struct {
 	TomMessageCommon
-	ProductId                 packet.OptionId
-	BidPrice                  packet.Price
-	BidSize                   int
-	BidPriorityCustomerSize   int
-	BidCondition              byte
-	OfferPrice                packet.Price
-	OfferSize                 int
-	OfferPriorityCustomerSize int
-	OfferCondition            byte
+	ProductId packet.OptionId
+	Bid       TomSide
+	Ask       TomSide
 }
 
 func (m *TomMessageQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
@@ -372,26 +380,16 @@ func (m *TomMessageQuote) DecodeFromBytes(data []byte, df gopacket.DecodeFeedbac
 		ProductId:        parseProductId(data[5:9]),
 	}
 	if m.Type == TomMessageTypeQuoteCompact {
-		m.BidPrice = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[9:11])))
-		m.BidSize = int(binary.LittleEndian.Uint16(data[11:13]))
-		m.BidPriorityCustomerSize = int(binary.LittleEndian.Uint16(data[13:15]))
-		m.BidCondition = data[15]
-		m.OfferPrice = packet.PriceFrom2Dec(int(binary.LittleEndian.Uint16(data[16:18])))
-		m.OfferSize = int(binary.LittleEndian.Uint16(data[18:20]))
-		m.OfferPriorityCustomerSize = int(binary.LittleEndian.Uint16(data[20:22]))
-		m.OfferCondition = data[22]
+		m.Bid.parseTomSideCompact(data[9:16])
+		m.Ask.parseTomSideCompact(data[16:23])
 	} else if m.Type == TomMessageTypeQuoteWide {
-		m.BidPrice = packet.PriceFrom4Dec(int(binary.LittleEndian.Uint32(data[9:13])))
-		m.BidSize = int(binary.LittleEndian.Uint32(data[13:17]))
-		m.BidPriorityCustomerSize = int(binary.LittleEndian.Uint32(data[17:21]))
-		m.BidCondition = data[21]
-		m.OfferPrice = packet.PriceFrom4Dec(int(binary.LittleEndian.Uint32(data[22:26])))
-		m.OfferSize = int(binary.LittleEndian.Uint32(data[26:30]))
-		m.OfferPriorityCustomerSize = int(binary.LittleEndian.Uint32(data[30:34]))
-		m.OfferCondition = data[34]
+		m.Bid.parseTomSideWide(data[9:22])
+		m.Ask.parseTomSideWide(data[22:35])
 	} else {
 		panic("wrong message type")
 	}
+	m.Bid.Side = packet.MarketSideBid
+	m.Ask.Side = packet.MarketSideAsk
 	return nil
 }
 func (m *TomMessageQuote) OptionId() packet.OptionId {
