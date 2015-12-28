@@ -330,7 +330,7 @@ func (m *TomMessageSystemState) DecodeFromBytes(data []byte, df gopacket.DecodeF
 		TomMessageCommon: decodeTomMessage(data),
 		Version:          string(data[5:13]),
 		Session:          binary.LittleEndian.Uint32(data[13:17]),
-		Status:           data[18],
+		Status:           data[17],
 	}
 	return nil
 }
