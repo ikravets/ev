@@ -136,13 +136,13 @@ func (c *Config) Report() string {
 	for _, block := range c.ast {
 		fmt.Fprintf(&buf, "  %s\n", nd(block.Name, block.Desc))
 		for _, reg := range block.Regs {
-			fmt.Fprintf(&buf, "%c%12c%0#16x %0#16x %s\n", pref[reg.isBad], ' ', reg.value, reg.Addr, nd(reg.Name, reg.Desc))
+			fmt.Fprintf(&buf, "%c %-20d %0#16[2]x %0#16x %s\n", pref[reg.isBad], reg.value, reg.Addr, nd(reg.Name, reg.Desc))
 			for _, f := range reg.Fields {
 				mid := fmt.Sprintf("-%-8d", f.Bits[1])
 				if f.Width == 1 {
 					mid = fmt.Sprintf("%9c", ' ')
 				}
-				fmt.Fprintf(&buf, "%c %-10d %0#-18.*[2]x %9[4]d%s %s\n", pref[f.isBad], f.value, int(f.Width+3)/4, f.Bits[0], mid, nd(f.Name, f.Desc))
+				fmt.Fprintf(&buf, "%c %-20d %0#-18.*[2]x %9[4]d%s %s\n", pref[f.isBad], f.value, int(f.Width+3)/4, f.Bits[0], mid, nd(f.Name, f.Desc))
 			}
 		}
 	}
