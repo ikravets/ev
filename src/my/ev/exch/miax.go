@@ -126,15 +126,20 @@ func (s *SesMServerConn) run() {
 	defer errs.Catch(func(ce errs.CheckerError) {
 		log.Printf("caught %s\n", ce)
 	})
-	defer func() {
+	sendLastMessages := func(endSession bool) {
+		if endSession {
+			errs.CheckE(s.mconn.WriteMessageSimple(&miax.SesMEndOfSession{}))
+		}
 		errs.CheckE(s.mconn.WriteMessageSimple(&miax.SesMGoodBye{Reason: miax.GoodByeReasonTerminating}))
+	}
+	defer func() {
 		s.conn.Close()
 		log.Println("sesm finished")
 	}()
-	errs.CheckE(s.login())
-	defer func() {
-		errs.CheckE(s.mconn.WriteMessageSimple(&miax.SesMEndOfSession{}))
-	}()
+	if err := s.login(); err != nil {
+		sendLastMessages(false)
+		errs.CheckE(err)
+	}
 	cancelSendHeartbeat := make(chan struct{})
 	defer func() {
 		// close channel only if not already closed
@@ -152,6 +157,7 @@ func (s *SesMServerConn) run() {
 	for {
 		m, err := s.mconn.ReadMessage()
 		if err == io.EOF {
+			sendLastMessages(true)
 			return
 		}
 		errs.CheckE(err)
@@ -162,6 +168,7 @@ func (s *SesMServerConn) run() {
 			rt, ok := m.(*miax.SesMRetransmRequest)
 			errs.Check(ok)
 			errs.CheckE(s.sendAll(rt.StartSeqNumber, rt.EndSeqNumber))
+			sendLastMessages(true)
 			return
 		case miax.TypeSesMUnseq:
 			rf, ok := m.(*miax.SesMRefreshRequest)
@@ -181,6 +188,7 @@ func (s *SesMServerConn) run() {
 			errs.CheckE(s.mconn.WriteMessageSimple(&eor))
 		case miax.TypeSesMClientHeartbeat:
 		default:
+			sendLastMessages(true)
 			return
 		}
 	}
