@@ -170,6 +170,13 @@ func (m *SimMessage) subscribedOptionId() packet.OptionId {
 	}
 	return packet.OptionIdUnknown
 }
+func (m *SimMessage) scalePrice(price packet.Price) packet.Price {
+	if m.sim.Options() == nil {
+		return price
+	}
+	em := m.Pam.Layer().(packet.ExchangeMessage)
+	return price.Scale(m.sim.Options().PriceScale(em.OptionId()))
+}
 
 func orderFromItto(oid packet.OptionId, os nasdaq.OrderSide) order {
 	return order{
