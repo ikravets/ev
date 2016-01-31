@@ -11,6 +11,7 @@ import (
 
 const (
 	OA_UNKNOWN = iota
+	OA_OPTIONS
 	OA_ORDERS
 	OA_BOOKS
 )
@@ -207,4 +208,34 @@ func (o *OperationTop) GetNewSize(sk SizeKind) int {
 }
 func (o *OperationTop) GetPrice() int {
 	return packet.PriceTo4Dec(o.price)
+}
+
+type OperationScale struct {
+	Operation
+	optionId   packet.OptionId
+	priceScale int
+}
+
+func (o *OperationScale) getOperation() *Operation {
+	return &o.Operation
+}
+func (op *OperationScale) CanAffect(what int) bool {
+	return what == OA_OPTIONS && op.GetOptionId().Valid()
+}
+func (o *OperationScale) GetOptionId() packet.OptionId {
+	return o.optionId
+}
+func (o *OperationScale) GetSide() (side packet.MarketSide) {
+	return packet.MarketSideUnknown
+}
+func (o *OperationScale) GetDefaultSizeDelta() int {
+	errs.Check(false)
+	return 0
+}
+func (o *OperationScale) GetNewSize(sk SizeKind) int {
+	errs.Check(false)
+	return 0
+}
+func (o *OperationScale) GetPrice() int {
+	return o.priceScale
 }
