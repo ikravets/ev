@@ -103,6 +103,9 @@ func (s *EfhSim) HandleMessage(message packet.ApplicationMessage) {
 	ops := m.MessageOperations()
 	for _, op := range ops {
 		//log.Println(op)
+		if op.CanAffect(sim.OA_OPTIONS) {
+			s.simu.Options().ApplyOperation(op)
+		}
 		if op.CanAffect(sim.OA_ORDERS) {
 			s.simu.OrderDb().ApplyOperation(op)
 			s.observer.OperationAppliedToOrders(op)
