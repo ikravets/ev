@@ -1,4 +1,4 @@
-// Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
+// Copyright (c) Ilia Kravets, 2014-2016. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
 package sim
@@ -6,6 +6,8 @@ package sim
 import (
 	"errors"
 	"log"
+
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )
@@ -64,14 +66,7 @@ func (d *orderDb) findOrder(session *Session, orderId packet.OrderId) (order ord
 }
 
 func (d *orderDb) ApplyOperation(operation SimOperation) {
-	operation.getOperation().populate()
-	oid := operation.GetOptionId()
-	if oid.Invalid() {
-		return
-	}
 	switch op := operation.(type) {
-	case *OperationTop:
-		// nothing to do
 	case *OperationAdd:
 		// intentionally allow adding zero price/size orders
 		o := op.order
@@ -89,7 +84,7 @@ func (d *orderDb) ApplyOperation(operation SimOperation) {
 		if l := len(d.orders); l > d.stat.maxOrders {
 			d.stat.maxOrders = l
 		}
-	default:
+	case *OperationRemove, *OperationUpdate:
 		o := *operation.getOperation().origOrder
 		oidx := operation.getOperation().origOrderIndex()
 		o.Size += op.GetDefaultSizeDelta()
@@ -102,6 +97,8 @@ func (d *orderDb) ApplyOperation(operation SimOperation) {
 		case o.Size < 0:
 			log.Fatalf("negative size after operation %#v origOrder=%#v\n", operation, o)
 		}
+	default:
+		errs.Check(false)
 	}
 }
 
