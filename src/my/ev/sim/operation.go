@@ -1,4 +1,4 @@
-// Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
+// Copyright (c) Ilia Kravets, 2014-2016. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
 package sim
@@ -9,6 +9,12 @@ import (
 	"my/ev/packet"
 )
 
+const (
+	OA_UNKNOWN = iota
+	OA_ORDERS
+	OA_BOOKS
+)
+
 type SimOperation interface {
 	GetMessage() *SimMessage
 	GetOptionId() packet.OptionId
@@ -17,6 +23,7 @@ type SimOperation interface {
 	GetDefaultSizeDelta() int
 	GetNewSize(SizeKind) int
 	GetPrice() int
+	CanAffect(what int) bool
 	getOperation() *Operation
 }
 
@@ -71,6 +78,9 @@ type OperationAdd struct {
 	order
 }
 
+func (op *OperationAdd) CanAffect(what int) bool {
+	return (what == OA_BOOKS || what == OA_ORDERS) && op.GetOptionId().Valid()
+}
 func (o *OperationAdd) getOperation() *Operation {
 	return &o.Operation
 }
@@ -112,6 +122,9 @@ type OperationRemove struct {
 func (o *OperationRemove) getOperation() *Operation {
 	return &o.Operation
 }
+func (op *OperationRemove) CanAffect(what int) bool {
+	return (what == OA_BOOKS || what == OA_ORDERS) && op.GetOptionId().Valid()
+}
 func (o *OperationRemove) GetOptionId() packet.OptionId {
 	return o.Operation.getOptionId()
 }
@@ -140,6 +153,9 @@ type OperationUpdate struct {
 
 func (o *OperationUpdate) getOperation() *Operation {
 	return &o.Operation
+}
+func (op *OperationUpdate) CanAffect(what int) bool {
+	return (what == OA_BOOKS || what == OA_ORDERS) && op.GetOptionId().Valid()
 }
 func (o *OperationUpdate) GetOptionId() packet.OptionId {
 	return o.Operation.getOptionId()
@@ -172,6 +188,9 @@ type OperationTop struct {
 
 func (o *OperationTop) getOperation() *Operation {
 	return &o.Operation
+}
+func (op *OperationTop) CanAffect(what int) bool {
+	return what == OA_BOOKS && op.GetOptionId().Valid()
 }
 func (o *OperationTop) GetOptionId() packet.OptionId {
 	return o.optionId
