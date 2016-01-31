@@ -1,4 +1,4 @@
-// Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
+// Copyright (c) Ilia Kravets, 2014-2016. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
 package sim
@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/cznic/b"
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 )
@@ -44,9 +45,7 @@ type book struct {
 
 func (b *book) ApplyOperation(operation SimOperation) {
 	oid := operation.GetOptionId()
-	if oid.Invalid() {
-		return
-	}
+	errs.Check(oid.Valid())
 	os, ok := b.options[oid]
 	if !ok {
 		os = NewOptionState(b.newOptionSideState)
