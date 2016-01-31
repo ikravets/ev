@@ -12,6 +12,7 @@ import (
 type Sim interface {
 	Session(flows []gopacket.Flow) Session
 	Subscr() *Subscr
+	Options() Options
 	OrderDb() OrderDb
 	Book() Book
 	Sessions() []Session
@@ -21,6 +22,7 @@ type Sim interface {
 
 type simu struct {
 	subscr    *Subscr
+	options   Options
 	orderDb   OrderDb
 	book      Book
 	sessions  []Session
@@ -29,7 +31,8 @@ type simu struct {
 
 func NewSim(shallow bool) Sim {
 	sim := &simu{
-		subscr: NewSubscr(),
+		subscr:  NewSubscr(),
+		options: NewOptions(),
 	}
 	if shallow {
 		sim.book = NewBookTop()
@@ -41,6 +44,9 @@ func NewSim(shallow bool) Sim {
 }
 func (sim *simu) Subscr() *Subscr {
 	return sim.subscr
+}
+func (sim *simu) Options() Options {
+	return sim.options
 }
 func (sim *simu) Book() Book {
 	return sim.book
