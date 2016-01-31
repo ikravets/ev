@@ -1,4 +1,4 @@
-// Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
+// Copyright (c) Ilia Kravets, 2014-2016. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
 package packet
@@ -6,6 +6,8 @@ package packet
 import (
 	"errors"
 	"fmt"
+
+	"github.com/ikravets/errs"
 )
 
 type MarketSide byte
@@ -117,6 +119,23 @@ func PriceTo2Dec(price Price) int {
 }
 func PriceTo4Dec(price Price) int {
 	return int(price)
+}
+func (p Price) Scale(decimals int) Price {
+	mult := []Price{
+		1,
+		10,
+		100,
+		1000,
+		10000,
+		100000,
+		1000000,
+		10000000,
+		100000000,
+		1000000000,
+		10000000000,
+	}
+	errs.Check(decimals < len(mult))
+	return p * mult[decimals] / PriceScale4Dec
 }
 
 type SecondsMessage interface {
