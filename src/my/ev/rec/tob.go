@@ -1,10 +1,12 @@
-// Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
+// Copyright (c) Ilia Kravets, 2014-2016. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
 package rec
 
 import (
 	"log"
+
+	"github.com/ikravets/errs"
 
 	"my/ev/packet"
 	"my/ev/sim"
@@ -54,9 +56,7 @@ func (l *TobLogger) MessageArrived(idm *sim.SimMessage) {
 func (*TobLogger) OperationAppliedToOrders(sim.SimOperation) {}
 
 func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) {
-	if l.consumeOps == 0 {
-		log.Fatal("book operation is not expected")
-	}
+	errs.Check(l.consumeOps != 0)
 	if l.hasOldTob {
 		return
 	}
@@ -78,9 +78,7 @@ func (l *TobLogger) BeforeBookUpdate(book sim.Book, operation sim.SimOperation) 
 }
 
 func (l *TobLogger) AfterBookUpdate(book sim.Book, operation sim.SimOperation) bool {
-	if l.consumeOps == 0 {
-		log.Fatal("book operation is not expected")
-	}
+	errs.Check(l.consumeOps != 0)
 	l.curOps++
 	if l.curOps < l.consumeOps {
 		return false
