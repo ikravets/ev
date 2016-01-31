@@ -1,4 +1,4 @@
-// Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
+// Copyright (c) Ilia Kravets, 2014-2016. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
 package rec
@@ -144,9 +144,8 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 
 	var or ordrespLogInfo
 	var ou orduLogInfo
-	if _, ok := operation.(*sim.OperationTop); ok {
-		return
-	} else if op, ok := operation.(*sim.OperationAdd); ok {
+	switch op := operation.(type) {
+	case *sim.OperationAdd:
 		var oid packet.OptionId
 		if op.Independent() {
 			oid = op.GetOptionId()
@@ -166,7 +165,7 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 		if op.GetSide() == packet.MarketSideAsk {
 			ou.side = 1
 		}
-	} else {
+	case *sim.OperationRemove, *sim.OperationUpdate:
 		if operation.GetOptionId().Invalid() {
 			or = ordrespLogInfo{notFound: 1}
 		} else {
@@ -190,6 +189,8 @@ func (s *SimLogger) OperationAppliedToOrders(operation sim.SimOperation) {
 		}
 		or.orderId = operation.GetOrigOrderId()
 		ou.orderId = or.orderId
+	default:
+		errs.Check(false)
 	}
 	s.printfln("ORDL %d %016x%s", or.addOp, or.orderId.ToUint64(), or.ordlSuffix)
 	s.printfln("ORDRESP %d %d %d %08x %08x %012x %016x", or.notFound, or.addOp, or.side, or.size, or.price, or.optionId.ToUint64(), or.orderId.ToUint64())
