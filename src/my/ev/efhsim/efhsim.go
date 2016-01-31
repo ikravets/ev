@@ -1,4 +1,4 @@
-// Copyright (c) Ilia Kravets, 2015. All rights reserved. PROVIDED "AS IS"
+// Copyright (c) Ilia Kravets, 2014-2016. All rights reserved. PROVIDED "AS IS"
 // WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. See LICENSE file for details.
 
 package efhsim
@@ -103,10 +103,14 @@ func (s *EfhSim) HandleMessage(message packet.ApplicationMessage) {
 	ops := m.MessageOperations()
 	for _, op := range ops {
 		//log.Println(op)
-		s.simu.OrderDb().ApplyOperation(op)
-		s.observer.OperationAppliedToOrders(op)
-		s.observer.BeforeBookUpdate(s.simu.Book(), op)
-		s.simu.Book().ApplyOperation(op)
-		s.observer.AfterBookUpdate(s.simu.Book(), op)
+		if op.CanAffect(sim.OA_ORDERS) {
+			s.simu.OrderDb().ApplyOperation(op)
+			s.observer.OperationAppliedToOrders(op)
+		}
+		if op.CanAffect(sim.OA_BOOKS) {
+			s.observer.BeforeBookUpdate(s.simu.Book(), op)
+			s.simu.Book().ApplyOperation(op)
+			s.observer.AfterBookUpdate(s.simu.Book(), op)
+		}
 	}
 }
