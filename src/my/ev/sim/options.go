@@ -23,7 +23,7 @@ type option struct {
 func NewOptions() Options {
 	return &options{
 		m: make(map[packet.OptionId]option),
-		d: option{priceScale: 1},
+		d: option{priceScale: packet.PriceDefaultDec},
 	}
 }
 func (o *options) PriceScale(oid packet.OptionId) int {
