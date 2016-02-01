@@ -69,9 +69,11 @@ func NewEfhLogger(c EfhLoggerConfig) *EfhLogger {
 func (l *EfhLogger) MessageArrived(idm *sim.SimMessage) {
 	l.stream.MessageArrived(idm)
 	l.tobLogger.MessageArrived(idm)
+	if oid, price, size, err := idm.TradeInfo(); err == nil {
+		l.genUpdateTrades(oid, price, size)
+		return
+	}
 	switch m := l.stream.getExchangeMessage().(type) {
-	case packet.TradeMessage:
-		l.genUpdateTrades(m)
 	case *nasdaq.IttoMessageOptionDirectory:
 		l.genUpdateDefinitionsNom(m)
 	case *bats.PitchMessageSymbolMapping:
@@ -147,8 +149,7 @@ func (l *EfhLogger) genUpdateQuotes(bid, ask tob) {
 	}
 	errs.CheckE(l.printer.PrintMessage(m))
 }
-func (l *EfhLogger) genUpdateTrades(msg packet.TradeMessage) {
-	oid, price, size := msg.TradeInfo()
+func (l *EfhLogger) genUpdateTrades(oid packet.OptionId, price packet.Price, size int) {
 	m := efhm_trade{
 		efhm_header: l.genUpdateHeaderForOption(EFHM_TRADE, oid),
 		Price:       uint32(packet.PriceTo4Dec(price)),
