@@ -103,24 +103,38 @@ func (oid OrderId) ToUint64() uint64 {
 
 type Price int
 
-const (
-	PriceScale4Dec Price = 10000
-	PriceScale2Dec Price = 100
-)
+const PriceDefaultDec = 4
 
 func PriceFrom2Dec(price2d int) Price {
-	return Price(price2d) * PriceScale4Dec / PriceScale2Dec
+	return Price(price2d).Scale(2)
 }
 func PriceFrom4Dec(price4d int) Price {
-	return Price(price4d)
+	return Price(price4d).Scale(4)
 }
 func PriceTo2Dec(price Price) int {
-	return int(price * PriceScale2Dec / PriceScale4Dec)
+	return price.ToInt(2)
 }
 func PriceTo4Dec(price Price) int {
-	return int(price)
+	return price.ToInt(4)
 }
-func (p Price) Scale(decimals int) Price {
+func (p Price) Scale(decimals_stored int) Price {
+	mult := []Price{
+		1,
+		10,
+		100,
+		1000,
+		10000,
+		100000,
+		1000000,
+		10000000,
+		100000000,
+		1000000000,
+		10000000000,
+	}
+	errs.Check(decimals_stored < len(mult))
+	return p * mult[PriceDefaultDec] / mult[decimals_stored]
+}
+func (p Price) ToInt(decimals int) int {
 	mult := []Price{
 		1,
 		10,
@@ -135,7 +149,7 @@ func (p Price) Scale(decimals int) Price {
 		10000000000,
 	}
 	errs.Check(decimals < len(mult))
-	return p * mult[decimals] / PriceScale4Dec
+	return int(p * mult[decimals] / mult[PriceDefaultDec])
 }
 
 type SecondsMessage interface {
