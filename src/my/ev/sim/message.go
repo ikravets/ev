@@ -4,6 +4,7 @@
 package sim
 
 import (
+	"errors"
 	"log"
 
 	"my/ev/packet"
@@ -32,6 +33,17 @@ func NewSimMessage(sim Sim, pam packet.ApplicationMessage) *SimMessage {
 	return m
 }
 
+var notTrade = errors.New("not a trade")
+
+func (m *SimMessage) TradeInfo() (oid packet.OptionId, price packet.Price, size int, err error) {
+	if tm, ok := m.Pam.Layer().(packet.TradeMessage); ok {
+		oid, price, size = tm.TradeInfo()
+		price = m.scalePrice(price)
+	} else {
+		err = notTrade
+	}
+	return
+}
 func (m *SimMessage) BookUpdates() int {
 	return m.opsPerBook
 }
