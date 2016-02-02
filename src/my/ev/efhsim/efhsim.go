@@ -110,7 +110,7 @@ func (s *EfhSim) HandleMessage(message packet.ApplicationMessage) {
 			s.simu.OrderDb().ApplyOperation(op)
 			s.observer.OperationAppliedToOrders(op)
 		}
-		if op.CanAffect(sim.OA_BOOKS) {
+		if op.CanAffect(sim.OA_BOOKS) || m.BookUpdates() > 1 {
 			s.observer.BeforeBookUpdate(s.simu.Book(), op)
 			s.simu.Book().ApplyOperation(op)
 			s.observer.AfterBookUpdate(s.simu.Book(), op)
