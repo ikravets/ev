@@ -9,7 +9,6 @@ import (
 	"net"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/ikravets/errs"
 
@@ -51,10 +50,8 @@ func (s *EfhSim) RegisterChannels(cc channels.Config) (err error) {
 	for _, c := range cc.Addrs() {
 		a, err := net.ResolveUDPAddr("udp", c)
 		errs.CheckE(err)
-		ipFlow := gopacket.NewFlow(layers.EndpointIPv4, nil, a.IP.To4())
-		portBytes := []byte{byte(a.Port >> 8), byte(a.Port)}
-		udpFlow := gopacket.NewFlow(layers.EndpointUDPPort, nil, portBytes)
-		s.simu.Session([]gopacket.Flow{ipFlow, udpFlow})
+		flows := []gopacket.Flow{channels.IPFlow(a), channels.UDPFlow(a)}
+		s.simu.Session(flows)
 	}
 	return
 }
