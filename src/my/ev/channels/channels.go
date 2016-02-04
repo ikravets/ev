@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/ikravets/errs"
 )
 
@@ -88,6 +89,15 @@ func (c *config) Addrs() []string {
 func (c *config) addAddr(addr string) {
 	c.addrs = append(c.addrs, addr)
 	return
+}
+
+func IPFlow(addr *net.UDPAddr) gopacket.Flow {
+	return gopacket.NewFlow(layers.EndpointIPv4, nil, addr.IP.To4())
+}
+
+func UDPFlow(addr *net.UDPAddr) gopacket.Flow {
+	portBytes := []byte{byte(addr.Port >> 8), byte(addr.Port)}
+	return gopacket.NewFlow(layers.EndpointUDPPort, nil, portBytes)
 }
 
 var EndpointSubchannelMetadata = gopacket.EndpointTypeMetadata{"subchannel", func(b []byte) string {
