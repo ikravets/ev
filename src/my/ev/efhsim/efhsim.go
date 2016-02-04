@@ -6,7 +6,6 @@ package efhsim
 import (
 	"io"
 	"log"
-	"net"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
@@ -48,9 +47,12 @@ func (s *EfhSim) RegisterChannels(cc channels.Config) (err error) {
 	defer errs.PassE(&err)
 	s.simu.SessionsIgnoreSrc(true)
 	for _, c := range cc.Addrs() {
-		a, err := net.ResolveUDPAddr("udp", c)
+		a, subch, err := channels.ParseChannel(c)
 		errs.CheckE(err)
 		flows := []gopacket.Flow{channels.IPFlow(a), channels.UDPFlow(a)}
+		if subch > 0 {
+			flows = append(flows, channels.SubchannelFlow(subch))
+		}
 		s.simu.Session(flows)
 	}
 	return
