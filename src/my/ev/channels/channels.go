@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/ikravets/errs"
@@ -39,8 +40,21 @@ func (c *config) LoadFromReader(rd io.Reader) (err error) {
 	return
 }
 
-func (c *config) LoadFromStr(nameOrAddr string) (err error) {
+func ParseChannel(channel string) (ch *net.UDPAddr, subch int, err error) {
 	defer errs.PassE(&err)
+	subch = -1
+	if fields := strings.Split(channel, ":"); len(fields) == 3 {
+		ch, err = net.ResolveUDPAddr("udp", strings.Join(fields[:2], ":"))
+		errs.CheckE(err)
+		subch, err = strconv.Atoi(fields[2])
+	} else {
+		ch, err = net.ResolveUDPAddr("udp", channel)
+		errs.CheckE(err)
+	}
+	return
+}
+
+func (c *config) LoadFromStr(nameOrAddr string) (err error) {
 	switch nameOrAddr {
 	case "nasdaq":
 		for i := 0; i < 4; i++ {
@@ -59,8 +73,7 @@ func (c *config) LoadFromStr(nameOrAddr string) (err error) {
 			c.addAddr(fmt.Sprintf("224.0.105.%d:%d", 1+i, 51001+i))
 		}
 	default:
-		_, err = net.ResolveUDPAddr("udp", nameOrAddr)
-		errs.CheckE(err)
+		_, _, err = ParseChannel(nameOrAddr)
 		c.addAddr(nameOrAddr)
 	}
 	return
