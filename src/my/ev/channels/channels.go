@@ -4,6 +4,7 @@
 package channels
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/gopacket"
 	"github.com/ikravets/errs"
 )
 
@@ -86,4 +88,15 @@ func (c *config) Addrs() []string {
 func (c *config) addAddr(addr string) {
 	c.addrs = append(c.addrs, addr)
 	return
+}
+
+var EndpointSubchannelMetadata = gopacket.EndpointTypeMetadata{"subchannel", func(b []byte) string {
+	return strconv.Itoa(int(binary.LittleEndian.Uint32(b)))
+}}
+var EndpointSubchannel = gopacket.RegisterEndpointType(13000, EndpointSubchannelMetadata)
+
+func SubchannelFlow(s int) gopacket.Flow {
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, uint32(s))
+	return gopacket.NewFlow(EndpointSubchannel, nil, b)
 }
